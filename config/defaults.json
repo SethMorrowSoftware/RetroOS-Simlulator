@@ -103,7 +103,7 @@
   "defaults": {
     "sound": false,
     "crtEffect": true,
-    "petEnabled": false,
+    "petEnabled": true,
     "petType": "neko",
     "screensaverDelay": 300000,
     "desktopBg": "#008080",
@@ -154,7 +154,7 @@
     "soundsystem": { "enabled": true, "config": { "masterVolume": 0.5, "enableMp3": true } },
     "achievements": { "enabled": true, "config": { "showToasts": true, "toastDuration": 3000 } },
     "clippy": { "enabled": true, "config": { "appearanceChance": 0.15, "autoHideDelay": 8000 } },
-    "desktoppet": { "enabled": false, "config": { "petType": "neko" } },
+    "desktoppet": { "enabled": true, "config": { "petType": "neko" } },
     "screensaver": { "enabled": true, "config": { "idleTimeout": 300000, "mode": "toasters" } },
     "eastereggs": { "enabled": true, "config": { "enableKonami": true, "enableCheats": true } },
     "dvd-bouncer": { "enabled": true, "config": { "autoStart": false, "speed": 2, "logoSize": 80 } }

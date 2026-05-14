@@ -67,6 +67,18 @@ export const featuresEvents = {
         }
     },
 
+    'easteregg:triggered': {
+        namespace: 'easteregg',
+        action: 'triggered',
+        description: 'Easter egg activated (Konami, cheat code, etc.) — other features can react',
+        payload: {
+            code: 'string?'
+        },
+        example: {
+            code: 'konami'
+        }
+    },
+
     // ==========================================
     // ACHIEVEMENT EVENTS
     // ==========================================

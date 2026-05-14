@@ -53,6 +53,17 @@ const DEFAULT_ACHIEVEMENTS = [
     { id: 'clippy_hater', name: 'Clippy Hater', desc: 'Dismissed 5x', icon: '😠' },
     { id: 'clippy_terminator', name: 'Clippy Terminator', desc: 'Dismissed 10x', icon: '🔫' },
     { id: 'matrix_mode', name: 'Neo', desc: 'Entered Matrix', icon: '🌧️' },
+    { id: 'secret_admin', name: 'Rosebud Whisperer', desc: 'Found the admin cheat', icon: '🌹' },
+    { id: 'bsod_master', name: 'BSOD Master', desc: 'Crashed the system on purpose', icon: '💀' },
+    // Pet-themed achievements (see DesktopPet.js for unlock conditions)
+    { id: 'fortune_teller', name: 'Fortune Teller', desc: 'Pet read your fortune', icon: '🔮' },
+    { id: 'pet_first_friend', name: 'Hello, Little One', desc: 'First time petting your pet', icon: '🤝' },
+    { id: 'pet_lover', name: 'Pet Lover', desc: 'Petted your friend 10 times', icon: '🐾' },
+    { id: 'pet_best_friend', name: 'Best Friend', desc: '50 pets — true companionship', icon: '💖' },
+    { id: 'pet_first_meal', name: 'Lunch Time', desc: 'Fed your pet for the first time', icon: '🍪' },
+    { id: 'pet_foodie', name: 'Foodie', desc: 'Fed your pet 10 times', icon: '🍱' },
+    { id: 'pet_whisperer', name: 'Pet Whisperer', desc: 'Tried every pet type', icon: '🧙' },
+    { id: 'pet_codemate', name: 'Codemate', desc: 'Triggered a code with your pet around', icon: '🕹️' },
 ];
 
 /**
