@@ -26,10 +26,13 @@ class NotificationsFeature extends FeatureBase {
 
     async initialize() {
         this._createContainer();
-        this._eventUnsubscribers = [];
+
+        // `this.subscribe(...)` (FeatureBase) routes through SubscriptionManager
+        // under this feature's owner ID, so cleanup() auto-releases all of
+        // these on disable. The old manual `_eventUnsubscribers` array is gone.
 
         // DM received
-        this._eventUnsubscribers.push(EventBus.on('mp:dm:received', (data) => {
+        this.subscribe('mp:dm:received', (data) => {
             this.show({
                 title: `Message from ${data.senderName}`,
                 body: data.text?.substring(0, 80) || 'New message',
@@ -39,10 +42,10 @@ class NotificationsFeature extends FeatureBase {
                     EventBus.emit('command:app:launch', { appId: 'instantmessenger', params: { openChat: data.senderId } });
                 }
             });
-        }));
+        });
 
         // Game invite
-        this._eventUnsubscribers.push(EventBus.on('mp:game:invite', (data) => {
+        this.subscribe('mp:game:invite', (data) => {
             this.show({
                 title: 'Game Invite',
                 body: `${data.fromName} invites you to ${data.gameName}`,
@@ -54,30 +57,30 @@ class NotificationsFeature extends FeatureBase {
                     { label: 'Decline', onClick: () => {} }
                 ]
             });
-        }));
+        });
 
         // Friend request
-        this._eventUnsubscribers.push(EventBus.on('mp:friend:request', (data) => {
+        this.subscribe('mp:friend:request', (data) => {
             this.show({
                 title: 'Friend Request',
                 body: `${data.fromName} wants to be your friend`,
                 icon: '\u{1F465}',
                 sound: 'notification'
             });
-        }));
+        });
 
         // Player joined your game
-        this._eventUnsubscribers.push(EventBus.on('mp:game:player_joined', (data) => {
+        this.subscribe('mp:game:player_joined', (data) => {
             this.show({
                 title: 'Player Joined',
                 body: `${data.displayName} joined the game`,
                 icon: '\u{1F3AE}',
                 duration: 3000
             });
-        }));
+        });
 
         // Your turn - compare against MultiplayerClient's local user ID
-        this._eventUnsubscribers.push(EventBus.on('mp:game:turn', (data) => {
+        this.subscribe('mp:game:turn', (data) => {
             const myInfo = MultiplayerClient.getUserInfo();
             if (data.nextPlayer === myInfo.userId) {
                 this.show({
@@ -88,30 +91,30 @@ class NotificationsFeature extends FeatureBase {
                     duration: 4000
                 });
             }
-        }));
+        });
 
         // Campaign events
-        this._eventUnsubscribers.push(EventBus.on('mp:campaign:event', (data) => {
+        this.subscribe('mp:campaign:event', (data) => {
             this.show({
                 title: data.title || 'Campaign Update',
                 body: data.body || 'Something happened in the campaign',
                 icon: '\u{1F4DC}',
                 duration: 6000
             });
-        }));
+        });
 
         // Chat mention
-        this._eventUnsubscribers.push(EventBus.on('mp:chat:mention', (data) => {
+        this.subscribe('mp:chat:mention', (data) => {
             this.show({
                 title: `${data.senderName} mentioned you`,
                 body: data.text?.substring(0, 80) || '',
                 icon: '\u{1F4AC}',
                 sound: 'notification'
             });
-        }));
+        });
 
         // General-purpose notification:show event (used by command handlers, StorageManager, scripts, etc.)
-        this._eventUnsubscribers.push(EventBus.on('notification:show', (data) => {
+        this.subscribe('notification:show', (data) => {
             this.show({
                 title: data.title || 'Notice',
                 body: data.message || data.body || '',
@@ -120,17 +123,12 @@ class NotificationsFeature extends FeatureBase {
                 duration: data.duration || this.defaultDuration,
                 onClick: data.onClick || null
             });
-        }));
+        });
     }
 
     cleanup() {
-        // Unsubscribe all event listeners
-        if (this._eventUnsubscribers) {
-            for (const unsub of this._eventUnsubscribers) {
-                if (typeof unsub === 'function') unsub();
-            }
-            this._eventUnsubscribers = [];
-        }
+        // Subscriptions registered via this.subscribe(...) are auto-released
+        // by FeatureBase via SubscriptionManager.unsubscribeAll(this.id).
         if (this.container && this.container.parentNode) {
             this.container.parentNode.removeChild(this.container);
         }

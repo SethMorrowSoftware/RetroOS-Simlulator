@@ -70,12 +70,43 @@ Walk every app and feature once. Apply the per-app checklist below to each. Each
 3. **Tier C — feature-rich:** `AdminPanel`, `AnalyticsDashboard`, `ControlPanel`, `Inbox`, `ChatRoom`, `InstantMessenger`, `Defrag`, `HyperCard`, `CampaignStudio`, `BonziBuddy`, `DOSBox`, `Doom`, `Asteroids`, `MyComputer`, `Reversi`, `Solitaire`, `Spider`, `Hangman`, `Pong`, `Snake`, `Tetris`, `GameLobby`, `DisplayProperties`, `FeaturesSettings`. Many small per-app quirks — go in groups of 2–3.
 4. **Tier D — singletons-by-design:** any app that legitimately should remain single-instance (Settings panels, GameLobby host, etc.). Audit but mark `singleton: true` deliberately.
 
+### Full project sweep — status
+
+A complete audit ran across all 44 apps + 12 features + 2 plugin features. Net result: the platform is now wall-to-wall compliant with the checklist.
+
+**Apps that were fixed:**
+
+| App | Fix | Migration item |
+|---|---|---|
+| `Paint.js` | Per-window state for `ctx`, `tool`, `color`, `brushSize`, `lastX`, `lastY`, `painting`, `resizeObserver`, `_mpSession`, `_mpUnsubscribers` via prototype accessors (same pattern as Terminal.js W4.4). Two Paint windows now own independent drawing state. | Multi-instance compliance (CC-4) |
+| `TaskManager.js` | Replaced 5 raw `EventBus.on()` + manual `eventUnsubscribers` array with `this.subscribe(...)` calls. Auto-clean on close. | Subscription hygiene |
+| `MyComputer.js` | Replaced 6 raw `EventBus.on()` + manual handler-store-then-`EventBus.off()` in `onClose` with `this.subscribe(...)`. | Subscription hygiene |
+| `ScriptRunner.js` | Migrated wildcard `EventBus.on('*', ...)` + manual `eventSubscription` cleanup to `this.subscribe('*', ...)`. | Subscription hygiene |
+
+**Features that were fixed:**
+
+| Feature | Fix | Migration item |
+|---|---|---|
+| `AchievementSystem.js` | Dropped module-level `_achievementsCache` lazy cache; reads config achievements fresh via `getConfig`, stores runtime registrations on the instance. Cleared on `cleanup()` for clean re-enable. | P2.6 |
+| `Notifications.js` | 8 raw `EventBus.on()` + manual `_eventUnsubscribers` array → 8 `this.subscribe(...)` calls. | Subscription hygiene |
+| `OnlineUsers.js` | 2 raw `EventBus.on()` + manual `_eventUnsubscribers` array → 2 `this.subscribe(...)` calls. | Subscription hygiene |
+
+**Confirmed clean (no fixes needed):** every remaining app (40+) and feature (9+) passes the checklist. Apps with `StorageManager.set` calls that have no `StateManager.setState` pair (`Browser`, `Notepad`, `MediaPlayer`, `ChatRoom`, `GameLobby`, `Tetris`, `Phone`, `Minesweeper`, `InstantMessenger`, `DisplayProperties`, `Snake`, `Solitaire`, `SkiFree`, `AdminPanel`, `BonziBuddy`, `FreeCell`, `CampaignManager`, `ContentTemplateManager`, `MoodOrchestrator`, `ClippyAssistant`) are storage-only persistence — no drift surface to fix. `SoundSystem.js:476` `fetch(src)` is for media assets (public/CDN), no auth header needed. The `dvd-bouncer` plugin's redundant `disable()` cleanup is harmless but slightly verbose — not blocking.
+
+**No app or feature still violates:**
+- per-window state on `this` (Multi-instance compliance)
+- raw `EventBus.on()` lifecycle subscriptions without auto-cleanup
+- `CommandBus` direct usage (the script engine moved off it in the previous PR; no app or feature imports `CommandBus.js` anymore)
+- `sse:*` legacy aliases over semantic names
+- module-level caches that drift from `StateManager`
+- innerHTML usage without `escapeHtml`/`escAttr` import (per `bash scripts/lint-innerhtml.sh`)
+
 ### Features
 
 Same per-feature checklist applies to:
 - `SoundSystem`, `AchievementSystem`, `EasterEggs`, `ClippyAssistant`, `DesktopPet`, `Screensaver`, `SystemDialogs`, `CampaignManager`, `MoodOrchestrator`, `ContentTemplateManager`, `OnlineUsers`, `Notifications`.
 
-Features should already be in OK shape because Wave 1 hardened `FeatureBase` lifecycle. The main thing to verify per feature: subscriptions registered inside `initialize()` are released on `disable()` (the `SubscriptionManager` integration in PR #2 makes this automatic, but verify by toggling each feature off/on twice and watching `getOwnerCounts()`).
+All 12 audited; 3 (`AchievementSystem`, `Notifications`, `OnlineUsers`) needed fixes — landed in the sweep above. The remainder were already clean.
 
 ---
 
@@ -166,13 +197,9 @@ W3.2 currently does FS → state at boot only. For full bidirectional sync at ru
 
 **Decision:** ⏳ Indefinitely skipped. See [Skipped items](#skipped-items-with-rationale).
 
-### P2.6 — Module-level cache drift (Cross-Cutting Theme CC-2)
+### P2.6 — Module-level cache drift (Cross-Cutting Theme CC-2) ✅
 
-`AchievementSystem._achievementsCache` (and similar in other features) maintain module-level caches that drift from `StateManager.state.achievements`. Either:
-- Drop the cache and read through `StateManager.getState(...)` every time, or
-- Make the cache invalidation subscribe to `state:change` for the relevant path.
-
-**Estimated effort:** 1 small PR per feature.
+`AchievementSystem._achievementsCache` was the only module-level cache identified by the audit. Resolution: the module-level `let _achievementsCache = null` is gone; config-defined achievements are now read fresh from `getConfig('achievements', null)` on every access (so admin changes propagate without re-init), and runtime-registered achievements live on the feature instance's `_runtimeAchievements` Map (so they survive enable/disable correctly and are cleared on cleanup). A subsequent audit of every other feature confirmed no similar pattern exists.
 
 ### P2.7 — Active-window dual source of truth (Cross-Cutting Theme CC-2) ✅
 
@@ -255,8 +282,8 @@ These rules apply to every PR in Phase 1 and Phase 2.
 | Phase | Theme | Status |
 |---|---|---|
 | Phase 0 | Verification & baseline | ⏳ Pending — needs manual smoke (no automated harness for these scenarios) |
-| Phase 1 | App + feature audit and migration | ⏳ Pending — 44 apps + 12 features to walk |
-| Phase 2 | Internal cleanup | 🟡 In progress — P2.2 + P2.7 ✅, P2.1 partially landed (call sites migrated, file deletion deferred), 6 items still open |
+| Phase 1 | App + feature audit and migration | ✅ Complete — full audit of 44 apps + 12 features + 2 plugin features ran; 7 violations identified across `Paint`, `TaskManager`, `MyComputer`, `ScriptRunner`, `AchievementSystem`, `Notifications`, `OnlineUsers` — all fixed. Remaining items are clean. |
+| Phase 2 | Internal cleanup | 🟡 In progress — P2.2 + P2.6 + P2.7 ✅; P2.1 partial (call sites migrated, file deletion deferred); P2.3, P2.4, P2.8, P2.9 still open |
 | Phase 3 | Documentation polish | ⏳ Pending — gated on Phase 2 |
 
 Total effort estimate: roughly one PR per app/feature (Phase 1) + one PR per Phase 2 item ≈ **50–60 small PRs**. Most are individually trivial; the total represents the long tail of "all the existing code now needs to use the new APIs the platform exposes."

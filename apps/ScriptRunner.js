@@ -3017,7 +3017,9 @@ Type your script or click Help for full reference.
         });
 
         // ===== EVENT MONITOR =====
-        this.eventSubscription = EventBus.on('*', (payload, meta, event) => {
+        // this.subscribe(...) auto-cleans on window close — no manual
+        // unsubscribe needed (the wildcard listener used to leak).
+        this.subscribe('*', (payload, meta, event) => {
             if (event.name.startsWith('script:') || event.name.startsWith('macro:')) return;
             if (this.eventLog.length > this.maxLogEntries) this.eventLog.shift();
             this.eventLog.push({
@@ -4663,9 +4665,7 @@ into the editor to modify and run it!
             clearInterval(this.executionTimer);
             this.executionTimer = null;
         }
-        if (this.eventSubscription) {
-            this.eventSubscription();
-        }
+        // Event subscriptions auto-clean via this.subscribe(...) tracking.
         if (this.isRecording) {
             EventBus.emit('macro:record:stop');
         }

@@ -56,24 +56,52 @@ const DEFAULT_ACHIEVEMENTS = [
 ];
 
 /**
- * Get achievements from config or fall back to defaults.
- * Caches the result so runtime registerAchievement() calls persist.
+ * P2.6 — Module-level cache drift fix. Previously this file held a
+ * `let _achievementsCache = null` that was populated on first read of
+ * config-defined achievements and never invalidated. When admins updated
+ * the achievement list at runtime (via ControlPanel → ConfigLoader), the
+ * cache stayed stale and `getAchievement(id)` returned old data.
+ *
+ * The fix splits the source: config-defined achievements are read fresh
+ * from `getConfig` (or the defaults) every time, and runtime-registered
+ * achievements live on the feature instance so they survive enable/disable
+ * without leaking through to a different feature's view.
  */
-let _achievementsCache = null;
-function getAllAchievements() {
-    if (!_achievementsCache) {
-        const configured = getConfig('achievements', null);
-        _achievementsCache = (Array.isArray(configured) && configured.length > 0)
-            ? [...configured]
-            : [...DEFAULT_ACHIEVEMENTS];
-    }
-    return _achievementsCache;
-}
 
 class AchievementSystem extends FeatureBase {
     constructor() {
         super(FEATURE_METADATA);
         this.activeToasts = new Set();
+        // Runtime-registered achievements. Populated only by
+        // `registerAchievement(...)` calls from other features or scripts.
+        // Config-defined achievements are read through `getConfig` on
+        // every access so admin changes propagate without a re-init.
+        this._runtimeAchievements = new Map();
+    }
+
+    /**
+     * Get the full achievement set: config (or defaults) plus any
+     * runtime-registered entries. Reads through `getConfig` each call
+     * so admin changes to the achievement list propagate immediately.
+     * @returns {Array}
+     */
+    _getAllAchievements() {
+        const configured = getConfig('achievements', null);
+        const base = (Array.isArray(configured) && configured.length > 0)
+            ? configured
+            : DEFAULT_ACHIEVEMENTS;
+        if (this._runtimeAchievements.size === 0) return [...base];
+        // Runtime registrations take precedence on id collision.
+        const baseIds = new Set(base.map(a => a.id));
+        const merged = base.map(a =>
+            this._runtimeAchievements.has(a.id)
+                ? this._runtimeAchievements.get(a.id)
+                : a
+        );
+        for (const [id, a] of this._runtimeAchievements) {
+            if (!baseIds.has(id)) merged.push(a);
+        }
+        return merged;
     }
 
     /**
@@ -107,6 +135,10 @@ class AchievementSystem extends FeatureBase {
         });
         this.activeToasts.clear();
 
+        // Drop runtime-registered achievements so a re-enable starts from
+        // the config/default set (config-driven entries are read on demand).
+        this._runtimeAchievements.clear();
+
         super.cleanup();
     }
 
@@ -118,7 +150,7 @@ class AchievementSystem extends FeatureBase {
         if (!this.isEnabled()) return;
         if (!this.getConfig('showToasts', true)) return;
 
-        const achievement = getAllAchievements().find(a => a.id === id) || {
+        const achievement = this._getAllAchievements().find(a => a.id === id) || {
             name: id, desc: 'Achievement unlocked!', icon: '🏆'
         };
 
@@ -155,7 +187,7 @@ class AchievementSystem extends FeatureBase {
      * @returns {Array}
      */
     getAll() {
-        return getAllAchievements();
+        return this._getAllAchievements();
     }
 
     /**
@@ -182,11 +214,14 @@ class AchievementSystem extends FeatureBase {
      * @returns {Object|null}
      */
     getAchievement(id) {
-        return getAllAchievements().find(a => a.id === id) || null;
+        return this._getAllAchievements().find(a => a.id === id) || null;
     }
 
     /**
-     * Register a new achievement
+     * Register a new achievement at runtime. Persists in the feature
+     * instance's `_runtimeAchievements` map until disable/cleanup, so
+     * `getAchievement(id)` and `showToast(id)` see the new entry without
+     * needing to refresh a module-level cache.
      * @param {Object} achievement - Achievement definition { id, name, desc, icon }
      */
     registerAchievement(achievement) {
@@ -195,13 +230,13 @@ class AchievementSystem extends FeatureBase {
             return;
         }
 
-        // Check if already exists
-        if (getAllAchievements().find(a => a.id === achievement.id)) {
+        // Check if already exists (config or runtime)
+        if (this._getAllAchievements().find(a => a.id === achievement.id)) {
             this.warn(`Achievement ${achievement.id} already exists`);
             return;
         }
 
-        getAllAchievements().push({
+        this._runtimeAchievements.set(achievement.id, {
             id: achievement.id,
             name: achievement.name,
             desc: achievement.desc || 'Achievement unlocked!',
@@ -217,10 +252,11 @@ class AchievementSystem extends FeatureBase {
      */
     getProgress() {
         const unlocked = this.getUnlocked();
+        const all = this._getAllAchievements();
         return {
-            total: getAllAchievements().length,
+            total: all.length,
             unlocked: unlocked.length,
-            percentage: getAllAchievements().length > 0 ? Math.round((unlocked.length / getAllAchievements().length) * 100) : 0
+            percentage: all.length > 0 ? Math.round((unlocked.length / all.length) * 100) : 0
         };
     }
 }

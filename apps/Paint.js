@@ -8,6 +8,38 @@ import FileSystemManager from '../core/FileSystemManager.js';
 import EventBus from '../core/EventBus.js';
 import MultiplayerClient from '../core/MultiplayerClient.js';
 
+/**
+ * Per-window state for Paint. Each Paint window owns its own canvas
+ * context, selected tool, brush size, etc. Opening two Paint windows
+ * previously shared these via class-level fields, so picking a color
+ * in window A also changed the active tool in window B. We follow
+ * Terminal's pattern: store everything in `setInstanceState` /
+ * `getInstanceState` and expose `this.<field>` accessors on the
+ * prototype so the rest of the file reads/writes per-window storage
+ * without rewriting every reference.
+ *
+ * Defaults are seeded in `onOpen()` for each new window.
+ */
+const PER_WINDOW_FIELDS = [
+    'ctx', 'painting', 'tool', 'color', 'lastX', 'lastY',
+    'brushSize', 'resizeObserver', '_mpSession', '_mpUnsubscribers'
+];
+
+function defaultInstanceState() {
+    return {
+        ctx: null,
+        painting: false,
+        tool: 'brush', // brush, eraser, bucket
+        color: '#000000',
+        lastX: 0,
+        lastY: 0,
+        brushSize: 3,
+        resizeObserver: null,
+        _mpSession: null,
+        _mpUnsubscribers: []
+    };
+}
+
 class Paint extends AppBase {
     constructor() {
         super({
@@ -19,22 +51,9 @@ class Paint extends AppBase {
             minWidth: 560,
             minHeight: 460,
             resizable: true,
-            singleton: false, // Allow multiple Paint windows for working on multiple images
+            singleton: false, // Each window has its own state via the per-window accessors below
             category: 'accessories'
         });
-
-        this.ctx = null;
-        this.painting = false;
-        this.tool = 'brush'; // brush, eraser, bucket
-        this.color = '#000000';
-        this.lastX = 0;
-        this.lastY = 0;
-        this.brushSize = 3;
-        this.resizeObserver = null;
-
-        // Multiplayer collaborative drawing
-        this._mpSession = null;
-        this._mpUnsubscribers = [];
 
         // Register semantic event commands for scriptability
         this.registerCommands();
@@ -215,6 +234,13 @@ class Paint extends AppBase {
     }
 
     onOpen(params = {}) {
+        // Seed per-window defaults — every Paint window starts with its own
+        // tool/color/brush size so two windows don't share drawing state.
+        const defaults = defaultInstanceState();
+        for (const [key, value] of Object.entries(defaults)) {
+            this.setInstanceState(key, value, false);
+        }
+
         // Store file path if opening a specific file
         if (params.filePath) {
             this.setInstanceState('currentFile', params.filePath);
@@ -923,6 +949,19 @@ class Paint extends AppBase {
             this.alert(`Error saving image: ${e.message}`);
         }
     }
+}
+
+// Per-window accessor properties — proxy reads/writes of `this.ctx`,
+// `this.tool`, `this.color`, etc. to per-window storage so the existing
+// ~40 references inside Paint keep working unchanged. Same pattern as
+// Terminal.js (W4.4). Defaults are seeded in `onOpen` for each window.
+for (const field of PER_WINDOW_FIELDS) {
+    Object.defineProperty(Paint.prototype, field, {
+        get() { return this.getInstanceState(field); },
+        set(value) { this.setInstanceState(field, value, false); },
+        configurable: true,
+        enumerable: false
+    });
 }
 
 export default Paint;

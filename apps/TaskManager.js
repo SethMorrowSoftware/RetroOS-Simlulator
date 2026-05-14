@@ -40,9 +40,6 @@ class TaskManager extends AppBase {
         this.nextPid = 3000;
         this.windowPids = new Map();
 
-        // Event unsubscribers
-        this.eventUnsubscribers = [];
-
         // Register scriptability hooks
         this.registerCommands();
         this.registerQueries();
@@ -434,11 +431,10 @@ class TaskManager extends AppBase {
     }
 
     subscribeToEvents() {
-        // Subscribe to window open/close events for immediate updates
-        const onWindowOpen = () => {
-            this.update();
-        };
-
+        // Subscribe to window open/close events for immediate updates.
+        // `this.subscribe(...)` (AppBase) registers via SubscriptionManager
+        // under this window's owner ID, so the unsubscribes run automatically
+        // when the window closes — no manual `eventUnsubscribers` array needed.
         const onWindowClose = () => {
             // Clear selection when a window closes
             const btnEndTask = this.getElement('#btn-end-task');
@@ -450,32 +446,11 @@ class TaskManager extends AppBase {
             this.update();
         };
 
-        const onWindowFocus = () => {
-            this.update();
-        };
-
-        const onWindowMinimize = () => {
-            this.update();
-        };
-
-        const onWindowRestore = () => {
-            this.update();
-        };
-
-        EventBus.on(Events.WINDOW_OPEN, onWindowOpen);
-        EventBus.on(Events.WINDOW_CLOSE, onWindowClose);
-        EventBus.on(Events.WINDOW_FOCUS, onWindowFocus);
-        EventBus.on(Events.WINDOW_MINIMIZE, onWindowMinimize);
-        EventBus.on(Events.WINDOW_RESTORE, onWindowRestore);
-
-        // Store unsubscribers
-        this.eventUnsubscribers.push(
-            () => EventBus.off(Events.WINDOW_OPEN, onWindowOpen),
-            () => EventBus.off(Events.WINDOW_CLOSE, onWindowClose),
-            () => EventBus.off(Events.WINDOW_FOCUS, onWindowFocus),
-            () => EventBus.off(Events.WINDOW_MINIMIZE, onWindowMinimize),
-            () => EventBus.off(Events.WINDOW_RESTORE, onWindowRestore)
-        );
+        this.subscribe(Events.WINDOW_OPEN, () => this.update());
+        this.subscribe(Events.WINDOW_CLOSE, onWindowClose);
+        this.subscribe(Events.WINDOW_FOCUS, () => this.update());
+        this.subscribe(Events.WINDOW_MINIMIZE, () => this.update());
+        this.subscribe(Events.WINDOW_RESTORE, () => this.update());
     }
 
     onClose() {
@@ -484,10 +459,7 @@ class TaskManager extends AppBase {
             clearInterval(this.updateInterval);
             this.updateInterval = null;
         }
-
-        // Unsubscribe from events
-        this.eventUnsubscribers.forEach(unsub => unsub());
-        this.eventUnsubscribers = [];
+        // Subscriptions registered via this.subscribe() auto-clean on close.
     }
 
     update() {
