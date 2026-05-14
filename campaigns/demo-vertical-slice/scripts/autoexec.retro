@@ -1,0 +1,134 @@
+# ============================================================================
+# SIGNAL LOST — Demo Vertical Slice
+# ============================================================================
+# A compact ARG demo that exercises every Phase 1-3 system:
+#   - Narrative state (story, scene, objective, flag, clue)
+#   - Mood orchestration (calm → tense → glitch transitions)
+#   - Diegetic messaging (inbox, IM, phone, browser, dialogs)
+#   - Content template delivery
+#   - Media cue triggers (audio, fx, subtitle)
+#   - Showrunner-compatible state for live-ops inspection
+#
+# This campaign tells a 3-scene micro-story about a missing signal.
+# ============================================================================
+
+# ======================== INIT ========================
+
+story.start("demo-vertical-slice")
+scene.enter("prologue")
+mood.set("calm")
+
+# Set initial flags
+flag.set("signal_strength", 100)
+flag.set("interference_detected", 0)
+flag.set("decoder_found", 0)
+
+# ======================== SCENE 1: PROLOGUE ========================
+
+# Add initial objectives
+objective.add("investigate-signal", "Investigate the anomalous signal", {})
+objective.add("check-inbox", "Check your inbox for the briefing", {})
+
+# Send briefing email
+inbox.send("ops@command.local", "PRIORITY: Signal Anomaly Detected", "Agent,\n\nWe've detected an anomalous signal originating from an unknown source. Your mission: locate, decode, and report.\n\nSignal coordinates have been uploaded to your terminal.\n\n— Command")
+
+# NPC sends IM after short delay
+set $delay_done = 0
+wait 2000
+im.npcSend("dr-chen", "Hey, did you get that signal alert? Something's not right. Check the frequency analyzer.", {})
+
+# Add first clue
+clue.add("signal-coordinates", ["location", "signal"])
+
+# Drop a file into the filesystem for discovery
+emit "command:fs:write" { "path": "C:/Campaigns/demo-vertical-slice/signal-data.txt", "content": "SIGNAL INTERCEPT LOG\n====================\nFrequency: 14.7 kHz\nOrigin: UNKNOWN\nPattern: Non-random, possibly encoded\nTimestamp: 2026-03-05T00:00:00Z\nStatus: ACTIVE\n\nWARNING: Interference increasing." }
+
+# ======================== SCENE 2: INVESTIGATION ========================
+
+wait 5000
+
+# Transition to investigation scene
+scene.complete("prologue")
+scene.enter("investigation")
+
+# Mood shift to mysterious
+mood.transition("calm", "mysterious", 3000)
+
+# Update objectives
+objective.complete("check-inbox")
+objective.add("find-decoder", "Find the signal decoder tool", {})
+objective.add("analyze-pattern", "Analyze the signal pattern", {})
+
+# Signal degradation flag
+flag.set("signal_strength", 72)
+flag.set("interference_detected", 1)
+
+# Dr. Chen sends more messages
+wait 2000
+im.npcSend("dr-chen", "The signal is degrading. I'm seeing interference patterns I've never encountered before.", {})
+
+wait 3000
+im.npcSend("dr-chen", "I found something in the old archives. There's a decoder tool — check the Help system.", {})
+
+# Phone voicemail from unknown source
+phone.voicemail("UNKNOWN", "...static... can you hear... the signal is... not what it seems... find the pattern before... ...static...")
+
+# Add decoder clue
+clue.add("decoder-reference", ["tool", "archive"])
+flag.set("decoder_found", 1)
+
+# Another file drop
+emit "command:fs:write" { "path": "C:/Campaigns/demo-vertical-slice/decoder-notes.txt", "content": "DECODER NOTES (Dr. Chen)\n========================\nThe signal uses a substitution cipher.\nKey pattern: every 3rd character.\nOnce decoded, the message reveals coordinates.\n\nI think someone — or something — is trying to communicate." }
+
+# ======================== SCENE 3: REVELATION ========================
+
+wait 8000
+
+scene.complete("investigation")
+scene.enter("revelation")
+
+# Mood escalates to tense
+mood.transition("mysterious", "tense", 2000)
+
+# Complete investigation objectives
+objective.complete("find-decoder")
+objective.complete("analyze-pattern")
+objective.add("decode-message", "Decode the final message", {})
+
+# Signal critical
+flag.set("signal_strength", 23)
+
+# Urgent inbox
+inbox.send("SYSTEM@ALERT.LOCAL", "CRITICAL: Signal Integrity Failing", "AUTOMATED ALERT\n\nSignal integrity has dropped below 25%.\nInterference source: INTERNAL\n\nThis is not an external signal.\nThe signal is coming from inside the system.\n\nRecommendation: DECODE IMMEDIATELY")
+
+wait 3000
+
+# Glitch moment
+mood.set("glitch")
+
+wait 1500
+mood.set("tense")
+
+# Dr. Chen's final message
+im.npcSend("dr-chen", "I decoded it. The signal... it's a message. From us. From the future. It says: 'Don't trust the silence.'", {})
+
+# Final clue
+clue.add("decoded-message", ["signal", "revelation", "final"])
+clue.reveal("decoded-message")
+
+# Complete the campaign arc
+wait 3000
+objective.complete("decode-message")
+objective.complete("investigate-signal")
+
+# End mood
+mood.transition("tense", "calm", 5000)
+
+# Browser injection — hidden report page
+browser.inject("signal-report", "final-report", "<div style='font-family:monospace;padding:20px;background:#0a0a0a;color:#0f0;'><h2>SIGNAL DECODED</h2><p>Origin: Internal timestamp loop</p><p>Message: Don't trust the silence.</p><p>Status: ARCHIVED</p><hr><p><em>Case closed. But the silence remains.</em></p></div>")
+
+# Final system dialog
+wait 2000
+emit "dialog:alert" { "title": "Campaign Complete", "message": "Signal Lost — Demo Vertical Slice complete.\n\nAll systems exercised:\n- 3 scenes traversed\n- 5 objectives completed\n- 3 clues discovered\n- 6 flags set\n- 4 mood transitions\n- 3 inbox messages\n- 4 IM conversations\n- 1 voicemail\n- 1 browser injection\n- 2 filesystem drops" }
+
+story.end("demo-vertical-slice", "signal-decoded")

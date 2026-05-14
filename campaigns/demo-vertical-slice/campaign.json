@@ -1,0 +1,27 @@
+{
+    "id": "demo-vertical-slice",
+    "name": "Signal Lost — Demo Vertical Slice",
+    "version": "1.0.0",
+    "description": "A self-contained demo campaign exercising the full ARG pipeline: scenes, objectives, flags, clues, mood transitions, media cues, diegetic messaging, and content templates.",
+    "author": "IlluminatOS Team",
+    "engine": {
+        "minVersion": "1.0.0"
+    },
+    "entryScript": "autoexec.retro",
+    "dependencies": [],
+    "capabilities": {
+        "liveOps": true,
+        "telemetry": true,
+        "highFidelityMedia": false
+    },
+    "mediaBudgets": {
+        "maxConcurrentAudio": 4,
+        "maxConcurrentVideo": 1,
+        "maxPreloadedAssets": 8,
+        "maxPreloadBytes": 10485760
+    },
+    "migration": {
+        "from": null,
+        "strategy": "fresh"
+    }
+}

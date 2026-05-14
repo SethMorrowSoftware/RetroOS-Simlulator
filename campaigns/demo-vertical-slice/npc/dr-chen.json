@@ -1,0 +1,29 @@
+{
+    "id": "dr-chen",
+    "name": "Dr. Sarah Chen",
+    "avatar": null,
+    "role": "Signal analyst and cryptography expert",
+    "personality": "Direct, analytical, occasionally unsettled by findings",
+    "messages": [
+        {
+            "text": "Hey, did you get that signal alert? Something's not right. Check the frequency analyzer.",
+            "priority": "normal",
+            "conditions": { "scene": "prologue" }
+        },
+        {
+            "text": "The signal is degrading. I'm seeing interference patterns I've never encountered before.",
+            "priority": "normal",
+            "conditions": { "scene": "investigation" }
+        },
+        {
+            "text": "I found something in the old archives. There's a decoder tool — check the Help system.",
+            "priority": "normal",
+            "conditions": { "scene": "investigation" }
+        },
+        {
+            "text": "I decoded it. The signal... it's a message. From us. From the future. It says: 'Don't trust the silence.'",
+            "priority": "high",
+            "conditions": { "scene": "revelation" }
+        }
+    ]
+}

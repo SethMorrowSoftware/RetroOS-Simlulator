@@ -1,0 +1,12 @@
+{
+  "assets": [
+    {
+      "url": "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css",
+      "output": "assets/vendor/fontawesome/css/all.min.css"
+    },
+    {
+      "url": "https://fonts.googleapis.com/css2?family=VT323&display=swap",
+      "output": "assets/vendor/google-fonts/vt323.css"
+    }
+  ]
+}

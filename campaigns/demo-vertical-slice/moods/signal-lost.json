@@ -1,0 +1,60 @@
+{
+    "signal-calm": {
+        "name": "Signal Calm",
+        "description": "Quiet monitoring state",
+        "visual": {
+            "bgColor": "#0a0a1a",
+            "crtIntensity": 0.2,
+            "cssVars": {
+                "--mood-accent": "#4488cc",
+                "--mood-glow": "rgba(68, 136, 204, 0.1)"
+            }
+        },
+        "audio": {
+            "ambient": null
+        },
+        "transition": {
+            "duration": 2000,
+            "easing": "ease-in-out"
+        }
+    },
+    "signal-interference": {
+        "name": "Signal Interference",
+        "description": "Growing interference and distortion",
+        "visual": {
+            "bgColor": "#1a0a0a",
+            "crtIntensity": 0.65,
+            "cssVars": {
+                "--mood-accent": "#cc6633",
+                "--mood-glow": "rgba(204, 102, 51, 0.2)"
+            }
+        },
+        "audio": {
+            "ambient": null
+        },
+        "transition": {
+            "duration": 1000,
+            "easing": "ease-in"
+        }
+    },
+    "signal-critical": {
+        "name": "Signal Critical",
+        "description": "Signal near failure — maximum tension",
+        "visual": {
+            "bgColor": "#1a0000",
+            "crtIntensity": 0.9,
+            "cssVars": {
+                "--mood-accent": "#ff2222",
+                "--mood-glow": "rgba(255, 34, 34, 0.25)"
+            }
+        },
+        "audio": {
+            "ambient": null,
+            "stinger": null
+        },
+        "transition": {
+            "duration": 500,
+            "easing": "ease-out"
+        }
+    }
+}

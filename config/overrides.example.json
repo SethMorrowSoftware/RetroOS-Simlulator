@@ -1,0 +1,8 @@
+{
+  "_description": "Copy this file to overrides.json and edit to customize IlluminatOS! Config values here override defaults.json. Only include sections you want to change.",
+
+  "branding": {
+    "osName": "MyCustomOS!",
+    "sidebarText": "MyCustomOS!"
+  }
+}

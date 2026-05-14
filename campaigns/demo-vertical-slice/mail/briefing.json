@@ -1,0 +1,20 @@
+{
+    "initial-briefing": {
+        "from": "ops@command.local",
+        "subject": "PRIORITY: Signal Anomaly Detected",
+        "body": "Agent,\n\nWe've detected an anomalous signal originating from an unknown source. Your mission: locate, decode, and report.\n\nSignal coordinates have been uploaded to your terminal.\n\n— Command",
+        "priority": "high",
+        "conditions": {}
+    },
+    "signal-critical-alert": {
+        "from": "SYSTEM@ALERT.LOCAL",
+        "subject": "CRITICAL: Signal Integrity Failing",
+        "body": "AUTOMATED ALERT\n\nSignal integrity has dropped below 25%.\nInterference source: INTERNAL\n\nThis is not an external signal.\nThe signal is coming from inside the system.\n\nRecommendation: DECODE IMMEDIATELY",
+        "priority": "urgent",
+        "conditions": {
+            "flags": {
+                "interference_detected": 1
+            }
+        }
+    }
+}

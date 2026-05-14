@@ -1,0 +1,20 @@
+{
+    "description": "Event-to-script trigger wiring for the Signal Lost demo campaign",
+    "bindings": [
+        {
+            "event": "story:campaign:enable",
+            "filter": { "campaignId": "demo-vertical-slice" },
+            "action": "runScript",
+            "script": "autoexec.retro"
+        },
+        {
+            "event": "story:flag:set",
+            "filter": { "key": "signal_strength" },
+            "action": "emit",
+            "emitEvent": "story:telemetry:checkpoint",
+            "emitPayload": {
+                "type": "signal_strength_change"
+            }
+        }
+    ]
+}

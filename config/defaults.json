@@ -1,0 +1,208 @@
+{
+  "_version": 1,
+  "_description": "IlluminatOS! default configuration. Do not edit — use overrides.json for customization.",
+
+  "branding": {
+    "osName": "IlluminatOS!",
+    "version": "95.0",
+    "buildNumber": "1995",
+    "versionString": "Version 95.0 - Modular Edition",
+    "sidebarText": "IlluminatOS!",
+    "bootMessage": "Starting Windows 95...",
+    "screensaverText": "IlluminatOS! - The Nostalgia Machine",
+    "bsodTitle": "IlluminatOS!",
+    "terminalBanner": "IlluminatOS! [Version 95.0.1995]",
+    "biosVersion": "IlluminatOS BIOS v2.1",
+    "shutdownMessage": "It is now safe to turn off your computer.",
+    "aboutText": "(C) Copyright IlluminatOS Team 1995-2026",
+    "aboutSubtitle": "Windows 95 Experience",
+    "copyrightText": "Copyright \u00a9 2024",
+    "creditsTitle": "ILLUMINATOS! - CREDITS",
+    "tagline": "Made with nostalgia and JavaScript",
+    "welcomeTitle": "Welcome to IlluminatOS!",
+    "computerName": "ILLUMINATOS-PC",
+    "websiteUrl": "https://sethmorrow.com",
+    "helpDescription": "a nostalgic recreation of the Windows 95 experience in your web browser",
+    "shutdownDialogTitle": "Shut Down Windows",
+    "shutdownDialogPrompt": "What do you want the computer to do?",
+    "welcomeButtonText": "Let's Go!",
+    "runDialogPrompt": "Type the name of a program, folder, document, or Internet resource, and the OS will open it for you."
+  },
+
+  "welcomeTips": {
+    "heading": "Did you know?",
+    "headingIcon": "\uD83D\uDCA1",
+    "items": [
+      "Double-click desktop icons to open applications",
+      "Right-click anywhere for context menus",
+      "Try the Konami Code for a surprise! \u2191\u2191\u2193\u2193\u2190\u2192\u2190\u2192BA",
+      "Click the clock 10 times for disco mode!",
+      "Type \"rosebud\" to unlock admin access",
+      "Check out the Terminal for Easter eggs"
+    ]
+  },
+
+  "startMenuLabels": {
+    "programs": "Programs",
+    "documents": "Documents",
+    "settings": "Settings",
+    "find": "Find...",
+    "help": "Help",
+    "run": "Run...",
+    "shutDown": "Shut Down...",
+    "adminPanel": "Admin Panel",
+    "adminLogin": "Admin Login",
+    "internet": "Internet",
+    "multimedia": "Multimedia",
+    "accessories": "Accessories",
+    "systemTools": "System Tools",
+    "games": "Games"
+  },
+
+  "achievements": [
+    { "id": "first_boot", "name": "First Boot", "desc": "Welcome!", "icon": "\uD83D\uDC4B" },
+    { "id": "konami_master", "name": "Konami Master", "desc": "Entered the code", "icon": "\uD83C\uDFAE" },
+    { "id": "disco_fever", "name": "Disco Fever", "desc": "Clicked clock 10x", "icon": "\uD83D\uDD7A" },
+    { "id": "multitasker", "name": "Multitasker", "desc": "10+ windows", "icon": "\uD83E\uDE9F" },
+    { "id": "clippy_hater", "name": "Clippy Hater", "desc": "Dismissed 5x", "icon": "\uD83D\uDE20" },
+    { "id": "clippy_terminator", "name": "Clippy Terminator", "desc": "Dismissed 10x", "icon": "\uD83D\uDD2B" },
+    { "id": "matrix_mode", "name": "Neo", "desc": "Entered Matrix", "icon": "\uD83C\uDF27\uFE0F" }
+  ],
+
+  "easterEggs": {
+    "konamiTitle": "SECRET UNLOCKED!",
+    "konamiUnlocks": [
+      "\uD83C\uDFA8 Disco Mode (Terminal)",
+      "\uD83D\uDC15 Desktop Pet",
+      "\uD83C\uDF27\uFE0F Matrix Mode (Terminal)"
+    ],
+    "konamiButtonText": "Awesome!"
+  },
+
+  "bootTips": [
+    "Loading your personalized experience...",
+    "Initializing desktop icons...",
+    "Starting Windows Manager...",
+    "Loading system tray...",
+    "Preparing applications...",
+    "Almost ready..."
+  ],
+
+  "desktopIcons": [
+    { "id": "mycomputer", "label": "My Computer", "emoji": "\uD83D\uDCBB", "type": "app" },
+    { "id": "recyclebin", "label": "Recycle Bin", "emoji": "\uD83D\uDDD1\uFE0F", "type": "app" },
+    { "id": "terminal", "label": "Terminal", "emoji": "\uD83D\uDCDF", "type": "app" },
+    { "id": "inbox", "label": "Inbox", "emoji": "\uD83D\uDCE7", "type": "app" },
+    { "id": "ciphers", "label": "Cipher Decoder", "emoji": "\uD83D\uDD0D", "type": "link", "url": "https://sethmorrow.com/ciphers" },
+    { "id": "music", "label": "Music", "emoji": "\uD83C\uDFB5", "type": "link", "url": "https://sethmorrow.com/music" },
+    { "id": "videos", "label": "Videos", "emoji": "\uD83D\uDCFA", "type": "link", "url": "https://sethmorrow.com/videos" },
+    { "id": "books", "label": "Books", "emoji": "\uD83D\uDCDA", "type": "link", "url": "https://sethmorrow.com/books" },
+    { "id": "audiobooks", "label": "Audiobooks", "emoji": "\uD83C\uDFA7", "type": "link", "url": "https://sethmorrow.com/audiobooks" }
+  ],
+
+  "defaults": {
+    "sound": false,
+    "crtEffect": true,
+    "petEnabled": false,
+    "petType": "neko",
+    "screensaverDelay": 300000,
+    "desktopBg": "#008080",
+    "wallpaper": "space",
+    "colorScheme": "slate",
+    "userName": "User"
+  },
+
+  "quickLaunch": [
+    { "type": "app", "appId": "terminal", "icon": "\uD83D\uDCBB", "title": "Terminal" },
+    { "type": "app", "appId": "notepad", "icon": "\uD83D\uDCDD", "title": "Notepad" },
+    { "type": "link", "url": "https://sethmorrow.com", "icon": "\uD83C\uDF00", "title": "Internet" }
+  ],
+
+  "wallpapers": {
+    "clouds": {
+      "label": "Clouds",
+      "css": "radial-gradient(ellipse at 20% 30%, rgba(255,255,255,0.8) 0%, transparent 50%), radial-gradient(ellipse at 80% 40%, rgba(255,255,255,0.6) 0%, transparent 40%), radial-gradient(ellipse at 50% 70%, rgba(255,255,255,0.7) 0%, transparent 45%), radial-gradient(ellipse at 10% 80%, rgba(255,255,255,0.5) 0%, transparent 35%), linear-gradient(180deg, #87CEEB 0%, #4A90D9 100%)"
+    },
+    "tiles": {
+      "label": "Tiles",
+      "css": "repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(255,255,255,0.1) 10px, rgba(255,255,255,0.1) 20px), repeating-linear-gradient(-45deg, transparent, transparent 10px, rgba(0,0,0,0.1) 10px, rgba(0,0,0,0.1) 20px)"
+    },
+    "waves": {
+      "label": "Waves",
+      "css": "repeating-linear-gradient(45deg, transparent, transparent 20px, rgba(255,255,255,0.15) 20px, rgba(255,255,255,0.15) 40px), repeating-linear-gradient(-45deg, transparent, transparent 20px, rgba(0,0,0,0.1) 20px, rgba(0,0,0,0.1) 40px), linear-gradient(135deg, #1a5276 0%, #2980b9 50%, #1a5276 100%)"
+    },
+    "forest": {
+      "label": "Forest",
+      "css": "linear-gradient(180deg, #228B22 0%, #006400 30%, #004d00 60%, #003300 100%)"
+    },
+    "space": {
+      "label": "Space",
+      "css": "radial-gradient(ellipse at 20% 20%, rgba(255,255,255,0.8) 0%, transparent 1%), radial-gradient(ellipse at 80% 30%, rgba(255,255,255,0.6) 0%, transparent 1%), radial-gradient(ellipse at 40% 60%, rgba(255,255,255,0.9) 0%, transparent 1%), radial-gradient(ellipse at 60% 80%, rgba(255,255,255,0.5) 0%, transparent 1%), radial-gradient(ellipse at 10% 70%, rgba(255,255,255,0.7) 0%, transparent 1%), radial-gradient(ellipse at 90% 60%, rgba(255,255,255,0.4) 0%, transparent 1%), radial-gradient(ellipse at 30% 90%, rgba(255,255,255,0.6) 0%, transparent 1%), radial-gradient(ellipse at 70% 10%, rgba(255,255,255,0.8) 0%, transparent 1%), linear-gradient(180deg, #0a0a2e 0%, #1a1a4e 50%, #0a0a2e 100%)"
+    }
+  },
+
+  "colorSchemes": {
+    "win95": { "label": "Windows 95", "window": "#c0c0c0", "titlebar": "#000080" },
+    "highcontrast": { "label": "High Contrast", "window": "#000000", "titlebar": "#800080" },
+    "desert": { "label": "Desert", "window": "#d4c4a8", "titlebar": "#8b7355" },
+    "ocean": { "label": "Ocean", "window": "#b0c4de", "titlebar": "#003366" },
+    "rose": { "label": "Rose", "window": "#e8d0d0", "titlebar": "#8b4560" },
+    "slate": { "label": "Slate", "window": "#a0a0b0", "titlebar": "#404050" }
+  },
+
+  "features": {
+    "soundsystem": { "enabled": true, "config": { "masterVolume": 0.5, "enableMp3": true } },
+    "achievements": { "enabled": true, "config": { "showToasts": true, "toastDuration": 3000 } },
+    "clippy": { "enabled": true, "config": { "appearanceChance": 0.15, "autoHideDelay": 8000 } },
+    "desktoppet": { "enabled": false, "config": { "petType": "neko" } },
+    "screensaver": { "enabled": true, "config": { "idleTimeout": 300000, "mode": "toasters" } },
+    "eastereggs": { "enabled": true, "config": { "enableKonami": true, "enableCheats": true } },
+    "dvd-bouncer": { "enabled": true, "config": { "autoStart": false, "speed": 2, "logoSize": 80 } }
+  },
+
+  "filesystem": {
+    "welcomeFile": {
+      "path": ["C:", "Users", "User", "Desktop", "Welcome.txt"],
+      "content": "Welcome to IlluminatOS!\n\nEverything you see here is running in your browser.\n\nTry exploring the file system using:\n- Terminal (type \"dir\" and \"cd\")\n- My Computer\n- This desktop!\n\nYou can create, edit, and save files that persist across your session.\n\nHave fun!"
+    },
+    "documentFiles": [
+      {
+        "path": ["C:", "Users", "User", "Documents", "resume.txt"],
+        "content": "Your Resume\n\nSkills:\n- Add your skills here\n\nExperience:\n- Add your experience here"
+      },
+      {
+        "path": ["C:", "Users", "User", "Documents", "ideas.txt"],
+        "content": "1. Build a portfolio OS\n2. Add more easter eggs\n3. Make it feel authentic\n4. Add fun retro games"
+      },
+      {
+        "path": ["C:", "Users", "User", "Documents", "welcome.txt"],
+        "content": "Welcome to IlluminatOS!\n\nThis is a fully functional retro desktop environment.\nTry exploring the file system, opening applications, and discovering easter eggs!\n\nHave fun!"
+      }
+    ],
+    "secretFiles": [
+      {
+        "path": ["C:", "Users", "User", "Secret", "aperture.log"],
+        "content": "Aperture Science Computer-Aided Enrichment Center\n\nTest Subject: [REDACTED]\nStatus: The cake is a lie.\n\n- GLaDOS"
+      },
+      {
+        "path": ["C:", "Users", "User", "Secret", "hal9000.txt"],
+        "content": "I'm sorry Dave, I'm afraid I can't do that.\n\nThis mission is too important for me to allow you to jeopardize it.\n\n- HAL 9000"
+      }
+    ],
+    "projectFiles": [
+      {
+        "path": ["C:", "Users", "User", "Projects", "retro-os", "README.md"],
+        "content": "# IlluminatOS!\n\nA Windows 95-style operating system built with vanilla JavaScript.\n\n## Features\n- Virtual file system\n- Multiple applications\n- Desktop environment\n- And more!"
+      }
+    ]
+  },
+
+  "apps": {
+    "disabledApps": [],
+    "startMenuOverrides": {}
+  },
+
+  "plugins": [
+    { "path": "./plugins/features/dvd-bouncer/index.js", "enabled": true }
+  ]
+}
