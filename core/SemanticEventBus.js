@@ -94,9 +94,9 @@ class SemanticEventBusClass {
         this.debounceTimers = new Map();
 
         // Command registry — single source of truth for command execution.
-        // Backed by the same handler set CommandBus uses. New code should
-        // call registerCommand()/executeCommand() directly; CommandBus.js is
-        // a thin facade slated for removal in Wave 4.
+        // Platform handlers are registered at boot by `core/CommandRegistry.js`;
+        // app- and feature-level commands self-register via
+        // `EventBus.registerCommand()`.
         this.commandHandlers = new Map(); // command name (no 'command:' prefix) -> handler fn
 
         // Cached regex for pattern matching (avoid re-creating on every emit)
@@ -1145,13 +1145,13 @@ class SemanticEventBusClass {
     }
 
     // ==========================================
-    // COMMAND REGISTRY (unified with CommandBus)
+    // COMMAND REGISTRY
     // ==========================================
 
     /**
-     * Register a command handler. Replaces the parallel `CommandBus.register`
-     * mechanism. The handler receives the payload and may return a value
-     * (or Promise) — the requestId/action:result protocol is handled here.
+     * Register a command handler. The handler receives the payload and may
+     * return a value (or Promise) — the requestId/action:result protocol is
+     * handled here.
      *
      * @param {string} command - Command name without the `command:` prefix
      *                           (e.g. `app:launch`, `fs:read`).
@@ -1181,7 +1181,8 @@ class SemanticEventBusClass {
 
     /**
      * Execute a registered command. Emits `action:result` when the payload
-     * carries a `requestId`, matching the legacy CommandBus protocol.
+     * carries a `requestId` so callers using the request/response protocol
+     * receive the outcome.
      *
      * @param {string} command - Command name without the `command:` prefix.
      * @param {object} payload - Command payload (may include `requestId`).

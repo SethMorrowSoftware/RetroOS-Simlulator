@@ -536,11 +536,10 @@ class StateManagerClass {
      * represented in `state.icons` (matched by label). Existing icons keep
      * their persisted position; new icons get auto-positioned by addIcon.
      *
-     * Note: this is one-way (FS → state) at boot only. Runtime mutations
-     * still flow state → FS via `FileSystemManager.syncDesktopIcons`. A
-     * full bidirectional reconcile (subscribing to FS events to re-merge)
-     * is a future improvement; this addresses the most painful case
-     * (cross-session new shortcuts).
+     * Note: this is one-way (FS → state). Boot calls run once; runtime
+     * FS → state reconciliation is installed by `installDesktopIconReconciler`.
+     * Runtime mutations in the other direction (state → FS) flow via
+     * `FileSystemManager.syncDesktopIcons`.
      *
      * @param {object} FileSystemManager - The FS singleton (passed to avoid
      *                                      a circular import).
@@ -590,6 +589,51 @@ class StateManagerClass {
             console.log(`[StateManager] Reconciled ${added} icon(s) from filesystem.`);
         }
         return added;
+    }
+
+    /**
+     * Install a runtime listener that keeps `state.icons` in sync with new
+     * `.lnk` files appearing in the Desktop folder. Together with the boot
+     * call to `reconcileIconsFromFileSystem` this closes F2 — bidirectional
+     * desktop-icon sync. A `.lnk` dropped in `Desktop/` by a terminal
+     * command or script now surfaces as an icon without a page reload.
+     *
+     * Avoids feedback loops by:
+     *   1. Filtering events to the Desktop directory path.
+     *   2. Skipping events whose payload carries `source: 'syncDesktopIcons'`
+     *      — that's the state → FS pump and would otherwise pong-pong back.
+     *   3. Re-entry guard during the reconcile call itself.
+     *
+     * Idempotent — calling twice installs only one listener. The listener
+     * is intentionally process-lifetime (no SubscriptionManager owner) so
+     * it survives user-switch cascades.
+     *
+     * @param {object} FileSystemManager - The FS singleton (passed to avoid
+     *                                      a circular import).
+     */
+    installDesktopIconReconciler(FileSystemManager) {
+        if (this._desktopIconReconcilerInstalled) return;
+        if (!FileSystemManager || typeof FileSystemManager.getDesktopShortcuts !== 'function') {
+            return;
+        }
+        this._desktopIconReconcilerInstalled = true;
+
+        const desktopPathStr = (PATHS.DESKTOP || []).join('/');
+
+        EventBus.on(Events.FILESYSTEM_DIRECTORY_CHANGED, (payload = {}) => {
+            if (payload.path !== desktopPathStr) return;
+            if (payload.source === 'syncDesktopIcons') return;
+            if (this._isReconcilingIcons) return;
+
+            this._isReconcilingIcons = true;
+            try {
+                this.reconcileIconsFromFileSystem(FileSystemManager);
+            } finally {
+                this._isReconcilingIcons = false;
+            }
+        });
+
+        console.log('[StateManager] Desktop-icon reconciler installed (FS → state live sync).');
     }
 
     /**

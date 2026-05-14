@@ -21,7 +21,7 @@ IlluminatOS! is a browser-hosted OS simulation with:
 1. Load config (`ConfigLoader`)
 2. Initialize user session and real-time SSE connection (v2 API only)
 3. Register apps (`AppRegistry`)
-4. Initialize core services (`StorageManager`, `StateManager`, `WindowManager`, `CommandBus`, `ScriptEngine`)
+4. Initialize core services (`StorageManager`, `StateManager`, `WindowManager`, `CommandRegistry`, `ScriptEngine`)
 5. Sync filesystem shortcuts and installed apps
 6. Register and initialize features (`FeatureRegistry`)
 7. Load plugin manifest and plugin features (`PluginLoader`)
@@ -35,7 +35,7 @@ Boot health diagnostics are collected per-component and exposed at `window.__OS_
 
 ### Core systems
 - `core/SemanticEventBus.js`: the single event bus — pub/sub with middleware, request/response, channels, async streams, schema validation, and the unified command registry (`registerCommand`/`executeCommand`). (`core/EventBus.js` is a one-line re-export so old imports keep working.)
-- `core/CommandBus.js`: deprecated facade. `CommandBus.register/execute` delegate to `SemanticEventBus.commandHandlers` — both APIs see the same registry. New code calls `EventBus.registerCommand` / `EventBus.executeCommand` directly.
+- `core/CommandRegistry.js`: wires every platform-level command handler (`command:fs:*`, `command:window:*`, `command:terminal:*`, `command:dialog:*`, `command:app:*`, `command:setting:*`, etc.), the `query:*` listeners, and the `timer:*` / `macro:*` lifecycle state into the unified `SemanticEventBus.commandHandlers` registry. Initialised once at boot; new code calls `EventBus.registerCommand` / `EventBus.executeCommand` directly.
 - `core/SubscriptionManager.js`: owner-scoped subscription tracker. Wraps every `EventBus.on` and `StateManager.subscribe` against the active owner (window/feature/plugin/`session`); `unsubscribeAll(ownerId)` releases the lot.
 - `core/EventTopology.js`: single registry of every backend event bridged to the frontend; `RealtimeClient` derives its allowlist from it.
 - `core/HealthMonitor.js`: live runtime health snapshot — subscription accounting, storage telemetry, event-bus stats + schema coverage, feature posture, realtime state, bounded fault ring buffer. Exposed at `window.__OS_HEALTH`.
@@ -254,7 +254,8 @@ curl 'http://localhost:8000/api/queue.php?action=status'
 - A backend test suite (`test-backend.php`), a RetroScript engine harness (`scripts/test-retroscript.sh`), and an aggregated `scripts/ci-gate.sh` (JS syntax + PHP lint + innerHTML safety + RetroScript + schema coverage) provide automated smoke coverage.
 - Boot diagnostics: `window.__OS_BOOT_HEALTH` captures the one-shot boot phase report; `window.__OS_HEALTH` is the live HealthMonitor snapshot for runtime triage.
 - **Script-driven, SSE-driven, and `command:fs:*` file operations** share one allowlist (`core/script/utils/PathValidation.js`). Adding a new safe root requires only one edit.
-- **Storage hardening**: `StorageManager.set/get/setGlobal/getGlobal/hydrationSet` reject payloads with `__proto__` / `constructor` / `prototype` keys at any depth; UI writes are dropped during snapshot hydration; icon coordinates are clamped to a sane range.
+- **Storage hardening**: `StorageManager.set/get/setGlobal/getGlobal/hydrationSet` reject payloads with `__proto__` / `constructor` / `prototype` keys at any depth; UI writes are dropped during snapshot hydration; pre-login `.set()` writes are queued and replayed under the user scope on login with set-if-missing semantics (so a returning user's data isn't clobbered by boot-time defaults); icon coordinates are clamped to a sane range.
+- **Desktop-icon sync is bidirectional**: state → FS via `FileSystemManager.syncDesktopIcons` and FS → state via `StateManager.installDesktopIconReconciler` (subscribes to `filesystem:directory:changed` and skips events with `source: 'syncDesktopIcons'` to avoid feedback loops).
 - Multiplayer state sync uses a re-broadcast guard plus a version-vector conflict surface (`mp:state:conflict`, `story:state:conflict`) so concurrent edits no longer silently clobber.
 
-The small set of deliberately deferred follow-ups (CommandBus file deletion, bidirectional desktop-icon sync, pre-login storage drift) is listed in `docs/MIGRATION_ROADMAP.md`.
+`docs/MIGRATION_ROADMAP.md` tracks deliberate non-decisions (e.g., the `core/EventBus.js` re-export); the previously-deferred F1 (CommandBus deletion), F2 (bidirectional icon sync), and F3 (pre-login storage drift) follow-ups are closed.

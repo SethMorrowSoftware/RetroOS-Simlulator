@@ -91,8 +91,8 @@ export const operationsEvents = {
     'filesystem:directory:changed': {
         namespace: 'filesystem',
         action: 'directory:changed',
-        description: 'Directory contents changed (file added/removed/renamed)',
-        payload: { path: 'string' },
+        description: 'Directory contents changed (file added/removed/renamed). Optional `source` identifies the writer so reconcilers can skip events they originated.',
+        payload: { path: 'string', source: 'string?' },
         example: { path: 'C:/Users/Desktop' }
     },
 
@@ -100,7 +100,7 @@ export const operationsEvents = {
         namespace: 'filesystem',
         action: 'file:changed',
         description: 'File content or metadata changed',
-        payload: { path: 'string' },
+        payload: { path: 'string', source: 'string?' },
         example: { path: 'C:/Users/Desktop/notes.txt' }
     },
 
