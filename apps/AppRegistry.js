@@ -64,6 +64,7 @@ import AnalyticsDashboard from './AnalyticsDashboard.js';
 import GameLobby from './GameLobby.js';
 import BonziBuddy from './BonziBuddy.js';
 import DOSBox from './DOSBox.js';
+import C64 from './C64.js';
 // --- System App Placeholders (Simple implementations for completeness) ---
 import AppBase from './AppBase.js';
 
@@ -234,6 +235,7 @@ class AppRegistryClass {
             new Zork(),
             new Tetris(),
             new DOSBox(),
+            new C64(),
         ]);
 
         // --- Multimedia ---
