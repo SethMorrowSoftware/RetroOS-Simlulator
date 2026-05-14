@@ -51,6 +51,31 @@ const EJS_LOADER_URL = `${EJS_DATA_PATH}loader.js`;
 const C64_CORE = 'c64';
 
 /**
+ * Hosts whose responses send permissive CORS to third-party origins.
+ * Requests to these hosts go direct from the browser. Everything else
+ * (including archive.org subdomains, whose CORS posture has been
+ * historically inconsistent for browser embeds) is routed through the
+ * IlluminatOS C64 proxy at `api/c64-proxy.php`, same pattern as DOSBox.
+ */
+const CORS_FRIENDLY_HOSTS = new Set([
+    // (intentionally empty — IA is treated as proxy-routed for determinism)
+]);
+
+/**
+ * Hosts the proxy is configured to fetch from. Used only to decide
+ * whether we send a request through the proxy or fall back to a direct
+ * fetch with the warning that CORS may fail. Must stay in sync with the
+ * `$allowed_hosts` list in api/c64-proxy.php.
+ */
+const PROXY_HOSTS = new Set([
+    'archive.org',
+    'csdb.dk',
+    'cdn.csdb.dk',
+    'raw.githubusercontent.com',
+    // ia###.us.archive.org subdomains are matched by suffix below.
+]);
+
+/**
  * Curated C64 library — modeled on DOSBox's GAME_LIBRARY in scope and shape.
  *
  * Each entry: { name, icon, category, year, desc, iaItem? | url? }
@@ -637,6 +662,19 @@ class C64 extends AppBase {
                         <div class="c64-loading-spinner"></div>
                         <div class="c64-loading-text" id="c64LoadingText">Loading VICE…</div>
                     </div>
+                    <div class="c64-error" id="c64Error" style="display:none;">
+                        <div class="c64-error-icon">⚠️</div>
+                        <div class="c64-error-title" id="c64ErrorTitle">Something went wrong</div>
+                        <div class="c64-error-body" id="c64ErrorBody"></div>
+                        <div class="c64-error-actions">
+                            <a class="c64-error-link" id="c64ErrorSearch"
+                               href="https://archive.org/search?query=commodore+64"
+                               target="_blank" rel="noopener" style="display:none;">
+                                🔍 Search Internet Archive
+                            </a>
+                            <button class="c64-btn" id="c64ErrorDismiss">Back to disk list</button>
+                        </div>
+                    </div>
                 </div>
                 <div class="c64-status" id="c64Status">Ready</div>
             </div>
@@ -694,6 +732,18 @@ class C64 extends AppBase {
             this.stopEmulator().then(() => { if (url !== null) this.loadGame(url, name); });
         });
         this.addHandler(fsBtn, 'click', () => this.toggleFullscreen());
+
+        const errorDismiss = this.getElement('#c64ErrorDismiss');
+        this.addHandler(errorDismiss, 'click', () => {
+            // Drop back to the splash so the user can pick something else.
+            const splash = this.getElement('#c64Splash');
+            const errorOverlay = this.getElement('#c64Error');
+            if (errorOverlay) errorOverlay.style.display = 'none';
+            if (splash) splash.style.display = 'flex';
+            // Reset the dropdown so re-picking the same option still fires.
+            if (gameSelect) gameSelect.value = '';
+            this.setStatus('Ready');
+        });
 
         // Preload the EmulatorJS loader script in the background so the
         // first user-initiated launch is faster.
@@ -792,27 +842,94 @@ class C64 extends AppBase {
         }
 
         if (!entry.iaItem) {
-            this.setStatus('Error: library entry has no url and no iaItem');
+            this._showError('Library entry "' + displayName + '" has no url and no iaItem.');
             return;
         }
 
-        this.setStatus('Resolving Internet Archive: ' + entry.iaItem + '…');
+        // Immediately swap to the loading overlay so the user sees visible
+        // feedback even before the resolver fetch returns. Without this the
+        // splash stays up during the (sometimes slow) metadata round-trip
+        // and it looks like the dropdown did nothing.
+        this._showLoading('Resolving "' + displayName + '" on Internet Archive…');
+        this.setStatus('Resolving: ' + entry.iaItem);
+
         try {
             const url = await this._resolveIAItemToUrl(entry.iaItem);
             await this.loadGame(url, displayName);
         } catch (err) {
-            console.error('[C64] IA resolve failed:', err);
-            this.setStatus(
-                `Couldn't resolve "${displayName}" on Internet Archive — ` +
-                'the item may have been renamed or removed. Try another title, ' +
-                'paste a URL, or use the File… button.'
+            console.error('[C64] IA resolve failed for', entry.iaItem, '→', err);
+            const iaSearch = 'https://archive.org/search?query=' +
+                encodeURIComponent(displayName + ' commodore 64');
+            this._showError(
+                `Couldn't load "${displayName}" from Internet Archive.`,
+                [
+                    `Reason: ${err?.message || err}`,
+                    `The IA item ID "${entry.iaItem}" may have been renamed or removed.`,
+                    'Try another title, paste a URL above, or click "File…" to load a local .d64.'
+                ],
+                { iaSearchUrl: iaSearch }
             );
+            this.setStatus('Failed: ' + (err?.message || err));
             this.emitAppEvent('error', {
                 error: err?.message || String(err),
                 iaItem: entry.iaItem,
                 name: displayName
             });
         }
+    }
+
+    /**
+     * Show the loading overlay with custom text. Hides the splash so
+     * something visible always happens when the user picks a game.
+     * @private
+     */
+    _showLoading(text) {
+        const splash = this.getElement('#c64Splash');
+        const stage = this.getElement('#c64Stage');
+        const loading = this.getElement('#c64Loading');
+        const loadingText = this.getElement('#c64LoadingText');
+        const errorOverlay = this.getElement('#c64Error');
+        if (splash) splash.style.display = 'none';
+        if (stage) stage.style.display = 'none';
+        if (errorOverlay) errorOverlay.style.display = 'none';
+        if (loading) loading.style.display = 'flex';
+        if (loadingText) loadingText.textContent = text || 'Loading…';
+    }
+
+    /**
+     * Show a prominent in-window error overlay. Surfaces failures the
+     * user would otherwise miss if they're not watching the status bar.
+     * @private
+     */
+    _showError(title, lines = [], opts = {}) {
+        const splash = this.getElement('#c64Splash');
+        const stage = this.getElement('#c64Stage');
+        const loading = this.getElement('#c64Loading');
+        const errorOverlay = this.getElement('#c64Error');
+        const errorTitle = this.getElement('#c64ErrorTitle');
+        const errorBody = this.getElement('#c64ErrorBody');
+        const errorSearch = this.getElement('#c64ErrorSearch');
+
+        if (splash) splash.style.display = 'none';
+        if (stage) stage.style.display = 'none';
+        if (loading) loading.style.display = 'none';
+        if (!errorOverlay) return;
+
+        if (errorTitle) errorTitle.textContent = title || 'Something went wrong';
+        if (errorBody) {
+            errorBody.innerHTML = (lines || []).map(line =>
+                `<div class="c64-error-line">${escapeHtml(line)}</div>`
+            ).join('');
+        }
+        if (errorSearch) {
+            if (opts.iaSearchUrl) {
+                errorSearch.style.display = 'inline-block';
+                errorSearch.href = opts.iaSearchUrl;
+            } else {
+                errorSearch.style.display = 'none';
+            }
+        }
+        errorOverlay.style.display = 'flex';
     }
 
     /**
@@ -837,16 +954,20 @@ class C64 extends AppBase {
             return this._iaResolveInFlight.get(itemId);
         }
 
-        const metaUrl = `https://archive.org/metadata/${encodeURIComponent(itemId)}`;
+        // The original IA metadata URL — what we want the upstream to be.
+        const directMetaUrl = `https://archive.org/metadata/${encodeURIComponent(itemId)}`;
+        // Route through our same-origin proxy so CORS is deterministic.
+        const fetchUrl = this.getLoadUrl(directMetaUrl);
+
         const promise = (async () => {
-            const res = await fetch(metaUrl, { credentials: 'omit' });
+            const res = await fetch(fetchUrl, { credentials: 'omit' });
             if (!res.ok) {
                 throw new Error(`IA metadata HTTP ${res.status} for "${itemId}"`);
             }
             const meta = await res.json();
             const files = Array.isArray(meta?.files) ? meta.files : [];
             if (files.length === 0) {
-                throw new Error(`IA item "${itemId}" has no files (renamed or empty?)`);
+                throw new Error(`IA item "${itemId}" has no files (renamed or removed?)`);
             }
 
             // Pick the most specific extension. Within a tier, prefer the
@@ -872,6 +993,9 @@ class C64 extends AppBase {
                 throw new Error(`No supported file in IA item "${itemId}" (looked for ${IA_PREFERRED_EXTS.join(', ')})`);
             }
 
+            // Build the original archive.org/download URL. `_startEmulatorWith`
+            // will pass it through `getLoadUrl()` again so the actual fetch
+            // goes via our proxy.
             const url = `https://archive.org/download/${encodeURIComponent(itemId)}/${encodeURI(pick.name)}`;
             this._iaUrlCache.set(itemId, url);
             return url;
@@ -881,6 +1005,58 @@ class C64 extends AppBase {
 
         this._iaResolveInFlight.set(itemId, promise);
         return promise;
+    }
+
+    /**
+     * Resolve a user-facing URL into the URL we should actually fetch.
+     * Hosts not in `CORS_FRIENDLY_HOSTS` get routed through our local
+     * PHP proxy (same pattern as DOSBox.getLoadUrl in apps/DOSBox.js).
+     *
+     * Deployments can override the proxy URL by setting
+     *   window.__C64_PROXY_URL = 'https://example.com/proxy.php';
+     * before the C64 app launches.
+     *
+     * @param {string} originalUrl
+     * @returns {string}
+     */
+    getLoadUrl(originalUrl) {
+        if (!originalUrl) return originalUrl;
+        try {
+            const u = new URL(originalUrl, document.baseURI);
+            const host = u.hostname.toLowerCase();
+
+            // Local schemes — never proxy.
+            if (u.protocol === 'blob:' || u.protocol === 'data:' || u.protocol === 'file:') {
+                return originalUrl;
+            }
+            // Same-origin — no CORS issue.
+            if (host === location.hostname.toLowerCase()) {
+                return originalUrl;
+            }
+            // Explicit CORS-friendly hosts — fetch direct.
+            if (CORS_FRIENDLY_HOSTS.has(host)) {
+                return originalUrl;
+            }
+
+            const isProxyAllowed =
+                PROXY_HOSTS.has(host) ||
+                /\.us\.archive\.org$/i.test(host) ||
+                host.endsWith('.archive.org') ||
+                host.endsWith('.csdb.dk');
+
+            if (isProxyAllowed) {
+                const customProxy = (typeof window !== 'undefined' && window.__C64_PROXY_URL) || null;
+                const proxyBase = customProxy
+                    ? customProxy
+                    : new URL('api/c64-proxy.php', document.baseURI).toString();
+                const sep = proxyBase.includes('?') ? '&' : '?';
+                return proxyBase + sep + 'url=' + encodeURIComponent(originalUrl);
+            }
+            // Unknown host — pass through; CORS may fail with a clear console error.
+            return originalUrl;
+        } catch {
+            return originalUrl;
+        }
     }
 
     /**
@@ -988,7 +1164,19 @@ class C64 extends AppBase {
         window.EJS_player = playerSelector;
         window.EJS_core = C64_CORE;
         window.EJS_pathtodata = EJS_DATA_PATH;
-        window.EJS_gameUrl = gameUrl || ''; // empty = boot machine, no media
+        // Route the ROM through our CORS proxy if the upstream host needs
+        // it (matches DOSBox.getLoadUrl in apps/DOSBox.js).
+        // When no URL is supplied, clear EJS_gameUrl entirely — setting
+        // it to an empty string makes EmulatorJS try to fetch "" and
+        // silently fail before anything visible happens. Clearing the
+        // global tells EmulatorJS to boot the machine with no media,
+        // which on C64 lands at the "READY." BASIC prompt.
+        const fetchableUrl = gameUrl ? this.getLoadUrl(gameUrl) : '';
+        if (fetchableUrl) {
+            window.EJS_gameUrl = fetchableUrl;
+        } else {
+            try { delete window.EJS_gameUrl; } catch { /* ignore */ }
+        }
         window.EJS_gameName = gameName || 'Commodore 64';
         window.EJS_startOnLoaded = true;
         window.EJS_volume = 0.5;
