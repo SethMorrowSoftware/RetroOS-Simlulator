@@ -1,0 +1,379 @@
+/* ============================================
+   Browser App - 90s Internet Explorer 4/5 Style
+   Win95 themed with proper 3D beveled borders,
+   menu bar, large labeled toolbar, animated globe
+   ============================================ */
+
+[id^="window-browser"] .window-content {
+    padding: 0 !important;
+    overflow: hidden !important;
+}
+
+.browser-app {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: var(--win95-gray);
+    font-family: var(--win95-font-family);
+    color: var(--win95-text-color);
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+/* ============================================
+   MENU BAR
+   ============================================ */
+.browser-menubar {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 2px 4px;
+    background: var(--win95-gray);
+    border-bottom: 1px solid var(--win95-button-shadow);
+    font-size: 13px;
+    flex-shrink: 0;
+}
+.browser-menu {
+    padding: 2px 8px;
+    cursor: pointer;
+    user-select: none;
+    border: 1px solid transparent;
+}
+.browser-menu:hover {
+    background: var(--win95-selection-bg);
+    color: var(--win95-selection-text);
+}
+.browser-menu u { text-decoration: underline; }
+
+/* ============================================
+   TOOLBAR (large IE4-style labeled buttons)
+   ============================================ */
+.browser-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 1px;
+    padding: 3px 4px;
+    background: var(--win95-gray);
+    border-bottom: 1px solid var(--win95-button-shadow);
+    flex-shrink: 0;
+    position: relative;
+}
+.browser-tbtn {
+    min-width: 50px;
+    height: 46px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2px 6px;
+    gap: 1px;
+    background: var(--win95-button-face);
+    border: 2px solid transparent;
+    cursor: pointer;
+    font-family: var(--win95-font-family);
+    color: var(--win95-text-color);
+    font-size: 11px;
+}
+.browser-tbtn:hover:not(:disabled) {
+    border-top: 2px solid var(--win95-button-highlight);
+    border-left: 2px solid var(--win95-button-highlight);
+    border-right: 2px solid #000;
+    border-bottom: 2px solid #000;
+}
+.browser-tbtn:active:not(:disabled) {
+    border-top: 2px solid #000;
+    border-left: 2px solid #000;
+    border-right: 2px solid var(--win95-button-highlight);
+    border-bottom: 2px solid var(--win95-button-highlight);
+}
+.browser-tbtn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    filter: grayscale(0.8);
+}
+.browser-tbtn-icon {
+    font-size: 20px;
+    line-height: 22px;
+}
+.browser-tbtn-label {
+    font-size: 11px;
+    line-height: 12px;
+}
+.browser-tbar-sep {
+    width: 1px;
+    align-self: stretch;
+    margin: 2px 4px;
+    background: linear-gradient(to bottom,
+        transparent 0%,
+        var(--win95-button-shadow) 15%,
+        var(--win95-button-shadow) 85%,
+        transparent 100%);
+    box-shadow: 1px 0 0 var(--win95-button-highlight);
+}
+
+/* The animated IE-style spinning globe */
+.browser-spinner {
+    margin-left: auto;
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid var(--win95-button-shadow);
+    background: #000;
+    border-radius: 2px;
+    overflow: hidden;
+    box-shadow: inset 1px 1px 0 #000, inset -1px -1px 0 var(--win95-button-highlight);
+}
+.browser-globe {
+    font-size: 28px;
+    line-height: 28px;
+    filter: drop-shadow(0 0 3px #44aaff);
+    transition: transform 0.2s linear;
+}
+.browser-spinner.spinning .browser-globe {
+    animation: browser-globe-spin 1.2s linear infinite;
+}
+@keyframes browser-globe-spin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+}
+
+/* ============================================
+   ADDRESS BAR
+   ============================================ */
+.browser-addrbar {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 6px;
+    background: var(--win95-gray);
+    border-bottom: 1px solid var(--win95-button-shadow);
+    flex-shrink: 0;
+}
+.browser-addr-label {
+    font-size: 12px;
+    color: var(--win95-button-shadow);
+    padding: 0 2px;
+}
+.browser-addr-input-wrap {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    background: var(--win95-input-bg);
+    border-top: 2px solid var(--win95-button-shadow);
+    border-left: 2px solid var(--win95-button-shadow);
+    border-right: 2px solid var(--win95-button-highlight);
+    border-bottom: 2px solid var(--win95-button-highlight);
+    padding: 1px 2px 1px 4px;
+}
+.browser-addr-input-wrap::before {
+    content: '📄';
+    font-size: 13px;
+    margin-right: 4px;
+    opacity: 0.8;
+}
+.browser-addr-input {
+    flex: 1;
+    height: 20px;
+    border: none;
+    outline: none;
+    background: transparent;
+    padding: 0;
+    font-size: 13px;
+    font-family: var(--win95-font-family);
+    color: var(--win95-text-color);
+}
+.browser-go-btn {
+    padding: 2px 14px;
+    height: 24px;
+    background: var(--win95-button-face);
+    border-top: 2px solid var(--win95-button-highlight);
+    border-left: 2px solid var(--win95-button-highlight);
+    border-right: 2px solid #000;
+    border-bottom: 2px solid #000;
+    font-family: var(--win95-font-family);
+    font-size: 12px;
+    cursor: pointer;
+    color: var(--win95-text-color);
+}
+.browser-go-btn:active {
+    border-top: 2px solid #000;
+    border-left: 2px solid #000;
+    border-right: 2px solid var(--win95-button-highlight);
+    border-bottom: 2px solid var(--win95-button-highlight);
+}
+
+/* ============================================
+   FAVORITES (Links) BAR
+   ============================================ */
+.browser-favbar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 6px;
+    background: var(--win95-gray);
+    border-bottom: 1px solid var(--win95-button-shadow);
+    flex-shrink: 0;
+    overflow: hidden;
+}
+.browser-favbar-label {
+    font-size: 12px;
+    color: var(--win95-button-shadow);
+    flex-shrink: 0;
+}
+.browser-favbar-list {
+    display: flex;
+    gap: 2px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    flex: 1;
+}
+.browser-favbar-list::-webkit-scrollbar { height: 6px; }
+.browser-favbar-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 2px 6px;
+    font-size: 12px;
+    cursor: pointer;
+    border: 1px solid transparent;
+    white-space: nowrap;
+    user-select: none;
+    color: var(--win95-text-color);
+}
+.browser-favbar-item:hover {
+    border-top: 1px solid var(--win95-button-highlight);
+    border-left: 1px solid var(--win95-button-highlight);
+    border-right: 1px solid #000;
+    border-bottom: 1px solid #000;
+    background: var(--win95-button-face);
+}
+.browser-favbar-icon { font-size: 11px; }
+.browser-favbar-name {
+    color: var(--win95-blue);
+    text-decoration: underline;
+}
+.browser-favbar-item:hover .browser-favbar-name { color: #c00; }
+
+/* ============================================
+   CONTENT AREA
+   ============================================ */
+.browser-content {
+    flex: 1;
+    background: #fff;
+    border-top: 2px solid var(--win95-button-shadow);
+    border-left: 2px solid var(--win95-button-shadow);
+    border-right: 2px solid var(--win95-button-highlight);
+    border-bottom: 2px solid var(--win95-button-highlight);
+    margin: 2px;
+    position: relative;
+    overflow: hidden;
+}
+.browser-iframe {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    border: none;
+    background: #fff;
+}
+.browser-loading {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, #000080 0%, #1084d0 100%);
+    color: #ffffff;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    font-size: 16px;
+    font-family: var(--win95-font-family);
+    text-shadow: 1px 1px 0 #000;
+    z-index: 1;
+}
+.browser-loading-globe {
+    font-size: 56px;
+    filter: drop-shadow(0 0 8px #6cf);
+    animation: browser-globe-spin 1.2s linear infinite;
+}
+
+/* ============================================
+   STATUS BAR
+   ============================================ */
+.browser-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 22px;
+    padding: 2px 4px;
+    background: var(--win95-gray);
+    border-top: 1px solid var(--win95-button-highlight);
+    font-size: 12px;
+    color: var(--win95-text-color);
+    flex-shrink: 0;
+}
+.browser-status-text {
+    flex: 1;
+    padding: 0 6px;
+    border-top: 1px solid var(--win95-button-shadow);
+    border-left: 1px solid var(--win95-button-shadow);
+    border-right: 1px solid var(--win95-button-highlight);
+    border-bottom: 1px solid var(--win95-button-highlight);
+    background: var(--win95-gray);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    line-height: 16px;
+}
+.browser-progress {
+    width: 110px;
+    height: 16px;
+    border-top: 1px solid var(--win95-button-shadow);
+    border-left: 1px solid var(--win95-button-shadow);
+    border-right: 1px solid var(--win95-button-highlight);
+    border-bottom: 1px solid var(--win95-button-highlight);
+    background: var(--win95-input-bg);
+    padding: 1px;
+    overflow: hidden;
+}
+.browser-progress-fill {
+    display: block;
+    height: 100%;
+    width: 0%;
+    background: repeating-linear-gradient(
+        90deg,
+        var(--win95-blue) 0,
+        var(--win95-blue) 8px,
+        #000080 8px,
+        #000080 12px
+    );
+    background-size: 12px 100%;
+    transition: width 0.25s ease;
+}
+.browser-progress.active .browser-progress-fill {
+    animation: browser-progress-march 0.6s linear infinite;
+}
+@keyframes browser-progress-march {
+    from { background-position: 0 0; }
+    to   { background-position: 12px 0; }
+}
+.browser-zone {
+    padding: 0 6px;
+    border-top: 1px solid var(--win95-button-shadow);
+    border-left: 1px solid var(--win95-button-shadow);
+    border-right: 1px solid var(--win95-button-highlight);
+    border-bottom: 1px solid var(--win95-button-highlight);
+    background: var(--win95-gray);
+    line-height: 16px;
+}
+
+/* Narrow window: hide toolbar text labels to keep things tidy */
+@media (max-width: 640px) {
+    .browser-tbtn-label { display: none; }
+    .browser-tbtn { min-width: 36px; height: 36px; }
+    .browser-tbtn-icon { font-size: 18px; }
+    .browser-spinner { width: 36px; height: 36px; }
+    .browser-globe { font-size: 22px; }
+}

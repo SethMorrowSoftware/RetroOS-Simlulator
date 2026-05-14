@@ -1,0 +1,378 @@
+/* ============================================
+   Desktop Icons
+   ============================================ */
+.icon {
+    position: absolute;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    padding: 6px;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: background 0.1s;
+    width: 90px;
+    user-select: none;
+}
+
+.icon.dragging {
+    opacity: 0.7;
+    z-index: 1000;
+}
+
+/* Cut state - items marked for cut appear faded */
+.icon.cut {
+    opacity: 0.5;
+}
+
+.icon.cut .icon-image {
+    filter: drop-shadow(2px 2px 0px rgba(0, 0, 0, 0.5)) grayscale(30%);
+}
+
+.icon:hover,
+.icon:focus {
+    background: rgba(0, 0, 128, 0.3);
+    border: 2px dotted white;
+    outline: none;
+}
+
+.icon.selected {
+    background: rgba(0, 0, 128, 0.5);
+    border: 2px dotted white;
+}
+
+.icon-image {
+    width: 32px;
+    height: 32px;
+    margin-bottom: 4px;
+    font-size: 32px;
+    filter: drop-shadow(1px 1px 0px rgba(0, 0, 0, 0.4));
+    transition: transform 0.1s;
+    pointer-events: none;
+}
+
+.icon:hover .icon-image {
+    transform: scale(1.1);
+}
+
+.icon-label {
+    color: white;
+    font-size: 12px;
+    text-align: center;
+    text-shadow: 1px 1px 2px black, -1px -1px 2px black, 1px -1px 2px black, -1px 1px 2px black;
+    word-wrap: break-word;
+    max-width: 90px;
+    pointer-events: none;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    line-height: 1.3;
+}
+
+/* ============================================
+   Icon List
+   ============================================ */
+.icon-list {
+    max-height: 200px;
+    overflow-y: auto;
+    border: 2px inset var(--win95-gray);
+    padding: 5px;
+    background: white;
+    margin-bottom: 10px;
+}
+
+.icon-list-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.icon-list-item:last-child {
+    border-bottom: none;
+}
+
+.icon-list-item:hover {
+    background: #e8e8e8;
+}
+
+/* ============================================
+   Color Grid
+   ============================================ */
+.color-grid {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 5px;
+    margin: 10px 0;
+}
+
+.theme-color {
+    width: 30px;
+    height: 30px;
+    cursor: pointer;
+    border: 2px outset var(--win95-gray);
+}
+
+.theme-color:hover,
+.theme-color.active {
+    border: 2px inset var(--win95-gray);
+}
+
+/* ============================================
+   Enhanced Icon Hover Effects
+   ============================================ */
+.icon:active .icon-image {
+    transform: scale(0.95);
+}
+
+.icon.selected .icon-label {
+    background: var(--win95-blue);
+    color: white;
+}
+
+/* ============================================
+   Icon System (FontAwesome + Emoji hybrid)
+   ============================================ */
+
+/* Base styles for FontAwesome icons */
+.retro-icon {
+    font-size: 16px;
+    width: 1em;
+    height: 1em;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    vertical-align: middle;
+    line-height: 1;
+}
+
+/* Base styles for emoji icons */
+.retro-icon-emoji {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    vertical-align: middle;
+    line-height: 1;
+}
+
+/* Size variants for icons */
+.retro-icon--sm {
+    font-size: 12px;
+}
+
+.retro-icon--lg {
+    font-size: 24px;
+}
+
+.retro-icon--xl {
+    font-size: 32px;
+}
+
+.retro-icon--2x {
+    font-size: 2em;
+}
+
+.retro-icon--3x {
+    font-size: 3em;
+}
+
+/* Desktop icon specific styling */
+.icon .retro-icon,
+.icon .retro-icon-emoji,
+.icon-image .retro-icon,
+.icon-image .retro-icon-emoji {
+    font-size: 32px;
+    width: 32px;
+    height: 32px;
+}
+
+/* Taskbar icon styling */
+.taskbar-button .retro-icon,
+.taskbar-button .retro-icon-emoji {
+    font-size: 14px;
+    margin-right: 4px;
+}
+
+/* Quick launch icons */
+.quick-launch-btn .retro-icon,
+.quick-launch-btn .retro-icon-emoji {
+    font-size: 14px;
+}
+
+/* System tray icons */
+.tray-icon .retro-icon,
+.tray-icon .retro-icon-emoji {
+    font-size: 16px;
+}
+
+/* Start menu icons */
+.start-menu-icon .retro-icon,
+.start-menu-icon .retro-icon-emoji {
+    font-size: 16px;
+    width: 20px;
+    text-align: center;
+}
+
+/* Window title bar icons */
+.title-icon .retro-icon,
+.title-icon .retro-icon-emoji {
+    font-size: 14px;
+}
+
+/* Dialog icons */
+.dialog-icon .retro-icon,
+.dialog-icon .retro-icon-emoji {
+    font-size: 48px;
+}
+
+/* Context menu icons */
+.context-icon .retro-icon,
+.context-icon .retro-icon-emoji {
+    font-size: 16px;
+    width: 20px;
+    text-align: center;
+}
+
+/* File browser icons */
+.mycomputer-item-icon .retro-icon,
+.mycomputer-item-icon .retro-icon-emoji,
+.mycomputer-list-icon .retro-icon,
+.mycomputer-list-icon .retro-icon-emoji {
+    font-size: 32px;
+}
+
+.mycomputer-list-icon .retro-icon,
+.mycomputer-list-icon .retro-icon-emoji {
+    font-size: 16px;
+}
+
+/* Alert/Confirm dialog icons */
+.alert-icon .retro-icon,
+.alert-icon .retro-icon-emoji,
+.confirm-icon .retro-icon,
+.confirm-icon .retro-icon-emoji {
+    font-size: 42px;
+}
+
+/* Achievement icon */
+.achievement-icon .retro-icon,
+.achievement-icon .retro-icon-emoji {
+    font-size: 32px;
+}
+
+/* Clippy character */
+.clippy-character .retro-icon-emoji {
+    font-size: 48px;
+}
+
+/* Desktop pet - now uses canvas rendering */
+
+/* Button icons with text */
+.btn .retro-icon,
+.btn .retro-icon-emoji {
+    margin-right: 6px;
+}
+
+/* Icon color utilities */
+.retro-icon-primary {
+    color: var(--win95-blue);
+}
+
+.retro-icon-success {
+    color: #008000;
+}
+
+.retro-icon-warning {
+    color: #ff8c00;
+}
+
+.retro-icon-danger {
+    color: #cc0000;
+}
+
+.retro-icon-muted {
+    color: #808080;
+}
+
+/* Icon hover effects */
+.retro-icon-hover:hover {
+    transform: scale(1.1);
+    transition: transform 0.15s ease;
+}
+
+/* Spinning icon animation */
+.retro-icon-spin {
+    animation: retro-spin 1s linear infinite;
+}
+
+@keyframes retro-spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* Pulse animation for icons */
+.retro-icon-pulse {
+    animation: retro-pulse 1s ease-in-out infinite;
+}
+
+@keyframes retro-pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+/* Icon in input fields */
+.input-icon-wrapper {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+}
+
+.input-icon-wrapper .retro-icon,
+.input-icon-wrapper .retro-icon-emoji {
+    position: absolute;
+    left: 8px;
+    color: #808080;
+    pointer-events: none;
+}
+
+.input-icon-wrapper input {
+    padding-left: 30px;
+}
+
+/* Icon stack (for layered icons) */
+.icon-stack {
+    position: relative;
+    display: inline-flex;
+    width: 1em;
+    height: 1em;
+}
+
+.icon-stack .retro-icon,
+.icon-stack .retro-icon-emoji {
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
+.icon-stack .icon-stack-base {
+    font-size: 1em;
+}
+
+.icon-stack .icon-stack-top {
+    font-size: 0.5em;
+    top: auto;
+    bottom: 0;
+    left: auto;
+    right: 0;
+}

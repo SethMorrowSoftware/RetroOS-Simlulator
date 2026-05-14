@@ -1,0 +1,717 @@
+/* ============================================
+   Dialog Box
+   ============================================ */
+.dialog-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.3);
+    z-index: 99990;
+    display: none;
+}
+
+.dialog-overlay.active {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.dialog-box {
+    background: var(--win95-gray);
+    border: 2px outset var(--win95-gray);
+    padding: 20px;
+    min-width: 300px;
+    text-align: center;
+}
+
+.dialog-icon {
+    font-size: 48px;
+    margin-bottom: 15px;
+}
+
+.dialog-text {
+    margin-bottom: 15px;
+    font-size: 13px;
+    white-space: pre-wrap;
+}
+
+.dialog-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+}
+
+/* ============================================
+   System Dialogs (Run, Shutdown, About, Welcome)
+   ============================================ */
+.system-dialog-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 99995;
+    display: none;
+    align-items: center;
+    justify-content: center;
+}
+
+.system-dialog-overlay.active {
+    display: flex;
+    animation: fadeIn 0.15s ease-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.system-dialog {
+    background: var(--win95-gray);
+    border: 2px outset var(--win95-gray);
+    box-shadow: 4px 4px 10px rgba(0, 0, 0, 0.4);
+    min-width: 400px;
+    max-width: 500px;
+    animation: dialogPop 0.2s ease-out;
+}
+
+@keyframes dialogPop {
+    from {
+        transform: scale(0.9);
+        opacity: 0;
+    }
+    to {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+.dialog-titlebar {
+    background: linear-gradient(90deg, var(--win95-blue) 0%, #1084d0 100%);
+    color: white;
+    padding: 4px 8px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: bold;
+    font-size: 16px;
+}
+
+.dialog-title-icon {
+    font-size: 14px;
+}
+
+.dialog-close-btn {
+    margin-left: auto;
+    width: 20px;
+    height: 18px;
+    background: var(--win95-gray);
+    border: 2px outset var(--win95-gray);
+    font-weight: bold;
+    font-size: 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+}
+
+.dialog-close-btn:active {
+    border: 2px inset var(--win95-gray);
+}
+
+.dialog-body {
+    padding: 20px;
+}
+
+.dialog-buttons {
+    padding: 10px 20px 15px;
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+}
+
+/* Run Dialog Specific */
+.run-dialog-content {
+    display: flex;
+    gap: 15px;
+}
+
+.run-icon {
+    font-size: 48px;
+    flex-shrink: 0;
+}
+
+.run-text p {
+    margin-bottom: 15px;
+    font-size: 15px;
+    line-height: 1.4;
+}
+
+.run-input-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.run-input-group label {
+    font-size: 15px;
+    flex-shrink: 0;
+}
+
+.run-input {
+    flex: 1;
+    padding: 4px 6px;
+    font-family: 'MS Sans Serif', 'Segoe UI', Tahoma, sans-serif;
+    font-size: 13px;
+    border: 2px inset var(--win95-gray);
+    background: white;
+}
+
+.run-input:focus {
+    outline: none;
+}
+
+/* Shutdown Dialog Specific */
+.shutdown-content {
+    display: flex;
+    gap: 20px;
+}
+
+.shutdown-icon {
+    font-size: 48px;
+    flex-shrink: 0;
+}
+
+.shutdown-text p {
+    margin-bottom: 15px;
+    font-size: 15px;
+}
+
+.shutdown-options {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.shutdown-option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 10px;
+    cursor: pointer;
+    border: 1px solid transparent;
+    font-size: 15px;
+}
+
+.shutdown-option:hover {
+    background: rgba(0, 0, 128, 0.1);
+}
+
+.shutdown-option input[type="radio"] {
+    margin: 0;
+}
+
+.shutdown-option .option-icon {
+    font-size: 18px;
+}
+
+/* About Dialog Specific */
+.about-dialog {
+    min-width: 450px;
+}
+
+.about-content {
+    text-align: center;
+}
+
+.about-logo {
+    padding: 20px;
+    margin-bottom: 15px;
+    background: linear-gradient(180deg, #000080 0%, #1084d0 100%);
+    border: 2px inset var(--win95-gray);
+}
+
+.about-logo-text {
+    font-size: 36px;
+    font-weight: bold;
+    color: white;
+    text-shadow: 2px 2px 0 rgba(0,0,0,0.5);
+    background: linear-gradient(90deg, #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.about-logo-subtitle {
+    color: #c0c0c0;
+    font-size: 14px;
+    margin-top: 5px;
+}
+
+.about-info {
+    text-align: left;
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+.about-info p {
+    margin-bottom: 5px;
+}
+
+.about-divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--win95-dark), transparent);
+    margin: 12px 0;
+}
+
+.about-specs {
+    color: #666;
+    font-size: 13px;
+}
+
+.about-specs span {
+    display: block;
+}
+
+.about-credits {
+    color: var(--win95-blue);
+    font-style: italic;
+    text-align: center;
+}
+
+/* Welcome Dialog Specific */
+.welcome-dialog {
+    min-width: 480px;
+}
+
+.welcome-banner {
+    text-align: center;
+    padding: 25px;
+    background: linear-gradient(180deg, #008080 0%, #004040 100%);
+    border: 2px inset var(--win95-gray);
+    margin-bottom: 15px;
+}
+
+.welcome-logo {
+    font-size: 42px;
+    font-weight: bold;
+    color: white;
+    text-shadow: 3px 3px 0 rgba(0,0,0,0.5);
+}
+
+.welcome-tips h3 {
+    margin-bottom: 10px;
+    font-size: 16px;
+}
+
+.tips-list {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 15px 0;
+}
+
+.tips-list li {
+    padding: 6px 0 6px 20px;
+    position: relative;
+    font-size: 14px;
+}
+
+.tips-list li::before {
+    content: '✓';
+    position: absolute;
+    left: 0;
+    color: #008000;
+}
+
+.welcome-checkbox {
+    margin-top: 15px;
+    padding-top: 10px;
+    border-top: 1px solid var(--win95-dark);
+}
+
+.welcome-checkbox label {
+    font-size: 14px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Shutdown Screen - Multi-phase Windows 95 sequence */
+.shutdown-screen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 999999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    opacity: 0;
+    transition: opacity 0.5s;
+}
+
+.shutdown-screen.active {
+    opacity: 1;
+}
+
+/* Phase 1: "Windows is shutting down..." - dark teal like real Win95 */
+.shutdown-screen.phase-shutting-down {
+    background: #008080;
+}
+
+.shutdown-screen.phase-shutting-down .shutdown-logo {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 30px;
+}
+
+.shutdown-logo-flag {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 3px;
+    width: 60px;
+    height: 60px;
+    transform: rotate(-8deg);
+    animation: flagWave 3s ease-in-out infinite;
+}
+
+@keyframes flagWave {
+    0%, 100% { transform: rotate(-8deg) scale(1); }
+    50% { transform: rotate(-6deg) scale(1.03); }
+}
+
+.shutdown-logo-flag .flag-r { background: #ff0000; border-radius: 2px 0 0 0; }
+.shutdown-logo-flag .flag-g { background: #00aa00; border-radius: 0 2px 0 0; }
+.shutdown-logo-flag .flag-b { background: #0000ff; border-radius: 0 0 0 2px; }
+.shutdown-logo-flag .flag-y { background: #ffcc00; border-radius: 0 0 2px 0; }
+
+.shutdown-phase-text {
+    color: #ffffff;
+    font-size: 24px;
+    text-align: center;
+    line-height: 1.6;
+}
+
+.shutdown-phase-subtext {
+    color: #c0c0c0;
+    font-size: 14px;
+    text-align: center;
+    margin-top: 8px;
+}
+
+/* Phase 2: "Please wait..." with progress steps */
+.shutdown-screen.phase-saving {
+    background: #008080;
+}
+
+.shutdown-progress-list {
+    list-style: none;
+    padding: 0;
+    margin: 20px 0 0 0;
+    font-size: 14px;
+    color: #c0c0c0;
+    text-align: left;
+    min-width: 280px;
+}
+
+.shutdown-progress-list li {
+    padding: 3px 0;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.shutdown-progress-list li.visible {
+    opacity: 1;
+}
+
+.shutdown-progress-list li.done {
+    color: #00ff00;
+}
+
+.shutdown-progress-list li.done::before {
+    content: '✓ ';
+}
+
+.shutdown-progress-list li.active::before {
+    content: '► ';
+    color: #ffcc00;
+}
+
+.shutdown-progress-list li.active {
+    color: #ffffff;
+}
+
+/* Phase 3: "It is now safe to turn off your computer" - black with orange */
+.shutdown-screen.phase-safe {
+    background: #000000;
+    cursor: pointer;
+}
+
+.shutdown-safe-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+}
+
+.shutdown-safe-content .shutdown-logo-flag {
+    width: 50px;
+    height: 50px;
+    animation: none;
+    transform: rotate(-8deg);
+}
+
+.shutdown-safe-text {
+    color: #ff8800;
+    font-size: 28px;
+    text-align: center;
+    text-shadow: 0 0 20px rgba(255, 136, 0, 0.3);
+    line-height: 1.4;
+    animation: safeTextGlow 2.5s ease-in-out infinite;
+}
+
+@keyframes safeTextGlow {
+    0%, 100% { text-shadow: 0 0 20px rgba(255, 136, 0, 0.3); }
+    50% { text-shadow: 0 0 30px rgba(255, 136, 0, 0.5), 0 0 60px rgba(255, 136, 0, 0.15); }
+}
+
+.shutdown-safe-hint {
+    color: #555555;
+    font-size: 12px;
+    margin-top: 40px;
+    animation: hintFadeIn 2s ease-in 1s both;
+}
+
+@keyframes hintFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* CRT scanline overlay on the safe-to-turn-off screen */
+.shutdown-screen.phase-safe::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0, 0, 0, 0.08) 2px,
+        rgba(0, 0, 0, 0.08) 4px
+    );
+    pointer-events: none;
+}
+
+/* Logoff overlay */
+.shutdown-screen.phase-logoff {
+    background: #008080;
+}
+
+.logoff-text {
+    color: #ffffff;
+    font-size: 22px;
+    text-align: center;
+    margin-bottom: 4px;
+}
+
+/* Blinking cursor effect for the saving phase */
+@keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+}
+
+.shutdown-cursor {
+    display: inline-block;
+    width: 8px;
+    height: 14px;
+    background: #ffffff;
+    margin-left: 2px;
+    vertical-align: middle;
+    animation: blink 1s step-end infinite;
+}
+
+/* Fade-through for phase transitions */
+@keyframes shutdownFadeThrough {
+    0% { opacity: 1; }
+    100% { opacity: 0; }
+}
+
+.shutdown-screen.fading {
+    animation: shutdownFadeThrough 0.6s ease-in forwards;
+}
+
+/* Alert/Confirm/Prompt Dialog Styles */
+.alert-dialog,
+.confirm-dialog,
+.prompt-dialog {
+    min-width: 350px;
+    max-width: 450px;
+}
+
+.alert-content,
+.confirm-content {
+    display: flex;
+    gap: 15px;
+    align-items: flex-start;
+}
+
+.alert-icon,
+.confirm-icon {
+    font-size: 42px;
+    flex-shrink: 0;
+}
+
+.alert-message,
+.confirm-message {
+    font-size: 14px;
+    line-height: 1.5;
+    padding-top: 5px;
+    word-wrap: break-word;
+}
+
+.prompt-content {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.prompt-message {
+    font-size: 14px;
+}
+
+.prompt-input {
+    width: 100%;
+    padding: 6px 8px;
+    font-size: 14px;
+    font-family: inherit;
+    border: 2px inset var(--win95-gray);
+    background: white;
+}
+
+.prompt-input:focus {
+    outline: none;
+}
+
+/* File Dialog Styles */
+.file-dialog {
+    min-width: 500px;
+    max-width: 600px;
+}
+
+.file-dialog-content {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.file-dialog-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.file-dialog-toolbar label {
+    font-size: 13px;
+    white-space: nowrap;
+}
+
+.file-dialog-path {
+    flex: 1;
+    padding: 4px 8px;
+    font-size: 13px;
+    font-family: inherit;
+    border: 2px inset var(--win95-gray);
+    background: white;
+}
+
+.file-dialog-btn {
+    padding: 4px 8px;
+    font-size: 14px;
+    background: var(--win95-gray);
+    border: 2px outset var(--win95-gray);
+    cursor: pointer;
+}
+
+.file-dialog-btn:active {
+    border-style: inset;
+}
+
+.file-dialog-browser {
+    height: 200px;
+    overflow-y: auto;
+    background: white;
+    border: 2px inset var(--win95-gray);
+    padding: 4px;
+}
+
+.file-dialog-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 8px;
+    cursor: pointer;
+    font-size: 13px;
+}
+
+.file-dialog-item:hover {
+    background: #e0e0e0;
+}
+
+.file-dialog-item.selected {
+    background: var(--win95-blue);
+    color: white;
+}
+
+.file-dialog-item-icon {
+    font-size: 16px;
+}
+
+.file-dialog-item-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.file-dialog-footer {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.file-dialog-filename-row,
+.file-dialog-filetype-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.file-dialog-filename-row label,
+.file-dialog-filetype-row label {
+    font-size: 13px;
+    white-space: nowrap;
+    min-width: 80px;
+}
+
+.file-dialog-filename,
+.file-dialog-filetype {
+    flex: 1;
+    padding: 4px 8px;
+    font-size: 13px;
+    font-family: inherit;
+    border: 2px inset var(--win95-gray);
+    background: white;
+}
+
+.file-dialog-error {
+    padding: 20px;
+    text-align: center;
+    color: #800000;
+}

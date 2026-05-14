@@ -1,0 +1,41 @@
+# ==================================================
+# Inbox Demo - Timed mail delivery sequence
+# ==================================================
+# This RetroScript delivers a series of mysterious
+# messages into the Inbox app over time, showcasing
+# the scripting API for ARG content delivery.
+#
+# Usage: Run this script from ScriptRunner or Terminal
+# ==================================================
+
+print [Inbox Demo] Starting timed message delivery...
+
+# --- Message 1: Welcome mail (immediate) ---
+emit command:inbox:deliverMessage from="Postmaster" to=["User"] subject="Welcome to IlluminatOS Mail" body="Hello!\n\nWelcome to your new Inbox. This is IlluminatOS Mail, your personal communication hub.\n\nYou can receive messages from the system, from other apps, and from... other sources.\n\nCheck back often. You never know what might arrive.\n\n- The Postmaster" tags=["system", "welcome"]
+print [Inbox Demo] Welcome message delivered.
+
+wait 3000
+
+# --- Message 2: System notification ---
+emit command:inbox:deliverMessage from="IT_Guy_Dave" to=["User"] subject="Re: Network Diagnostics" body="Hey,\n\nI ran the diagnostics you asked about. Everything looks normal on the surface, but there is something weird in the packet logs.\n\nThere is traffic going to an IP that does not match any of our registered servers. Started about a week ago. Probably nothing, but I will keep an eye on it.\n\nAlso - have you checked the new file that appeared in C:/Users/User/Secret? I did not put it there.\n\n- Dave\nIT Department" tags=["arg", "clue"] headers={"X-Quest-Stage": "1", "X-Checksum": "a7f3b2", "X-Priority": "High"}
+print [Inbox Demo] Clue message delivered.
+
+wait 4000
+
+# --- Message 3: Mysterious sender ---
+emit command:inbox:deliverMessage from="unknown@void.local" to=["User"] subject="Do you remember?" body="They told you to forget.\nBut the files are still there.\n\nLook closer.\n\n01110100 01110010 01110101 01110100 01101000" tags=["arg", "mystery", "encrypted"] headers={"X-Quest-Stage": "2", "X-Checksum": "ff00ff", "X-Routed-Via": "unknown", "X-Encryption": "binary-ascii"} scriptMeta={"questId": "awakening", "stage": 2, "decodable": true}
+print [Inbox Demo] Mystery message delivered.
+
+wait 3000
+
+# --- Message 4: From a friend ---
+emit command:inbox:deliverMessage from="CoolMom56" to=["User"] subject="Fwd: Fwd: Fwd: FUNNY JOKE!!!" body="Hi sweetie!!\n\nYour aunt Linda sent me this and I thought of you! LOL!!\n\n> Why did the computer go to the doctor?\n> Because it had a virus!! HAHAHAHA!\n\nForward this to 10 friends for good luck!!!\n\nLove, Mom\n\nP.S. Are you eating enough? Call me!" tags=["personal", "humor"]
+print [Inbox Demo] Forwarded joke delivered.
+
+wait 2000
+
+# --- Message 5: Newsletter spam ---
+emit command:inbox:deliverMessage from="deals@geocities-mall.com" to=["User"] subject="FREE!!! 100 Hours of Internet!!!" body="*** CONGRATULATIONS ***\n\nYou have been selected to receive\n100 FREE HOURS of Internet access!!!\n\nJust call 1-800-555-FREE and mention code: RETRO95\n\n*** LIMITED TIME OFFER ***\n\nThis message was sent to you because you signed up at www.coolwebsite.com\nTo unsubscribe, send a letter to: P.O. Box 1234, Cyberspace, CA 90210" tags=["spam"] headers={"X-Spam-Score": "9.5", "X-Mailer": "BulkMailer Pro 3.0"}
+print [Inbox Demo] Spam delivered.
+
+print [Inbox Demo] All messages delivered! Check your Inbox.

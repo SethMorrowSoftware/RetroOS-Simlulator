@@ -1,0 +1,92 @@
+/**
+ * IlluminatOS! - Main Styles Entry Point
+ * Windows 95 themed CSS with modern enhancements
+ *
+ * This file imports all modular CSS files in the correct order
+ * to maintain proper cascade and specificity.
+ */
+
+/* ============================================
+   CORE - Must be first
+   ============================================ */
+@import url('core/variables.css');
+@import url('core/base.css');
+@import url('core/display-properties.css');
+
+/* ============================================
+   EFFECTS - Color schemes early for theming
+   ============================================ */
+@import url('effects/color-schemes.css');
+@import url('effects/admin-effects.css');
+
+/* ============================================
+   FEATURES - System features
+   ============================================ */
+@import url('features/boot-screen.css');
+@import url('features/login-screen.css');
+@import url('features/crt-effect.css');
+@import url('features/screensaver.css');
+@import url('features/clippy.css');
+@import url('features/desktop-pet.css');
+@import url('features/notifications.css');
+@import url('features/achievements.css');
+@import url('features/bsod.css');
+
+/* ============================================
+   LAYOUT - Page layout components
+   ============================================ */
+@import url('layout/desktop.css');
+@import url('layout/context-menu.css');
+@import url('layout/taskbar.css');
+@import url('layout/start-menu.css');
+
+/* ============================================
+   COMPONENTS - Reusable UI components
+   ============================================ */
+@import url('components/icons.css');
+@import url('components/windows.css');
+@import url('components/buttons.css');
+@import url('components/forms.css');
+@import url('components/tabs.css');
+@import url('components/emoji-picker.css');
+@import url('components/tooltips.css');
+@import url('components/dialogs.css');
+
+/* ============================================
+   APPS - Application-specific styles
+   ============================================ */
+@import url('apps/calculator.css');
+@import url('apps/terminal.css');
+@import url('apps/notepad.css');
+@import url('apps/paint.css');
+@import url('apps/minesweeper.css');
+@import url('apps/snake.css');
+@import url('apps/media-player.css');
+@import url('apps/doom.css');
+@import url('apps/asteroids.css');
+@import url('apps/calendar.css');
+@import url('apps/freecell.css');
+@import url('apps/phone.css');
+@import url('apps/inbox.css');
+@import url('apps/instant-messenger.css');
+@import url('apps/chatroom.css');
+@import url('apps/browser.css');
+@import url('apps/tetris.css');
+@import url('apps/campaign-studio.css');
+@import url('apps/timeline-editor.css');
+@import url('apps/showrunner-console.css');
+@import url('apps/analytics-dashboard.css');
+@import url('apps/dosbox.css');
+@import url('apps/gamelobby.css');
+@import url('apps/hypercard.css');
+@import url('apps/bonzibuddy.css');
+
+/* ============================================
+   EFFECTS - Animations (near end)
+   ============================================ */
+@import url('effects/animations.css');
+
+/* ============================================
+   UTILITIES - Last for highest specificity
+   ============================================ */
+@import url('utilities/helpers.css');

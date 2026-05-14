@@ -1,0 +1,187 @@
+/* ============================================
+   Taskbar
+   ============================================ */
+.taskbar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 36px;
+    background: var(--win95-gray);
+    border-top: 2px solid var(--win95-light);
+    display: flex;
+    align-items: center;
+    padding: 2px;
+    box-shadow: inset 0 1px 0 var(--win95-light);
+    z-index: 9999;
+}
+
+.start-button {
+    height: 28px;
+    padding: 0 10px;
+    background: var(--win95-gray);
+    border: none;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-family: 'MS Sans Serif', 'Segoe UI', Tahoma, sans-serif;
+    font-size: 13px;
+    font-weight: bold;
+    cursor: pointer;
+    border-top: 2px solid var(--win95-light);
+    border-left: 2px solid var(--win95-light);
+    border-right: 2px solid #000;
+    border-bottom: 2px solid #000;
+    box-shadow: inset 1px 1px 0 var(--win95-light), inset -1px -1px 0 var(--win95-dark);
+}
+
+.start-button:active,
+.start-button.active {
+    border-top: 2px solid #000;
+    border-left: 2px solid #000;
+    border-right: 2px solid var(--win95-light);
+    border-bottom: 2px solid var(--win95-light);
+    padding-top: 1px;
+    padding-left: 11px;
+}
+
+.start-button:hover {
+    background: #d4d4d4;
+}
+
+.windows-flag {
+    width: 16px;
+    height: 16px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 1px;
+    transform: rotate(-5deg);
+    background:
+        linear-gradient(135deg, #f00 0%, #f00 100%) 0 0 / 9px 9px no-repeat,
+        linear-gradient(135deg, #0f0 0%, #0f0 100%) 10px 0 / 9px 9px no-repeat,
+        linear-gradient(135deg, #00f 0%, #00f 100%) 0 10px / 9px 9px no-repeat,
+        linear-gradient(135deg, #ff0 0%, #ff0 100%) 10px 10px / 9px 9px no-repeat;
+}
+
+.taskbar-divider {
+    width: 2px;
+    height: 26px;
+    background: var(--win95-dark);
+    margin: 0 3px;
+    box-shadow: 1px 0 0 var(--win95-light);
+}
+
+.taskbar-divider-small {
+    width: 1px;
+    height: 20px;
+    background: var(--win95-dark);
+    margin: 0 3px;
+    box-shadow: 1px 0 0 var(--win95-light);
+}
+
+.quick-launch {
+    display: flex;
+    gap: 2px;
+    padding: 0 4px;
+}
+
+.quick-launch-btn {
+    width: 24px;
+    height: 24px;
+    background: transparent;
+    border: 1px solid transparent;
+    font-size: 14px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.quick-launch-btn:hover {
+    background: rgba(255,255,255,0.3);
+    border: 1px solid var(--win95-light);
+}
+
+.taskbar-buttons {
+    display: flex;
+    gap: 4px;
+    flex: 1;
+    overflow: hidden;
+    padding: 0 4px;
+    min-width: 0;
+}
+
+.taskbar-button {
+    height: 26px;
+    padding: 0 8px;
+    background: var(--win95-button-face);
+    border: none;
+    border-top: 2px solid var(--win95-button-highlight);
+    border-left: 2px solid var(--win95-button-highlight);
+    border-right: 2px solid var(--win95-darkest);
+    border-bottom: 2px solid var(--win95-darkest);
+    font-family: 'MS Sans Serif', 'Segoe UI', Tahoma, sans-serif;
+    font-size: 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+    max-width: 160px;
+    min-width: 60px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex-shrink: 1;
+}
+
+.taskbar-button span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.taskbar-button.active {
+    border-top: 2px solid #000;
+    border-left: 2px solid #000;
+    border-right: 2px solid var(--win95-light);
+    border-bottom: 2px solid var(--win95-light);
+    background: #b0b0b0;
+}
+
+.taskbar-button:hover {
+    background: #d0d0d0;
+}
+
+.system-tray {
+    display: flex;
+    align-items: center;
+    padding: 0 6px;
+    height: 26px;
+    background: var(--win95-gray);
+    border: 1px inset var(--win95-gray);
+    gap: 3px;
+}
+
+.tray-icon {
+    font-size: 13px;
+    cursor: pointer;
+    padding: 1px 3px;
+}
+
+.tray-icon:hover {
+    background: rgba(0,0,0,0.1);
+}
+
+.taskbar-time {
+    padding: 0 8px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.taskbar-time:hover {
+    background: rgba(0,0,0,0.1);
+}

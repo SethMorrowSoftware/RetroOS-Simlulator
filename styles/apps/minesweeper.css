@@ -1,0 +1,247 @@
+/* ============================================
+   Minesweeper (Updated for authentic look)
+   ============================================ */
+.minesweeper-window {
+    background: #c0c0c0;
+    padding: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: fit-content; /* Critical for auto-sizing */
+    margin: 0 auto;
+}
+
+/* --- Difficulty menu bar --- */
+.ms-menu-bar {
+    display: flex;
+    gap: 2px;
+    padding: 2px;
+    background: #c0c0c0;
+}
+
+.ms-diff-btn {
+    flex: 1;
+    padding: 3px 6px;
+    background: #c0c0c0;
+    border-top: 2px solid #fff;
+    border-left: 2px solid #fff;
+    border-right: 2px solid #808080;
+    border-bottom: 2px solid #808080;
+    font-family: 'MS Sans Serif', Tahoma, sans-serif;
+    font-size: 11px;
+    font-weight: bold;
+    color: #000;
+    cursor: pointer;
+    letter-spacing: 0.4px;
+}
+.ms-diff-btn:active {
+    border-top: 2px solid #808080;
+    border-left: 2px solid #808080;
+    border-right: 2px solid #fff;
+    border-bottom: 2px solid #fff;
+}
+.ms-diff-btn.active {
+    background: #a0a0a0;
+    border-top: 2px solid #808080;
+    border-left: 2px solid #808080;
+    border-right: 2px solid #fff;
+    border-bottom: 2px solid #fff;
+    color: #000080;
+}
+
+/* --- Win / loss banner --- */
+.ms-banner {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    background: linear-gradient(180deg, #e7f5e7 0%, #c4e4c4 100%);
+    border-top: 2px solid #fff;
+    border-left: 2px solid #fff;
+    border-right: 2px solid #4a8a4a;
+    border-bottom: 2px solid #4a8a4a;
+    box-shadow: inset 1px 1px 0 #fff;
+    color: #173a17;
+}
+.ms-banner.lost {
+    background: linear-gradient(180deg, #fde4e4 0%, #f4b8b8 100%);
+    border-right-color: #8a3a3a;
+    border-bottom-color: #8a3a3a;
+    color: #4a0a0a;
+}
+.ms-banner.hidden { display: none; }
+
+.ms-banner-icon {
+    font-size: 24px;
+    line-height: 1;
+}
+.ms-banner-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+.ms-banner-title {
+    font-weight: bold;
+    font-size: 13px;
+    letter-spacing: 1px;
+}
+.ms-banner-sub {
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    color: inherit;
+    opacity: 0.85;
+}
+.ms-banner-record {
+    background: #ffd54f;
+    color: #5a3b00;
+    padding: 2px 6px;
+    border: 1px solid #b88c00;
+    font-size: 10px;
+    font-weight: bold;
+    letter-spacing: 0.8px;
+    box-shadow: 0 0 6px rgba(255, 200, 60, 0.6);
+    animation: ms-record-pulse 0.7s ease-in-out infinite alternate;
+}
+.ms-banner-record.hidden { display: none; }
+
+@keyframes ms-record-pulse {
+    from { box-shadow: 0 0 4px rgba(255, 200, 60, 0.35); }
+    to   { box-shadow: 0 0 12px rgba(255, 200, 60, 0.85); }
+}
+
+/* --- The Sunken Effects --- */
+.inset-border {
+    border-top: 2px solid #808080;
+    border-left: 2px solid #808080;
+    border-right: 2px solid #fff;
+    border-bottom: 2px solid #fff;
+}
+
+.mine-grid-wrapper {
+    border-top: 3px solid #808080; /* Deep inset */
+    border-left: 3px solid #808080;
+    border-right: 3px solid #fff;
+    border-bottom: 3px solid #fff;
+    display: inline-block;
+}
+
+/* --- Header Info --- */
+.ms-header-inset {
+    border-top: 2px solid #808080;
+    border-left: 2px solid #808080;
+    border-right: 2px solid #fff;
+    border-bottom: 2px solid #fff;
+    padding: 6px;
+    margin-bottom: 6px;
+}
+
+.mine-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.digital-display {
+    background: #000;
+    color: #ff0000;
+    font-family: 'Courier New', monospace;
+    font-size: 22px;
+    font-weight: bold;
+    padding: 2px 4px;
+    min-width: 42px;
+    text-align: right;
+    line-height: 1;
+}
+
+.mine-face-btn {
+    width: 26px;
+    height: 26px;
+    border-top: 2px solid #fff;
+    border-left: 2px solid #fff;
+    border-right: 2px solid #808080;
+    border-bottom: 2px solid #808080;
+    background: #c0c0c0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+.mine-face-btn:active {
+    border-top: 2px solid #808080;
+    border-left: 2px solid #808080;
+    border-right: 2px solid #fff;
+    border-bottom: 2px solid #fff;
+}
+
+/* --- Grid & Cells --- */
+.mine-grid {
+    display: grid;
+    background: #808080;
+}
+
+.mine-cell {
+    width: 24px;
+    height: 24px;
+    background: #c0c0c0;
+    border-top: 2px solid #fff;
+    border-left: 2px solid #fff;
+    border-right: 2px solid #808080;
+    border-bottom: 2px solid #808080;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    /* Win95 Font Specs */
+    font-family: "Times New Roman", Times, serif;
+    font-weight: 900;
+    font-size: 16px;
+    cursor: default;
+}
+
+.mine-cell.revealed {
+    border: 1px solid #808080;
+    border-right: none;
+    border-bottom: none;
+    width: 23px;
+    height: 23px;
+    padding-top: 1px;
+    padding-left: 1px;
+}
+
+.mine-cell.flagged:after {
+    content: '🚩';
+    font-size: 15px;
+    margin-top: -2px;
+    margin-left: -1px;
+}
+
+.mine-cell.mine {
+    background: #c0c0c0; /* Default mine is gray */
+}
+
+/* The Killer Mine */
+.mine-cell.mine-hit {
+    background-color: #ff0000 !important;
+}
+
+/* False Flag */
+.mine-cell.false-flag:after {
+    content: '❌';
+    position: absolute;
+    font-size: 16px;
+    color: red;
+}
+.mine-cell.false-flag:before {
+    content: '💣';
+}
+
+/* Numbers */
+.val-1 { color: #0000ff; }
+.val-2 { color: #008000; }
+.val-3 { color: #ff0000; }
+.val-4 { color: #000080; }
+.val-5 { color: #800000; }
+.val-6 { color: #008080; }
+.val-7 { color: #000000; }
+.val-8 { color: #808080; }

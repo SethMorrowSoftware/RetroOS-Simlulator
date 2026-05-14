@@ -1,0 +1,420 @@
+/* ============================================
+   DOSBox Emulator App
+   ============================================ */
+
+.dosbox-app {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: var(--win95-gray, #c0c0c0);
+    font-family: 'MS Sans Serif', 'Microsoft Sans Serif', Arial, sans-serif;
+    font-size: 12px;
+}
+
+/* ── Toolbar ─────────────────────────────── */
+
+.dosbox-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 4px 6px;
+    background: var(--win95-gray, #c0c0c0);
+    border-bottom: 1px solid #808080;
+    align-items: center;
+}
+
+.dosbox-url-bar {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex: 1;
+    min-width: 200px;
+}
+
+.dosbox-url-label {
+    white-space: nowrap;
+    font-weight: bold;
+    font-size: 11px;
+}
+
+.dosbox-url-input {
+    flex: 1;
+    padding: 2px 4px;
+    border: 2px solid;
+    border-color: #808080 #ffffff #ffffff #808080;
+    background: #fff;
+    font-family: inherit;
+    font-size: 12px;
+    min-width: 120px;
+}
+
+.dosbox-url-input:focus {
+    outline: none;
+}
+
+.dosbox-toolbar-buttons {
+    display: flex;
+    gap: 3px;
+}
+
+.dosbox-btn {
+    padding: 3px 10px;
+    background: var(--win95-gray, #c0c0c0);
+    border-top: 2px solid #ffffff;
+    border-left: 2px solid #ffffff;
+    border-right: 2px solid #000000;
+    border-bottom: 2px solid #000000;
+    font-family: inherit;
+    font-size: 11px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.dosbox-btn:hover {
+    background: #d4d0c8;
+}
+
+.dosbox-btn:active {
+    border-top: 2px solid #000000;
+    border-left: 2px solid #000000;
+    border-right: 2px solid #ffffff;
+    border-bottom: 2px solid #ffffff;
+    padding: 4px 9px 2px 11px;
+}
+
+.dosbox-btn:disabled {
+    color: #808080;
+    cursor: default;
+    text-shadow: 1px 1px 0 #ffffff;
+}
+
+.dosbox-btn:disabled:active {
+    border-top: 2px solid #ffffff;
+    border-left: 2px solid #ffffff;
+    border-right: 2px solid #000000;
+    border-bottom: 2px solid #000000;
+    padding: 3px 10px;
+}
+
+/* ── Game Select Dropdown ─────────────────── */
+
+.dosbox-game-select {
+    flex: 1;
+    min-width: 200px;
+    padding: 2px 4px;
+    border: 2px solid;
+    border-color: #808080 #ffffff #ffffff #808080;
+    background: #fff;
+    color: #000;
+    font-family: inherit;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.dosbox-game-select:focus {
+    outline: none;
+}
+
+.dosbox-game-select optgroup {
+    font-weight: bold;
+    font-style: normal;
+    color: #000080;
+}
+
+.dosbox-toolbar-sub {
+    border-top: 1px solid #ffffff;
+}
+
+/* ── Featured Bar ─────────────────────────── */
+
+.dosbox-library {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 6px;
+    background: var(--win95-gray, #c0c0c0);
+    border-bottom: 1px solid #808080;
+    overflow-x: auto;
+    flex-shrink: 0;
+}
+
+.dosbox-library-label {
+    font-size: 11px;
+    font-weight: bold;
+    white-space: nowrap;
+    color: #000;
+}
+
+.dosbox-library-spacer {
+    flex: 1;
+}
+
+.dosbox-library-link {
+    font-size: 11px;
+    color: #000080;
+    text-decoration: underline;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.dosbox-library-link:hover {
+    color: #0000ff;
+}
+
+.dosbox-featured-item {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    padding: 2px 8px;
+    background: var(--win95-gray, #c0c0c0);
+    border-top: 2px solid #ffffff;
+    border-left: 2px solid #ffffff;
+    border-right: 2px solid #000000;
+    border-bottom: 2px solid #000000;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 11px;
+    white-space: nowrap;
+}
+
+.dosbox-featured-item:hover {
+    background: #d4d0c8;
+}
+
+.dosbox-featured-item:active {
+    border-top: 2px solid #000000;
+    border-left: 2px solid #000000;
+    border-right: 2px solid #ffffff;
+    border-bottom: 2px solid #ffffff;
+}
+
+.dosbox-featured-icon {
+    font-size: 14px;
+}
+
+.dosbox-featured-name {
+    font-size: 11px;
+}
+
+/* ── Emulator Area ───────────────────────── */
+
+.dosbox-emulator-area {
+    flex: 1;
+    position: relative;       /* positioning context for absolute children */
+    background: #000;
+    min-height: 200px;
+    overflow: hidden;
+}
+
+/* All children of the emulator area are absolutely positioned so they
+   fill the parent's actual measured box. Percentage heights through a
+   flex chain can return 0 in some Win95-window layouts and the moment
+   js-dos measures `canvas.parentElement.getBoundingClientRect()` and
+   sees 0x0, it sets `canvas.style.width = 0px` forever. With
+   position: absolute + inset: 0 the children take their dimensions
+   from the parent's actual box, bypassing the chain entirely. */
+.dosbox-splash,
+.dosbox-stage,
+.dosbox-loading {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+}
+
+/* ── Splash Screen ───────────────────────── */
+
+.dosbox-splash {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: #000080;
+    color: #fff;
+    text-align: center;
+    gap: 8px;
+}
+
+.dosbox-splash-icon {
+    font-size: 56px;
+    margin-bottom: 4px;
+}
+
+.dosbox-splash-title {
+    font-size: 24px;
+    font-weight: bold;
+    font-family: 'VT323', 'Courier New', monospace;
+    color: #ffff00;
+}
+
+.dosbox-splash-sub {
+    font-size: 13px;
+    color: #c0c0c0;
+    max-width: 360px;
+    line-height: 1.4;
+}
+
+.dosbox-splash-hint {
+    font-size: 11px;
+    color: #808080;
+    margin-top: 12px;
+}
+
+.dosbox-splash-hint b {
+    color: #aaa;
+}
+
+/* ── js-dos Stage / Root ─────────────────── */
+
+/* The stage hosts a fresh .dosbox-root child per emulator session,
+   so we can fully destroy and recreate the Preact tree on stop/start.
+   Sizing comes from the absolute-positioned rule above; we just
+   guarantee a positioning context for js-dos's internal absolute
+   children. */
+.dosbox-stage {
+    overflow: hidden;
+}
+
+.dosbox-root {
+    width: 100%;
+    height: 100%;
+    min-width: 320px;
+    min-height: 200px;
+    position: relative;
+    overflow: hidden;
+    /* js-dos adds .jsdos-rso to this element and renders its Preact UI
+       in place. We do not need to override any internal layout. */
+}
+
+.dosbox-root canvas {
+    display: block;
+    image-rendering: pixelated;
+    min-width: 1px;
+    min-height: 1px;
+}
+
+/* ── js-dos / IlluminatOS class-name collision resets ──
+ *
+ * js-dos's Preact UI uses `class="window"` for its inner root div (see
+ * src/window/window.tsx in caiiiycuk/js-dos). IlluminatOS's
+ * styles/components/windows.css applies `.window { display: none; ... }`
+ * to every Win95 OS window (they're only shown when `.open` is added).
+ *
+ * The two `.window` classes collide head-on: js-dos's inner div gets
+ * `display: none` from the OS rule and the entire emulator render tree
+ * collapses to 0x0 — the "audio plays, screen is black" symptom. The
+ * scoped overrides below restore js-dos's intended Tailwind layout
+ * while leaving the outer Win95 window styling untouched.
+ *
+ * Also resets `.title-bar` and `.background-image` defensively in case
+ * js-dos ever reuses those names. */
+.dosbox-root .window {
+    display: block !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    z-index: auto !important;
+    transition: none !important;
+    animation: none !important;
+}
+
+.dosbox-root .window.maximized,
+.dosbox-root .window.minimized,
+.dosbox-root .window.active,
+.dosbox-root .window.open {
+    /* Defeat IlluminatOS state-modifier rules so they can't perturb
+       js-dos's layout if its store ever happens to write one. */
+    display: block !important;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    z-index: auto !important;
+}
+
+.dosbox-root .title-bar,
+.dosbox-root .background-image {
+    /* These IlluminatOS class names theoretically could collide too;
+       neutralize the OS-specific styling so js-dos's Tailwind owns
+       layout for any element with these classes inside our root. */
+    all: revert;
+}
+
+/* ── Loading Overlay ─────────────────────── */
+
+.dosbox-loading {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.85);
+    z-index: 10;
+    gap: 12px;
+}
+
+.dosbox-loading-spinner {
+    width: 36px;
+    height: 36px;
+    border: 4px solid #333;
+    border-top: 4px solid #ffff00;
+    border-radius: 50%;
+    animation: dosbox-spin 0.8s linear infinite;
+}
+
+@keyframes dosbox-spin {
+    to { transform: rotate(360deg); }
+}
+
+.dosbox-loading-text {
+    color: #c0c0c0;
+    font-size: 14px;
+    font-family: 'VT323', 'Courier New', monospace;
+}
+
+/* ── Status Bar ──────────────────────────── */
+
+.dosbox-status {
+    padding: 2px 6px;
+    background: var(--win95-gray, #c0c0c0);
+    border-top: 1px solid #808080;
+    font-size: 11px;
+    color: #000;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex-shrink: 0;
+}
+
+/* ── Fullscreen Tweaks ───────────────────── */
+
+.dosbox-emulator-area:fullscreen {
+    background: #000;
+}
+
+.dosbox-emulator-area:fullscreen .dosbox-stage,
+.dosbox-emulator-area:fullscreen .dosbox-root {
+    width: 100vw;
+    height: 100vh;
+}
+
+/* Splash text styling helpers */
+.dosbox-splash-sub code {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 0 4px;
+    border-radius: 2px;
+    font-family: 'VT323', 'Courier New', monospace;
+}

@@ -1,0 +1,33 @@
+/* ============================================
+   Emoji Picker
+   ============================================ */
+.emoji-picker {
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: 5px;
+    max-height: 200px;
+    overflow-y: auto;
+    background: white;
+    padding: 10px;
+    border: 2px inset var(--win95-gray);
+    margin-bottom: 10px;
+}
+
+.emoji-option {
+    font-size: 28px;
+    cursor: pointer;
+    padding: 5px;
+    text-align: center;
+    border: 2px solid transparent;
+    border-radius: 3px;
+}
+
+.emoji-option:hover {
+    background: var(--win95-blue);
+    border-color: white;
+}
+
+.emoji-option.selected {
+    background: var(--win95-blue);
+    border-color: white;
+}

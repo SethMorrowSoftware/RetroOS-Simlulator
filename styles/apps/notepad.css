@@ -1,0 +1,23 @@
+/* ============================================
+   Notepad
+   ============================================ */
+.notepad-toolbar {
+    padding: 5px;
+    background: var(--win95-gray);
+    border-bottom: 1px solid var(--win95-dark);
+    display: flex;
+    gap: 5px;
+}
+
+.notepad-content {
+    width: 100%;
+    height: 100%;
+    box-sizing: border-box;
+    background: white;
+    border: 2px inset var(--win95-gray);
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    padding: 8px;
+    resize: none;
+    outline: none;
+}

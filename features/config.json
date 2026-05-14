@@ -1,0 +1,260 @@
+{
+  "soundsystem": {
+    "id": "soundsystem",
+    "name": "Sound System",
+    "description": "Centralized audio management with MP3 support and synthesized fallbacks",
+    "icon": "🔊",
+    "category": "core",
+    "enabled": true,
+    "dependencies": [],
+    "config": {
+      "masterVolume": 0.5,
+      "enableMp3": true,
+      "enableFallbacks": true
+    },
+    "settings": [
+      {
+        "key": "masterVolume",
+        "label": "Master Volume",
+        "type": "slider",
+        "min": 0,
+        "max": 1,
+        "step": 0.1
+      },
+      {
+        "key": "enableMp3",
+        "label": "Enable MP3 Sounds",
+        "type": "checkbox"
+      },
+      {
+        "key": "enableFallbacks",
+        "label": "Enable Synthesized Fallbacks",
+        "type": "checkbox"
+      }
+    ]
+  },
+
+  "achievements": {
+    "id": "achievements",
+    "name": "Achievement System",
+    "description": "Unlock achievements and track milestones throughout IlluminatOS!",
+    "icon": "🏆",
+    "category": "enhancement",
+    "enabled": true,
+    "dependencies": ["soundsystem"],
+    "config": {
+      "showToasts": true,
+      "toastDuration": 3000,
+      "playSound": true
+    },
+    "settings": [
+      {
+        "key": "showToasts",
+        "label": "Show Achievement Toasts",
+        "type": "checkbox"
+      },
+      {
+        "key": "toastDuration",
+        "label": "Toast Duration (ms)",
+        "type": "number",
+        "min": 1000,
+        "max": 10000,
+        "step": 500
+      },
+      {
+        "key": "playSound",
+        "label": "Play Achievement Sound",
+        "type": "checkbox"
+      }
+    ]
+  },
+
+  "clippy": {
+    "id": "clippy",
+    "name": "Clippy Assistant",
+    "description": "The existentially challenged paperclip assistant - context-aware help with personality",
+    "icon": "📎",
+    "category": "enhancement",
+    "enabled": true,
+    "dependencies": ["soundsystem"],
+    "config": {
+      "appearanceChance": 0.15,
+      "autoHideDelay": 8000,
+      "showHints": true,
+      "enableIdleComments": true
+    },
+    "settings": [
+      {
+        "key": "enabled",
+        "label": "Enable Clippy",
+        "type": "checkbox",
+        "description": "Show/hide the Clippy assistant"
+      },
+      {
+        "key": "appearanceChance",
+        "label": "Appearance Frequency",
+        "type": "slider",
+        "min": 0,
+        "max": 1,
+        "step": 0.05,
+        "description": "How often Clippy appears (0 = never, 1 = always)"
+      },
+      {
+        "key": "autoHideDelay",
+        "label": "Auto-Hide Delay (ms)",
+        "type": "number",
+        "min": 3000,
+        "max": 30000,
+        "step": 1000
+      },
+      {
+        "key": "showHints",
+        "label": "Show Helpful Hints",
+        "type": "checkbox"
+      }
+    ]
+  },
+
+  "eastereggs": {
+    "id": "eastereggs",
+    "name": "Easter Eggs",
+    "description": "Hidden surprises and secrets - Konami code, cheat codes, and more",
+    "icon": "🥚",
+    "category": "enhancement",
+    "enabled": true,
+    "dependencies": ["achievements"],
+    "config": {
+      "enableKonami": true,
+      "enableCheats": true,
+      "enableSecrets": true
+    },
+    "settings": [
+      {
+        "key": "enableKonami",
+        "label": "Enable Konami Code",
+        "type": "checkbox"
+      },
+      {
+        "key": "enableCheats",
+        "label": "Enable Cheat Codes",
+        "type": "checkbox"
+      },
+      {
+        "key": "enableSecrets",
+        "label": "Enable Secret Features",
+        "type": "checkbox"
+      }
+    ]
+  },
+
+  "desktoppet": {
+    "id": "desktoppet",
+    "name": "Desktop Pet",
+    "description": "Animated desktop companion with retro behaviors - drag, play, and get fortunes",
+    "icon": "🐕",
+    "category": "enhancement",
+    "enabled": true,
+    "dependencies": [],
+    "config": {
+      "petType": "neko",
+      "animationSpeed": 1.0,
+      "enablePhysics": true,
+      "enableFortunes": true
+    },
+    "settings": [
+      {
+        "key": "enabled",
+        "label": "Enable Desktop Pet",
+        "type": "checkbox"
+      },
+      {
+        "key": "petType",
+        "label": "Pet Type",
+        "type": "select",
+        "options": ["neko", "dog", "sheep"]
+      },
+      {
+        "key": "animationSpeed",
+        "label": "Animation Speed",
+        "type": "slider",
+        "min": 0.5,
+        "max": 2,
+        "step": 0.1
+      },
+      {
+        "key": "enablePhysics",
+        "label": "Enable Physics",
+        "type": "checkbox"
+      }
+    ]
+  },
+
+  "screensaver": {
+    "id": "screensaver",
+    "name": "Screensaver",
+    "description": "Idle screensaver with multiple modes - flying toasters, starfield, marquee",
+    "icon": "🌌",
+    "category": "core",
+    "enabled": true,
+    "dependencies": [],
+    "config": {
+      "idleTimeout": 300000,
+      "mode": "toasters"
+    },
+    "settings": [
+      {
+        "key": "enabled",
+        "label": "Enable Screensaver",
+        "type": "checkbox"
+      },
+      {
+        "key": "idleTimeout",
+        "label": "Idle Time (seconds)",
+        "type": "number",
+        "min": 60,
+        "max": 3600,
+        "step": 30,
+        "transform": "milliseconds"
+      },
+      {
+        "key": "mode",
+        "label": "Screensaver Mode",
+        "type": "select",
+        "options": ["toasters", "starfield", "marquee", "none"]
+      }
+    ]
+  },
+
+  "systemdialogs": {
+    "id": "systemdialogs",
+    "name": "System Dialogs",
+    "description": "Windows 95 style dialogs - Run, Shutdown, File Open/Save, Alerts, and more",
+    "icon": "💬",
+    "category": "core",
+    "enabled": true,
+    "dependencies": [],
+    "config": {
+      "defaultPath": ["C:", "Users", "User", "Documents"],
+      "showHiddenFiles": false,
+      "playDialogSounds": true,
+      "showWelcomeOnBoot": true
+    },
+    "settings": [
+      {
+        "key": "playDialogSounds",
+        "label": "Play Dialog Sounds",
+        "type": "checkbox"
+      },
+      {
+        "key": "showHiddenFiles",
+        "label": "Show Hidden Files in File Dialogs",
+        "type": "checkbox"
+      },
+      {
+        "key": "showWelcomeOnBoot",
+        "label": "Show Welcome Dialog on Boot",
+        "type": "checkbox"
+      }
+    ]
+  }
+}

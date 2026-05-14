@@ -1,0 +1,55 @@
+/* ============================================
+   Buttons
+   ============================================ */
+.btn {
+    padding: 4px 12px;
+    background: var(--win95-gray);
+    border: none;
+    border-top: 2px solid var(--win95-light);
+    border-left: 2px solid var(--win95-light);
+    border-right: 2px solid #000;
+    border-bottom: 2px solid #000;
+    font-family: 'MS Sans Serif', 'Segoe UI', Tahoma, sans-serif;
+    font-size: 12px;
+    cursor: pointer;
+    margin-right: 2px;
+}
+
+.btn:active {
+    border-top: 2px solid #000;
+    border-left: 2px solid #000;
+    border-right: 2px solid var(--win95-light);
+    border-bottom: 2px solid var(--win95-light);
+}
+
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.btn:hover:not(:disabled) {
+    background: #d0d0d0;
+}
+
+.btn-primary {
+    background: var(--win95-blue);
+    color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+    background: #0000a0;
+}
+
+.btn-danger {
+    background: #cc0000;
+    color: white;
+}
+
+.btn-danger:hover:not(:disabled) {
+    background: #ff0000;
+}
+
+.btn-sm {
+    padding: 4px 10px;
+    font-size: 14px;
+}

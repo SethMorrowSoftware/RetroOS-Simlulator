@@ -1,0 +1,559 @@
+/**
+ * Campaign Studio - Windows 95 style campaign management tool
+ * Phase 3 ARG Expansion
+ */
+
+/* ==========================================
+   LAYOUT
+   ========================================== */
+
+.campaign-studio {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: #c0c0c0;
+    font-family: 'MS Sans Serif', 'Microsoft Sans Serif', Tahoma, sans-serif;
+    font-size: 11px;
+}
+
+/* ==========================================
+   TOOLBAR
+   ========================================== */
+
+.cs-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 2px 4px;
+    background: #c0c0c0;
+    border-bottom: 1px solid #808080;
+}
+
+.cs-toolbar-btn {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    padding: 2px 6px;
+    border: 1px solid transparent;
+    background: transparent;
+    cursor: pointer;
+    font-size: 11px;
+    font-family: inherit;
+    color: #000;
+}
+
+.cs-toolbar-btn:hover {
+    border: 1px outset #fff;
+    background: #d4d0c8;
+}
+
+.cs-toolbar-btn:active {
+    border: 1px inset #808080;
+}
+
+.cs-toolbar-icon {
+    font-size: 12px;
+}
+
+.cs-toolbar-separator {
+    width: 1px;
+    height: 20px;
+    margin: 0 4px;
+    background: #808080;
+    border-right: 1px solid #fff;
+}
+
+/* ==========================================
+   TABS
+   ========================================== */
+
+.cs-tabs {
+    display: flex;
+    padding: 4px 4px 0;
+    gap: 2px;
+    background: #c0c0c0;
+}
+
+.cs-tab {
+    padding: 3px 12px;
+    border: 2px outset #dfdfdf;
+    border-bottom: none;
+    background: #c0c0c0;
+    cursor: pointer;
+    font-size: 11px;
+    font-family: inherit;
+    position: relative;
+    top: 2px;
+    color: #000;
+}
+
+.cs-tab:hover {
+    background: #d4d0c8;
+}
+
+.cs-tab.active {
+    background: #c0c0c0;
+    border-bottom: 2px solid #c0c0c0;
+    top: 0;
+    padding-top: 5px;
+    font-weight: bold;
+}
+
+/* ==========================================
+   BODY
+   ========================================== */
+
+.cs-body {
+    flex: 1;
+    border: 2px inset #fff;
+    margin: 0 4px 4px;
+    overflow: hidden;
+    background: #fff;
+}
+
+.cs-tab-content {
+    display: none;
+    height: 100%;
+    overflow-y: auto;
+    padding: 8px;
+}
+
+.cs-tab-content.active {
+    display: block;
+}
+
+/* ==========================================
+   PANELS
+   ========================================== */
+
+.cs-panel {
+    border: 2px groove #c0c0c0;
+    margin-bottom: 8px;
+    background: #c0c0c0;
+}
+
+.cs-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 3px 6px;
+    background: #000080;
+    color: #fff;
+    font-weight: bold;
+    font-size: 11px;
+}
+
+.cs-panel-body {
+    padding: 6px;
+    background: #c0c0c0;
+}
+
+/* ==========================================
+   OVERVIEW
+   ========================================== */
+
+.cs-overview-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.cs-stat-panel .cs-panel-body {
+    text-align: center;
+    padding: 8px 6px;
+}
+
+.cs-stat-value {
+    font-size: 18px;
+    font-weight: bold;
+    color: #000080;
+}
+
+.cs-campaign-active {
+    line-height: 1.6;
+}
+
+.cs-empty-state {
+    color: #808080;
+    text-align: center;
+    padding: 12px;
+    font-style: italic;
+}
+
+/* ==========================================
+   TABLES
+   ========================================== */
+
+.cs-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+}
+
+.cs-table th {
+    background: #c0c0c0;
+    border: 1px solid #808080;
+    padding: 2px 6px;
+    text-align: left;
+    font-weight: bold;
+}
+
+.cs-table td {
+    border: 1px solid #d4d0c8;
+    padding: 2px 6px;
+    background: #fff;
+}
+
+.cs-table tr:hover td {
+    background: #e8e8ff;
+}
+
+.cs-row-highlight td {
+    background: #ffffcc !important;
+}
+
+.cs-mono {
+    font-family: 'Fixedsys', 'Courier New', monospace;
+    font-size: 11px;
+}
+
+/* ==========================================
+   STATUS BADGES
+   ========================================== */
+
+.cs-status-ok {
+    color: #008000;
+    font-weight: bold;
+}
+
+.cs-status-error {
+    color: #cc0000;
+    font-weight: bold;
+}
+
+.cs-status-active {
+    color: #000080;
+    font-weight: bold;
+}
+
+.cs-tag {
+    display: inline-block;
+    padding: 0 4px;
+    margin: 1px;
+    background: #d4d0c8;
+    border: 1px solid #808080;
+    font-size: 10px;
+}
+
+/* ==========================================
+   DIAGNOSTICS
+   ========================================== */
+
+.cs-diagnostics-output {
+    max-height: 250px;
+    overflow-y: auto;
+    background: #fff !important;
+}
+
+.cs-diag-item {
+    padding: 3px 6px;
+    border-bottom: 1px solid #e0e0e0;
+    font-size: 11px;
+}
+
+.cs-diag-info { color: #000; }
+.cs-diag-warn { color: #996600; }
+.cs-diag-error { color: #cc0000; }
+
+.cs-script-input {
+    width: 100%;
+    min-height: 80px;
+    border: 2px inset #fff;
+    padding: 4px;
+    font-family: 'Fixedsys', 'Courier New', monospace;
+    font-size: 11px;
+    resize: vertical;
+    background: #fff;
+    box-sizing: border-box;
+}
+
+.cs-script-actions {
+    padding: 4px 0;
+}
+
+.cs-script-result {
+    padding: 4px;
+    min-height: 20px;
+}
+
+/* ==========================================
+   INSPECTOR
+   ========================================== */
+
+.cs-inspector {
+    display: flex;
+    height: 100%;
+}
+
+.cs-inspector-sidebar {
+    width: 120px;
+    border-right: 2px groove #c0c0c0;
+    background: #c0c0c0;
+    flex-shrink: 0;
+}
+
+.cs-inspector-nav-item {
+    padding: 4px 8px;
+    cursor: pointer;
+    border-bottom: 1px solid #d4d0c8;
+    font-size: 11px;
+    color: #000;
+}
+
+.cs-inspector-nav-item:hover {
+    background: #d4d0c8;
+}
+
+.cs-inspector-nav-item.active {
+    background: #000080;
+    color: #fff;
+    font-weight: bold;
+}
+
+.cs-inspector-detail {
+    flex: 1;
+    padding: 8px;
+    overflow-y: auto;
+    background: #fff;
+}
+
+.cs-json-preview {
+    background: #fff;
+    border: 2px inset #c0c0c0;
+    padding: 8px;
+    font-family: 'Fixedsys', 'Courier New', monospace;
+    font-size: 11px;
+    overflow: auto;
+    max-height: 400px;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.cs-npc-card {
+    margin-bottom: 8px;
+}
+
+.cs-npc-name {
+    font-weight: bold;
+    padding: 3px 6px;
+    background: #000080;
+    color: #fff;
+    font-size: 11px;
+}
+
+/* ==========================================
+   INJECT PANEL
+   ========================================== */
+
+.cs-inject-group {
+    margin-bottom: 8px;
+}
+
+.cs-inject-group label {
+    display: block;
+    font-weight: bold;
+    margin-bottom: 2px;
+    color: #000;
+}
+
+.cs-inject-row {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.cs-input {
+    border: 2px inset #fff;
+    padding: 2px 4px;
+    font-size: 11px;
+    font-family: inherit;
+    background: #fff;
+    flex: 1;
+    min-width: 80px;
+}
+
+.cs-input-wide {
+    flex: 1;
+    min-width: 200px;
+}
+
+.cs-input-sm {
+    flex: 0 0 auto;
+    min-width: 80px;
+}
+
+.cs-json-input {
+    min-height: 60px;
+    margin-top: 4px;
+}
+
+.cs-btn-sm {
+    padding: 2px 8px;
+    border: 2px outset #dfdfdf;
+    background: #c0c0c0;
+    cursor: pointer;
+    font-size: 11px;
+    font-family: inherit;
+    white-space: nowrap;
+    color: #000;
+}
+
+.cs-btn-sm:hover {
+    background: #d4d0c8;
+}
+
+.cs-btn-sm:active {
+    border-style: inset;
+}
+
+.cs-btn-primary {
+    background: #d4d0c8;
+    font-weight: bold;
+}
+
+/* ==========================================
+   MEDIA TAB
+   ========================================== */
+
+.cs-budget-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.cs-budget-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.cs-budget-label {
+    width: 70px;
+    font-weight: bold;
+    font-size: 11px;
+}
+
+.cs-budget-bar {
+    flex: 1;
+    height: 14px;
+    border: 2px inset #fff;
+    background: #fff;
+}
+
+.cs-budget-fill {
+    height: 100%;
+    background: #000080;
+    transition: width 0.3s;
+}
+
+.cs-budget-fill.cs-budget-full {
+    background: #cc0000;
+}
+
+.cs-budget-value {
+    width: 50px;
+    text-align: right;
+    font-size: 11px;
+    font-family: 'Fixedsys', 'Courier New', monospace;
+}
+
+.cs-media-meta {
+    margin-top: 6px;
+    font-size: 10px;
+    color: #808080;
+}
+
+/* ==========================================
+   EVENT LOG
+   ========================================== */
+
+.cs-log {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.cs-log-filters {
+    display: flex;
+    gap: 12px;
+    padding: 4px 8px;
+    background: #c0c0c0;
+    border-bottom: 1px solid #808080;
+    flex-shrink: 0;
+}
+
+.cs-log-filters label {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    font-size: 11px;
+    cursor: pointer;
+    color: #000;
+}
+
+.cs-log-entries {
+    flex: 1;
+    overflow-y: auto;
+    background: #000;
+    color: #00ff00;
+    font-family: 'Fixedsys', 'Courier New', monospace;
+    font-size: 11px;
+    padding: 4px;
+}
+
+.cs-log-entries .cs-empty-state {
+    color: #808080;
+}
+
+.cs-log-entry {
+    padding: 1px 4px;
+    border-bottom: 1px solid #003300;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.cs-log-entry:hover {
+    background: #002200;
+}
+
+.cs-log-time {
+    color: #808080;
+    margin-right: 6px;
+}
+
+.cs-log-cat {
+    font-weight: bold;
+    margin-right: 6px;
+}
+
+.cs-log-cat-story .cs-log-cat { color: #ffff00; }
+.cs-log-cat-media .cs-log-cat { color: #00ccff; }
+.cs-log-cat-campaign .cs-log-cat { color: #ff8800; }
+.cs-log-cat-other .cs-log-cat { color: #cc66ff; }
+
+.cs-log-msg {
+    color: #00ff00;
+}
+
+/* ==========================================
+   RESPONSIVE
+   ========================================== */
+
+@media (max-width: 700px) {
+    .cs-overview-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}

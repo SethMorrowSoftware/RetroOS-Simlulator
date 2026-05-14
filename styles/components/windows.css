@@ -1,0 +1,433 @@
+/* ============================================
+   Windows
+   ============================================ */
+.window {
+    position: absolute;
+    background: var(--win95-window-bg);
+    border-top: 2px solid var(--win95-button-highlight);
+    border-left: 2px solid var(--win95-button-highlight);
+    border-right: 2px solid var(--win95-darkest);
+    border-bottom: 2px solid var(--win95-darkest);
+    box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.25);
+    min-width: 300px;
+    display: none;
+    flex-direction: column;
+    z-index: 1000;
+    /* Smooth transitions for position/size changes (not during drag) */
+    transition: box-shadow 0.15s ease;
+}
+
+/* Active window gets enhanced shadow for depth */
+.window.active {
+    box-shadow: 3px 3px 12px rgba(0, 0, 0, 0.4);
+}
+
+/* Disable transitions during drag/resize for responsiveness */
+.window.dragging,
+.window.resizing {
+    transition: none !important;
+}
+
+/* Window is visible when open */
+.window.open {
+    display: flex;
+}
+
+/* Minimized windows are hidden */
+.window.minimized {
+    display: none;
+}
+
+/* Focused window gets higher z-index (active class is for focus styling) */
+.window.active {
+    /* Focus is handled by z-index, not display */
+}
+
+.window.maximized {
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: calc(100vh - 36px) !important;
+    border-radius: 0;
+}
+
+/* Smooth maximize/restore animation */
+.window.maximizing {
+    transition: top 0.15s ease-out, left 0.15s ease-out, width 0.15s ease-out, height 0.15s ease-out !important;
+}
+
+/* Window opening animation */
+.window.opening {
+    animation: openWindow 0.15s ease-out forwards;
+}
+
+@keyframes openWindow {
+    from {
+        transform: scale(0.9);
+        opacity: 0;
+    }
+    to {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+.window.minimizing {
+    animation: minimizeWindow 0.2s ease-in forwards;
+}
+
+@keyframes minimizeWindow {
+    to {
+        transform: scale(0.5) translateY(50vh);
+        opacity: 0;
+    }
+}
+
+.window.restoring {
+    animation: restoreWindow 0.2s ease-out forwards;
+}
+
+@keyframes restoreWindow {
+    from {
+        transform: scale(0.5) translateY(50vh);
+        opacity: 0;
+    }
+    to {
+        transform: scale(1) translateY(0);
+        opacity: 1;
+    }
+}
+
+.title-bar {
+    background: linear-gradient(90deg, var(--win95-window-title) 0%, #1084d0 100%);
+    padding: 3px 4px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    color: var(--win95-window-title-text);
+    font-size: 13px;
+    font-weight: bold;
+    cursor: move;
+    user-select: none;
+    flex-shrink: 0;
+}
+
+.window:not(.active) .title-bar {
+    background: linear-gradient(90deg, var(--win95-window-title-inactive) 0%, #a0a0a0 100%);
+}
+
+.title-text {
+    padding-left: 5px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.window-controls {
+    display: flex;
+    gap: 2px;
+}
+
+.window-button {
+    width: 18px;
+    height: 16px;
+    background: var(--win95-gray);
+    border: none;
+    border-top: 2px solid var(--win95-light);
+    border-left: 2px solid var(--win95-light);
+    border-right: 2px solid #000;
+    border-bottom: 2px solid #000;
+    cursor: pointer;
+    font-size: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-family: 'Marlett', 'MS Sans Serif', sans-serif;
+}
+
+.window-button:active {
+    border-top: 2px solid #000;
+    border-left: 2px solid #000;
+    border-right: 2px solid var(--win95-light);
+    border-bottom: 2px solid var(--win95-light);
+}
+
+.window-button:hover {
+    background: #d0d0d0;
+}
+
+.window-button span {
+    position: relative;
+    display: block;
+    width: 12px;
+    height: 12px;
+}
+
+.window-button-minimize span::before {
+    content: '';
+    position: absolute;
+    left: 1px;
+    right: 1px;
+    bottom: 1px;
+    border-top: 2px solid #111;
+}
+
+.window-button-maximize span::before {
+    content: '';
+    position: absolute;
+    inset: 1px;
+    border: 2px solid #111;
+    box-sizing: border-box;
+    background: transparent;
+}
+
+.window-button-close span::before,
+.window-button-close span::after {
+    content: '';
+    position: absolute;
+    left: 5px;
+    top: 0;
+    width: 2px;
+    height: 12px;
+    background: #111;
+}
+
+.window-button-close span::before {
+    transform: rotate(45deg);
+}
+
+.window-button-close span::after {
+    transform: rotate(-45deg);
+}
+
+.window-button:active span {
+    transform: translate(1px, 1px);
+}
+
+.window-content {
+    padding: 2px;
+    background: var(--win95-gray);
+    font-size: 13px;
+    line-height: 1.4;
+    overflow: hidden;
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Edge resize handles - invisible but functional */
+.resize-handle {
+    position: absolute;
+    z-index: 10;
+}
+
+/* Corner handles - larger hit area */
+.resize-handle-se {
+    bottom: 0;
+    right: 0;
+    width: 16px;
+    height: 16px;
+    cursor: se-resize;
+    background: linear-gradient(135deg, transparent 50%, var(--win95-dark) 50%, var(--win95-dark) 60%, transparent 60%, transparent 70%, var(--win95-dark) 70%, var(--win95-dark) 80%, transparent 80%);
+}
+
+.resize-handle-sw {
+    bottom: 0;
+    left: 0;
+    width: 8px;
+    height: 8px;
+    cursor: sw-resize;
+}
+
+.resize-handle-ne {
+    top: 0;
+    right: 0;
+    width: 8px;
+    height: 8px;
+    cursor: ne-resize;
+}
+
+.resize-handle-nw {
+    top: 0;
+    left: 0;
+    width: 8px;
+    height: 8px;
+    cursor: nw-resize;
+}
+
+/* Edge handles */
+.resize-handle-n {
+    top: 0;
+    left: 8px;
+    right: 8px;
+    height: 4px;
+    cursor: n-resize;
+}
+
+.resize-handle-s {
+    bottom: 0;
+    left: 8px;
+    right: 16px;
+    height: 4px;
+    cursor: s-resize;
+}
+
+.resize-handle-e {
+    top: 8px;
+    right: 0;
+    bottom: 16px;
+    width: 4px;
+    cursor: e-resize;
+}
+
+.resize-handle-w {
+    top: 8px;
+    left: 0;
+    bottom: 8px;
+    width: 4px;
+    cursor: w-resize;
+}
+
+/* Hide resize handles when maximized */
+.window.maximized .resize-handle {
+    display: none;
+}
+
+/* Global dragging state - prevents text selection and maintains cursor */
+body.window-dragging {
+    cursor: move !important;
+    user-select: none !important;
+}
+
+body.window-dragging * {
+    cursor: move !important;
+    user-select: none !important;
+}
+
+body.window-resizing {
+    user-select: none !important;
+}
+
+body.window-resizing-n,
+body.window-resizing-s {
+    cursor: n-resize !important;
+}
+
+body.window-resizing-n *,
+body.window-resizing-s * {
+    cursor: n-resize !important;
+}
+
+body.window-resizing-e,
+body.window-resizing-w {
+    cursor: e-resize !important;
+}
+
+body.window-resizing-e *,
+body.window-resizing-w * {
+    cursor: e-resize !important;
+}
+
+body.window-resizing-ne,
+body.window-resizing-sw {
+    cursor: ne-resize !important;
+}
+
+body.window-resizing-ne *,
+body.window-resizing-sw * {
+    cursor: ne-resize !important;
+}
+
+body.window-resizing-nw,
+body.window-resizing-se {
+    cursor: nw-resize !important;
+}
+
+body.window-resizing-nw *,
+body.window-resizing-se * {
+    cursor: se-resize !important;
+}
+
+/* Snap preview overlay */
+.snap-preview {
+    position: fixed;
+    background: rgba(0, 0, 128, 0.3);
+    border: 2px dashed var(--win95-blue);
+    pointer-events: none;
+    z-index: 9999;
+    opacity: 0;
+    transform: scale(0.95);
+    transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.snap-preview.active {
+    opacity: 1;
+    transform: scale(1);
+}
+
+/* ============================================
+   Enhanced Window Title Bar
+   ============================================ */
+.title-bar {
+    position: relative;
+}
+
+.title-text {
+    flex: 1;
+    min-width: 0;
+}
+
+/* Window button hover effects */
+.window-button:hover {
+    background: #e0e0e0;
+}
+
+.window-button[data-action="close"]:hover {
+    background: #ff6b6b;
+    color: white;
+}
+
+/* ============================================
+   Enhanced Taskbar Button Styles
+   ============================================ */
+.taskbar-button {
+    position: relative;
+}
+
+.taskbar-button.minimized {
+    opacity: 0.7;
+}
+
+.taskbar-button .button-icon {
+    margin-right: 4px;
+}
+
+/* System Tray Enhanced */
+.system-tray {
+    gap: 6px;
+}
+
+.tray-icon {
+    position: relative;
+}
+
+.tray-icon:after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 2px;
+    background: var(--win95-blue);
+    transition: width 0.15s;
+}
+
+.tray-icon:hover:after {
+    width: 80%;
+}

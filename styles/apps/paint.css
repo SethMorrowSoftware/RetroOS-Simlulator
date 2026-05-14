@@ -1,0 +1,47 @@
+/* ============================================
+   Paint
+   ============================================ */
+.paint-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.paint-toolbar {
+    display: flex;
+    gap: 5px;
+    padding: 5px;
+    background: var(--win95-gray);
+    border-bottom: 1px solid var(--win95-dark);
+    flex-wrap: wrap;
+}
+
+.color-picker {
+    display: flex;
+    gap: 2px;
+}
+
+.color-option {
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+    border: 2px outset var(--win95-gray);
+}
+
+.color-option.active,
+.color-option:hover {
+    border: 2px inset var(--win95-gray);
+}
+
+.paint-canvas-container {
+    flex: 1;
+    overflow: auto;
+    background: #808080;
+    padding: 10px;
+}
+
+.paint-canvas {
+    background: white;
+    cursor: crosshair;
+    border: 1px solid #000;
+}

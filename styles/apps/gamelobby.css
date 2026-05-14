@@ -1,0 +1,261 @@
+/**
+ * Game Lobby — multiplayer game browser / matchmaking
+ *
+ * Dark Battle.net / MSN Gaming Zone aesthetic. All colors come from CSS
+ * variables so the global color-scheme switcher can recolor every surface.
+ *
+ * Define lobby-scoped vars on the container so the rest of the OS retains
+ * its standard Win95 palette.
+ */
+
+.gamelobby-container {
+    --gl-bg:           #1a1a2e;
+    --gl-surface:      #16213e;
+    --gl-surface-alt:  #0f3460;
+    --gl-text:         #e0e0e0;
+    --gl-text-dim:     #aaaaaa;
+    --gl-text-muted:   #888888;
+    --gl-text-faint:   #555555;
+    --gl-accent:       #e94560;
+    --gl-success:      #00ff00;
+    --gl-warning:      #ffaa00;
+    --gl-danger:       #ff4444;
+    --gl-info:         #4488ff;
+    --gl-border:       #333333;
+    --gl-border-soft:  #222222;
+
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: var(--gl-bg);
+    color: var(--gl-text);
+    font-family: 'MS Sans Serif', Tahoma, sans-serif;
+    font-size: 11px;
+}
+
+.gamelobby-header {
+    background: linear-gradient(to right, var(--gl-surface), var(--gl-surface-alt));
+    padding: 6px 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--gl-border);
+}
+
+.gamelobby-title {
+    font-size: 14px;
+    font-weight: bold;
+    color: var(--gl-accent);
+}
+
+.gamelobby-status { font-size: 10px; }
+.gamelobby-status--online  { color: var(--gl-success); }
+.gamelobby-status--offline { color: var(--gl-danger); }
+
+.gamelobby-offline {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 16px;
+    padding: 20px;
+    text-align: center;
+}
+.gamelobby-offline-icon { font-size: 40px; }
+.gamelobby-offline-title { font-size: 16px; color: var(--gl-accent); font-weight: bold; }
+.gamelobby-offline-body { color: var(--gl-text-muted); max-width: 300px; }
+.gamelobby-offline-hint { color: var(--gl-text-faint); font-size: 10px; margin-top: 20px; }
+.gamelobby-offline-hint code { color: var(--gl-success); }
+
+.gamelobby-body {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+}
+
+.gamelobby-sidebar {
+    width: 170px;
+    background: var(--gl-surface);
+    border-right: 1px solid var(--gl-border);
+    overflow-y: auto;
+}
+
+.gamelobby-sidebar-heading {
+    padding: 4px 8px;
+    background: var(--gl-surface-alt);
+    color: var(--gl-text-dim);
+    font-weight: bold;
+    font-size: 10px;
+}
+.gamelobby-sidebar-heading--spaced { margin-top: 8px; }
+
+.gamelobby-game-type,
+.gamelobby-action {
+    padding: 6px 10px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.gamelobby-game-type {
+    border-bottom: 1px solid var(--gl-bg);
+}
+.gamelobby-game-type:hover,
+.gamelobby-action:hover {
+    background: var(--gl-surface-alt);
+}
+.gamelobby-action--create { color: var(--gl-success); }
+.gamelobby-action--refresh { color: var(--gl-info); }
+
+.gamelobby-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.gamelobby-list-header {
+    padding: 4px 8px;
+    background: var(--gl-surface-alt);
+    display: flex;
+    justify-content: space-between;
+    color: var(--gl-text-dim);
+    font-size: 10px;
+}
+.gamelobby-col-game     { flex: 2; }
+.gamelobby-col-host     { flex: 1; }
+.gamelobby-col-players  { width: 60px; text-align: center; }
+.gamelobby-col-status   { width: 60px; text-align: center; }
+
+.gamelobby-list {
+    flex: 1;
+    overflow-y: auto;
+}
+
+.gamelobby-list-empty {
+    padding: 30px;
+    text-align: center;
+    color: var(--gl-text-faint);
+}
+.gamelobby-list-empty-icon { font-size: 24px; margin-bottom: 8px; }
+
+.gamelobby-list-loading {
+    padding: 20px;
+    text-align: center;
+    color: var(--gl-text-faint);
+}
+
+.gamelobby-session {
+    padding: 6px 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    border-bottom: 1px solid var(--gl-border-soft);
+}
+.gamelobby-session:hover { background: rgba(15, 52, 96, 0.4); }
+.gamelobby-session--selected { background: var(--gl-surface-alt); }
+
+.gamelobby-session-host { color: var(--gl-text-dim); }
+.gamelobby-session-status--lobby   { color: var(--gl-success); }
+.gamelobby-session-status--playing { color: var(--gl-warning); }
+.gamelobby-session-status--ended   { color: var(--gl-text-muted); }
+
+.gamelobby-actions {
+    padding: 6px 8px;
+    background: var(--gl-surface);
+    border-top: 1px solid var(--gl-border);
+}
+
+.gamelobby-btn {
+    padding: 4px 16px;
+    border: none;
+    cursor: pointer;
+    color: white;
+    font-family: inherit;
+}
+.gamelobby-btn + .gamelobby-btn { margin-left: 4px; }
+.gamelobby-btn--primary   { background: var(--gl-accent); }
+.gamelobby-btn--secondary { background: var(--gl-border); }
+
+/* Create game dialog uses Win95 chrome to feel "native" */
+.gamelobby-dialog {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: var(--win95-gray, #c0c0c0);
+    border: 2px outset #dfdfdf;
+    padding: 0;
+    z-index: 10;
+    width: 300px;
+}
+.gamelobby-dialog-title {
+    background: var(--win95-blue, #000080);
+    color: white;
+    padding: 3px 6px;
+    font-weight: bold;
+}
+.gamelobby-dialog-body { padding: 12px; color: #000; }
+.gamelobby-dialog-row { margin-bottom: 8px; }
+.gamelobby-dialog-row--actions {
+    margin-top: 12px;
+    display: flex;
+    gap: 4px;
+    justify-content: flex-end;
+}
+.gamelobby-dialog-input {
+    width: 100%;
+    padding: 2px;
+    margin-top: 2px;
+}
+.gamelobby-dialog-btn {
+    padding: 3px 12px;
+    border: 2px outset #dfdfdf;
+    background: var(--win95-gray, #c0c0c0);
+    cursor: pointer;
+}
+
+/* === Active game-type filter highlight === */
+.gamelobby-game-type--active {
+    background: var(--win95-selection-bg, #000080);
+    color: var(--win95-selection-text, #ffffff);
+    font-weight: bold;
+}
+
+/* === Toast === */
+.gamelobby-toast {
+    position: absolute;
+    left: 50%;
+    bottom: 10px;
+    transform: translateX(-50%);
+    background: var(--win95-gray, #c0c0c0);
+    border-top: 2px solid var(--win95-button-highlight, #ffffff);
+    border-left: 2px solid var(--win95-button-highlight, #ffffff);
+    border-right: 2px solid #000;
+    border-bottom: 2px solid #000;
+    padding: 6px 12px;
+    font-family: var(--win95-font-family);
+    font-size: 12px;
+    color: var(--win95-text-color, #000);
+    box-shadow: 3px 3px 0 rgba(0,0,0,0.35);
+    z-index: 10;
+    pointer-events: none;
+    animation: gamelobby-toast-in 0.18s ease-out;
+}
+@keyframes gamelobby-toast-in {
+    from { opacity: 0; transform: translate(-50%, 8px); }
+    to   { opacity: 1; transform: translate(-50%, 0); }
+}
+
+/* Make container positioned for absolute toast */
+.gamelobby-container {
+    position: relative;
+}
+
+/* Double-click affordance hint on rows */
+.gamelobby-session {
+    cursor: pointer;
+}
+.gamelobby-session:hover {
+    background: rgba(0, 0, 128, 0.08);
+}

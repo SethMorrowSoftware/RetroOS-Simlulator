@@ -1,0 +1,96 @@
+/* ============================================
+   Calculator (Pixel Perfect)
+   ============================================ */
+.calculator {
+    background: var(--win95-gray);
+    padding: 10px;
+    height: 100%;
+    width: 100%;
+    overflow: hidden; /* Force hide scrollbars if 1px off */
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box; /* Critical: includes padding in width/height */
+}
+
+.calc-display {
+    background: #ffffff;
+    padding: 0 8px; /* Remove vertical padding, let line-height handle it */
+    font-family: 'Courier New', monospace;
+    font-size: 22px;
+    line-height: 36px; /* Vertically center text */
+    text-align: right;
+
+    /* Authentic Sunken Border */
+    border-top: 2px solid #808080;
+    border-left: 2px solid #808080;
+    border-right: 2px solid #fff;
+    border-bottom: 2px solid #fff;
+
+    height: 40px;
+    margin-bottom: 5px;
+    box-sizing: border-box;
+}
+
+.calc-buttons {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    /* 5 rows * 36px + 4 gaps * 5px = ~200px height */
+    grid-template-rows: repeat(5, 36px);
+    gap: 5px;
+    flex: 1; /* Take up remaining space */
+}
+
+.calc-btn {
+    font-family: 'VT323', monospace;
+    font-size: 18px;
+    font-weight: bold;
+    cursor: pointer;
+    background: var(--win95-gray);
+
+    /* 3D Button Bevel */
+    border-top: 2px solid #fff;
+    border-left: 2px solid #fff;
+    border-right: 2px solid #000;
+    border-bottom: 2px solid #000;
+    box-shadow: 1px 1px 0 #808080; /* Shadow for extra depth */
+
+    /* Reset defaults */
+    padding: 0;
+    margin: 0;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.calc-btn:active {
+    /* Pressed Effect */
+    border-top: 2px solid #000;
+    border-left: 2px solid #000;
+    border-right: 2px solid #fff;
+    border-bottom: 2px solid #fff;
+    transform: translate(1px, 1px);
+    box-shadow: none;
+}
+
+.calc-btn:hover {
+    background: #d4d4d4;
+}
+
+/* Specific Button Colors/Sizes */
+.calc-btn.btn-danger {
+    color: #cc0000;
+}
+
+.calc-btn-zero {
+    grid-column: span 2;
+}
+
+.calc-btn-equal {
+    grid-row: span 2;
+    background: var(--win95-blue);
+    color: white;
+}
+.calc-btn-equal:hover {
+    background: #0000a0;
+}

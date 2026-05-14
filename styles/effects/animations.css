@@ -1,0 +1,151 @@
+/* ============================================
+   Animations
+   ============================================ */
+.shake {
+    animation: shake 0.5s ease-in-out;
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-10px); }
+    75% { transform: translateX(10px); }
+}
+
+/* Disco mode */
+.disco-mode {
+    animation: disco 0.5s linear infinite;
+}
+
+@keyframes disco {
+    0% { filter: hue-rotate(0deg); }
+    100% { filter: hue-rotate(360deg); }
+}
+
+/* Celebration particles */
+.celebration {
+    position: fixed;
+    pointer-events: none;
+    z-index: 99999;
+    font-size: 40px;
+    animation: celebrate 2s ease-out forwards;
+}
+
+@keyframes celebrate {
+    0% { transform: translateY(100vh) rotate(0deg); opacity: 1; }
+    100% { transform: translateY(-100vh) rotate(720deg); opacity: 0; }
+}
+
+/* ============================================
+   Better Start Menu Item Hover
+   ============================================ */
+.start-menu-item {
+    transition: background 0.1s;
+}
+
+.start-menu-item:hover .start-menu-icon {
+    transform: scale(1.1);
+}
+
+.start-menu-icon {
+    transition: transform 0.1s;
+}
+
+/* ============================================
+   Context Menu Enhancements
+   ============================================ */
+.context-item {
+    transition: background 0.1s;
+}
+
+.context-item:before {
+    content: '';
+    display: inline-block;
+    width: 18px;
+    height: 18px;
+    margin-right: 8px;
+    vertical-align: middle;
+}
+
+/* ============================================
+   Loading Spinner
+   ============================================ */
+.loading-spinner {
+    width: 24px;
+    height: 24px;
+    border: 3px solid var(--win95-gray);
+    border-top-color: var(--win95-blue);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* ============================================
+   Dial-up Connection Animation
+   ============================================ */
+.dialup-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.8);
+    z-index: 99996;
+    display: none;
+    align-items: center;
+    justify-content: center;
+}
+
+.dialup-overlay.active {
+    display: flex;
+}
+
+.dialup-dialog {
+    background: var(--win95-gray);
+    border: 2px outset var(--win95-gray);
+    padding: 20px;
+    text-align: center;
+    min-width: 350px;
+}
+
+.dialup-icon {
+    font-size: 48px;
+    margin-bottom: 15px;
+    animation: dialupPulse 0.5s ease-in-out infinite alternate;
+}
+
+@keyframes dialupPulse {
+    from { opacity: 1; }
+    to { opacity: 0.5; }
+}
+
+.dialup-status {
+    font-size: 16px;
+    margin-bottom: 15px;
+}
+
+.dialup-animation {
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    color: var(--win95-blue);
+    margin-bottom: 15px;
+    height: 20px;
+}
+
+.dialup-progress {
+    width: 100%;
+    height: 20px;
+    background: white;
+    border: 2px inset var(--win95-gray);
+    margin-bottom: 15px;
+    overflow: hidden;
+}
+
+.dialup-progress-bar {
+    height: 100%;
+    background: var(--win95-blue);
+    width: 0%;
+    transition: width 0.3s;
+}

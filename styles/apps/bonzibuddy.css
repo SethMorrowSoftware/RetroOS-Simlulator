@@ -1,0 +1,324 @@
+/* ============================================
+   BonziBuddy - Loving parody of the infamous
+   purple gorilla "helper" from circa 2001.
+   ============================================ */
+
+.bonzi-app {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: #d4d0c8;
+    font-family: 'MS Sans Serif', 'Microsoft Sans Serif', Tahoma, sans-serif;
+    font-size: 11px;
+    overflow: hidden;
+    user-select: none;
+}
+
+.bonzi-header {
+    background: linear-gradient(180deg, #7b2d8e 0%, #5a1d6e 100%);
+    color: white;
+    padding: 8px 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-bottom: 2px solid #3d0f4e;
+}
+
+.bonzi-gorilla {
+    font-size: 48px;
+    line-height: 1;
+    filter: drop-shadow(2px 2px 3px rgba(0,0,0,0.5));
+    animation: bonziIdle 2s ease-in-out infinite;
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+.bonzi-gorilla:hover    { transform: scale(1.1); }
+.bonzi-gorilla.scanning { animation: bonziScan 0.5s ease-in-out infinite; }
+.bonzi-gorilla.alarmed  { animation: bonziAlarm 0.3s ease-in-out infinite; }
+
+@keyframes bonziIdle  { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+@keyframes bonziScan  { 0%, 100% { transform: rotate(0deg); } 25% { transform: rotate(-10deg); } 75% { transform: rotate(10deg); } }
+@keyframes bonziAlarm { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.15); } }
+
+.bonzi-header-text h2 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: bold;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+}
+.bonzi-header-text p {
+    margin: 2px 0 0 0;
+    font-size: 10px;
+    opacity: 0.85;
+}
+
+.bonzi-tabs {
+    display: flex;
+    background: #c0c0c0;
+    border-bottom: 1px solid #808080;
+    padding: 0 4px;
+}
+.bonzi-tab {
+    padding: 4px 12px;
+    border: 1px solid transparent;
+    border-bottom: none;
+    cursor: pointer;
+    font-size: 11px;
+    font-family: inherit;
+    background: none;
+    margin-top: 2px;
+    position: relative;
+    top: 1px;
+}
+.bonzi-tab:hover { background: #d8d8d8; }
+.bonzi-tab.active {
+    background: #d4d0c8;
+    border: 1px solid #808080;
+    border-bottom: 1px solid #d4d0c8;
+    font-weight: bold;
+}
+
+.bonzi-content { flex: 1; overflow-y: auto; padding: 10px; }
+.bonzi-panel { display: none; }
+.bonzi-panel.active { display: block; }
+
+/* Home tab */
+.bonzi-welcome { text-align: center; padding: 10px; }
+.bonzi-welcome-gorilla {
+    font-size: 72px;
+    margin: 5px 0;
+    animation: bonziIdle 2s ease-in-out infinite;
+    cursor: pointer;
+}
+.bonzi-welcome h3 { color: #5a1d6e; margin: 5px 0; font-size: 14px; }
+
+.bonzi-speech {
+    background: #ffffcc;
+    border: 2px solid #5a1d6e;
+    border-radius: 10px;
+    padding: 10px 14px;
+    margin: 8px auto;
+    max-width: 360px;
+    position: relative;
+    font-size: 12px;
+    line-height: 1.4;
+    text-align: left;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+.bonzi-speech::after {
+    content: '';
+    position: absolute;
+    top: -10px;
+    left: 50%;
+    margin-left: -8px;
+    border: 8px solid transparent;
+    border-bottom-color: #5a1d6e;
+}
+
+.bonzi-action-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+    margin-top: 10px;
+}
+@media (max-width: 480px) {
+    .bonzi-action-grid { grid-template-columns: 1fr; }
+    .bonzi-speech { max-width: 100%; }
+}
+
+.bonzi-action-btn {
+    padding: 8px;
+    border: 2px outset #dfdfdf;
+    background: #c0c0c0;
+    font-family: inherit;
+    font-size: 11px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.1s;
+}
+.bonzi-action-btn:active { border-style: inset; }
+.bonzi-action-btn:hover { background: #d0d0d0; }
+.bonzi-action-btn .btn-icon { font-size: 18px; }
+
+/* Scanner tab */
+.bonzi-scanner { padding: 5px; }
+
+.bonzi-scan-status {
+    background: white;
+    border: 2px inset #c0c0c0;
+    padding: 8px;
+    margin-bottom: 8px;
+    font-family: 'Courier New', monospace;
+    font-size: 10px;
+    height: 120px;
+    overflow-y: auto;
+    line-height: 1.5;
+}
+
+.bonzi-progress-container {
+    background: white;
+    border: 2px inset #c0c0c0;
+    height: 20px;
+    margin-bottom: 8px;
+    position: relative;
+}
+.bonzi-progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #7b2d8e, #a855c7);
+    width: 0%;
+    transition: width 0.3s;
+}
+.bonzi-progress-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 10px;
+    font-weight: bold;
+    mix-blend-mode: difference;
+    color: white;
+}
+
+.bonzi-scan-controls {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 8px;
+}
+.bonzi-scan-controls button {
+    flex: 1;
+    padding: 6px;
+    border: 2px outset #dfdfdf;
+    background: #c0c0c0;
+    font-family: inherit;
+    font-size: 11px;
+    cursor: pointer;
+}
+.bonzi-scan-controls button:active { border-style: inset; }
+.bonzi-scan-controls button:disabled { color: #808080; cursor: default; }
+
+.bonzi-threat-list {
+    background: #fff0f0;
+    border: 2px inset #c0c0c0;
+    padding: 6px;
+    max-height: 100px;
+    overflow-y: auto;
+    display: none;
+}
+.bonzi-threat-list.has-threats { display: block; }
+.bonzi-threat-item {
+    padding: 3px 0;
+    border-bottom: 1px dotted #ddd;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 10px;
+}
+.bonzi-threat-item:last-child { border-bottom: none; }
+.threat-severity-high   { color: #cc0000; }
+.threat-severity-medium { color: #cc6600; }
+.threat-severity-low    { color: #ccaa00; }
+
+/* Toolbar tab */
+.bonzi-toolbar-promo { text-align: center; }
+.bonzi-toolbar-preview {
+    background: #e8e8e8;
+    border: 2px inset #c0c0c0;
+    padding: 4px 8px;
+    margin: 8px 0;
+    font-size: 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+.bonzi-toolbar-preview .toolbar-item {
+    padding: 2px 6px;
+    border: 1px outset #dfdfdf;
+    background: #c0c0c0;
+    font-size: 9px;
+    white-space: nowrap;
+}
+
+.bonzi-feature-list {
+    text-align: left;
+    margin: 8px 0;
+    padding: 8px;
+    background: #f0f0f0;
+    border: 1px solid #c0c0c0;
+}
+.bonzi-feature-list li {
+    padding: 3px 0;
+    font-size: 11px;
+    list-style: none;
+}
+.bonzi-feature-list li::before {
+    content: '✓  ';
+    color: #5a1d6e;
+    font-weight: bold;
+}
+
+.bonzi-install-btn {
+    padding: 10px 24px;
+    background: linear-gradient(180deg, #9b4dca, #7b2d8e);
+    color: white;
+    border: 2px outset #b060d0;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: bold;
+    cursor: pointer;
+    margin: 8px 0;
+}
+.bonzi-install-btn:active { border-style: inset; }
+
+/* Footer */
+.bonzi-footer {
+    background: #c0c0c0;
+    border-top: 1px solid #808080;
+    padding: 4px 8px;
+    font-size: 9px;
+    color: #666;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+.bonzi-footer a {
+    color: #5a1d6e;
+    cursor: pointer;
+    text-decoration: underline;
+}
+
+.bonzi-eula-text {
+    background: white;
+    border: 2px inset #c0c0c0;
+    padding: 8px;
+    font-size: 9px;
+    height: 140px;
+    overflow-y: auto;
+    line-height: 1.5;
+    margin: 8px 0;
+    font-family: 'Courier New', monospace;
+    white-space: pre-wrap;
+}
+
+.scan-line-clean  { color: #008000; }
+.scan-line-warn   { color: #cc6600; }
+.scan-line-threat { color: #cc0000; font-weight: bold; }
+.scan-line-info   { color: #333; }
+
+/* Persistent stats badge in header */
+.bonzi-stats-badge {
+    margin-left: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    font-size: 9px;
+    line-height: 1.25;
+    color: rgba(255,255,255,0.85);
+    text-shadow: 1px 1px 1px rgba(0,0,0,0.6);
+}
+.bonzi-stats-badge strong { color: #ffe066; }

@@ -1,0 +1,44 @@
+/* ============================================
+   Tabs
+   ============================================ */
+.tab-container {
+    margin-bottom: 10px;
+}
+
+.tab-buttons {
+    display: flex;
+    gap: 2px;
+}
+
+.tab-btn {
+    padding: 4px 12px;
+    background: var(--win95-gray);
+    border: 2px solid;
+    border-color: var(--win95-light) var(--win95-dark) var(--win95-gray) var(--win95-light);
+    font-family: 'MS Sans Serif', 'Segoe UI', Tahoma, sans-serif;
+    font-size: 12px;
+    cursor: pointer;
+    margin-bottom: -2px;
+}
+
+.tab-btn.active {
+    background: var(--win95-gray);
+    border-bottom-color: var(--win95-gray);
+    position: relative;
+    z-index: 1;
+}
+
+.tab-content {
+    border: 2px solid;
+    border-color: var(--win95-light) var(--win95-dark) var(--win95-dark) var(--win95-light);
+    padding: 10px;
+    background: var(--win95-gray);
+}
+
+.tab-pane {
+    display: none;
+}
+
+.tab-pane.active {
+    display: block;
+}

@@ -1,0 +1,24 @@
+/* ============================================
+   Desktop Pet
+   ============================================ */
+.desktop-pet {
+    position: fixed;
+    left: 0;
+    top: 0;
+    z-index: 8999;
+    cursor: pointer;
+    display: none;
+    pointer-events: auto;
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    background: transparent;
+}
+
+.desktop-pet canvas {
+    image-rendering: pixelated;
+    image-rendering: -moz-crisp-edges;
+    image-rendering: crisp-edges;
+    background: transparent;
+}

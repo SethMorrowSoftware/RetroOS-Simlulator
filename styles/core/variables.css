@@ -1,0 +1,44 @@
+/* ============================================
+   CSS Variables - Theme Colors
+   ============================================ */
+:root {
+    /* Core palette */
+    --win95-gray: #c0c0c0;
+    --win95-blue: #000080;
+    --win95-teal: #008080;
+    --win95-dark: #808080;
+    --win95-light: #ffffff;
+    --win95-darkest: #000000;
+    --desktop-bg: #008080;
+    --accent-color: #000080;
+
+    /* Window chrome */
+    --win95-window-bg: #c0c0c0;
+    --win95-window-title: #000080;
+    --win95-window-title-text: #ffffff;
+    --win95-window-title-inactive: #808080;
+
+    /* Buttons & 3D borders */
+    --win95-button-face: #c0c0c0;
+    --win95-button-highlight: #ffffff;
+    --win95-button-shadow: #808080;
+
+    /* Text & input */
+    --win95-text-color: #000000;
+    --win95-input-bg: #ffffff;
+    --win95-selection-bg: #000080;
+    --win95-selection-text: #ffffff;
+
+    /* Menus & UI */
+    --win95-menu-bg: #c0c0c0;
+    --win95-scrollbar-bg: #c0c0c0;
+
+    /* Typography */
+    --win95-font-family: 'MS Sans Serif', 'Segoe UI', Tahoma, Geneva, sans-serif;
+    --win95-font-size: 13px;
+
+    /* Icon size variables */
+    --icon-size: 32px;
+    --icon-label-size: 12px;
+    --icon-width: 80px;
+}

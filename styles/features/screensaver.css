@@ -1,0 +1,82 @@
+/* ============================================
+   Screensaver
+   ============================================ */
+.screensaver {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: #000;
+    z-index: 99998;
+    display: none;
+    cursor: none;
+}
+
+.screensaver.active {
+    display: block;
+}
+
+.flying-toasters {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+}
+
+.toaster {
+    position: absolute;
+    font-size: 48px;
+    animation: fly 10s linear infinite;
+}
+
+@keyframes fly {
+    from {
+        transform: translate(100vw, -50px) rotate(0deg);
+    }
+    to {
+        transform: translate(-100px, 100vh) rotate(360deg);
+    }
+}
+
+.screensaver-text {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: #333;
+    font-size: 14px;
+}
+
+/* Starfield screensaver */
+.flying-toasters.starfield-mode {
+    background: radial-gradient(ellipse at center, #0a0a2e 0%, #000000 100%);
+}
+.star {
+    position: absolute;
+    color: white;
+    animation: star-twinkle 2s ease-in-out infinite;
+}
+@keyframes star-twinkle {
+    0%, 100% { opacity: 0.3; transform: scale(0.8); }
+    50% { opacity: 1; transform: scale(1.2); }
+}
+
+/* Marquee screensaver */
+.flying-toasters.marquee-mode {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.marquee-text {
+    color: #00ff00;
+    font-size: 48px;
+    font-family: 'VT323', monospace;
+    white-space: nowrap;
+    animation: marquee-bounce 3s ease-in-out infinite;
+    text-shadow: 0 0 10px #00ff00, 0 0 20px #00ff00;
+}
+@keyframes marquee-bounce {
+    0%, 100% { transform: translateX(-30px); }
+    50% { transform: translateX(30px); }
+}

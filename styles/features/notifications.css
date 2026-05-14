@@ -1,0 +1,18 @@
+/* ============================================
+   Notifications - Toast Notification System
+   Ensures notifications appear above Clippy
+   and are visually prominent
+   ============================================ */
+
+#mp-notifications {
+    z-index: 100001 !important;
+}
+
+.mp-toast-notification {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.mp-toast-notification:hover {
+    transform: translateX(-4px);
+    box-shadow: 4px 4px 12px rgba(0, 0, 0, 0.5) !important;
+}

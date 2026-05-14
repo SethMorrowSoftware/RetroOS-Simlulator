@@ -1,0 +1,28 @@
+/* ============================================
+   Snake Game
+   ============================================ */
+.snake-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 10px;
+}
+
+.snake-info {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+    margin-bottom: 8px;
+    font-size: 14px;
+}
+
+.snake-canvas {
+    border: 3px inset var(--win95-gray);
+    background: #000;
+}
+
+.snake-controls {
+    margin-top: 8px;
+    font-size: 12px;
+    color: #666;
+}

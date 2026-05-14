@@ -1,0 +1,101 @@
+/* ============================================
+   Color Schemes
+   ============================================ */
+
+/* High Contrast Black */
+body.scheme-highcontrast {
+    --win95-gray: #000000;
+    --win95-blue: #800080;
+    --accent-color: #800080;
+}
+body.scheme-highcontrast .window {
+    background: #000000;
+    color: #ffffff;
+}
+body.scheme-highcontrast .window-header {
+    background: linear-gradient(90deg, #800080, #c000c0);
+}
+body.scheme-highcontrast .taskbar {
+    background: #000000;
+    color: #ffffff;
+}
+body.scheme-highcontrast .start-menu {
+    background: #000000;
+    color: #ffffff;
+}
+
+/* Desert */
+body.scheme-desert {
+    --win95-gray: #d4c4a8;
+    --win95-blue: #8b7355;
+    --accent-color: #8b7355;
+}
+body.scheme-desert .window {
+    background: #d4c4a8;
+}
+body.scheme-desert .window-header {
+    background: linear-gradient(90deg, #8b7355, #a08060);
+}
+body.scheme-desert .taskbar {
+    background: #d4c4a8;
+}
+body.scheme-desert .start-menu {
+    background: #d4c4a8;
+}
+
+/* Ocean */
+body.scheme-ocean {
+    --win95-gray: #b0c4de;
+    --win95-blue: #003366;
+    --accent-color: #003366;
+}
+body.scheme-ocean .window {
+    background: #b0c4de;
+}
+body.scheme-ocean .window-header {
+    background: linear-gradient(90deg, #003366, #004488);
+}
+body.scheme-ocean .taskbar {
+    background: #b0c4de;
+}
+body.scheme-ocean .start-menu {
+    background: #b0c4de;
+}
+
+/* Rose */
+body.scheme-rose {
+    --win95-gray: #e8d0d0;
+    --win95-blue: #8b4560;
+    --accent-color: #8b4560;
+}
+body.scheme-rose .window {
+    background: #e8d0d0;
+}
+body.scheme-rose .window-header {
+    background: linear-gradient(90deg, #8b4560, #a05070);
+}
+body.scheme-rose .taskbar {
+    background: #e8d0d0;
+}
+body.scheme-rose .start-menu {
+    background: #e8d0d0;
+}
+
+/* Slate */
+body.scheme-slate {
+    --win95-gray: #a0a0b0;
+    --win95-blue: #404050;
+    --accent-color: #404050;
+}
+body.scheme-slate .window {
+    background: #a0a0b0;
+}
+body.scheme-slate .window-header {
+    background: linear-gradient(90deg, #404050, #505060);
+}
+body.scheme-slate .taskbar {
+    background: #a0a0b0;
+}
+body.scheme-slate .start-menu {
+    background: #a0a0b0;
+}

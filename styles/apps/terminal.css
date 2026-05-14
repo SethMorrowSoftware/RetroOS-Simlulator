@@ -1,0 +1,298 @@
+/* ============================================
+   Terminal - Authentic Retro CRT Experience
+   ============================================ */
+.terminal {
+    background: #000;
+    color: #0f0;
+    padding: 10px;
+    font-family: 'VT323', monospace;
+    height: 100%;
+    overflow: hidden;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+}
+
+.terminal-content-wrapper {
+    position: relative;
+    z-index: 2;
+    overflow-y: auto;
+    height: 100%;
+    width: 100%;
+}
+
+.matrix-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+    pointer-events: none;
+    opacity: 0.3;
+    display: none;
+}
+
+.matrix-mode .matrix-canvas {
+    display: block;
+    opacity: 0.9;
+}
+
+.terminal-output {
+    margin-bottom: 5px;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+.terminal-input-line {
+    display: flex;
+    gap: 5px;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.terminal-prompt {
+    color: #0f0;
+    white-space: nowrap;
+}
+
+.terminal-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: #0f0;
+    font-family: 'VT323', monospace;
+    font-size: 18px;
+    outline: none;
+    caret-color: #0f0;
+}
+
+/* ============================================
+   CRT Phosphor Glow Effect
+   Characters emit a subtle green phosphor glow
+   like a real VT100/IBM 5151 monitor
+   ============================================ */
+.terminal-app {
+    text-shadow: 0 0 3px rgba(0, 255, 0, 0.4);
+}
+
+.terminal-app .terminal-output > div {
+    text-shadow: 0 0 3px rgba(0, 255, 0, 0.35);
+}
+
+/* Brighter glow for the input line (active phosphor) */
+.terminal-app .terminal-input-line {
+    text-shadow: 0 0 5px rgba(0, 255, 0, 0.5);
+}
+
+.terminal-app .terminal-input {
+    text-shadow: 0 0 5px rgba(0, 255, 0, 0.5);
+}
+
+/* ============================================
+   Blinking Block Cursor
+   Authentic block cursor that blinks at ~530ms
+   just like a classic terminal
+   ============================================ */
+.terminal-app .terminal-input {
+    caret-color: transparent;
+}
+
+.terminal-app .terminal-cursor {
+    display: inline-block;
+    width: 8px;
+    height: 16px;
+    background: #c0c0c0;
+    animation: cursorBlink 1.06s step-end infinite;
+    vertical-align: text-bottom;
+    margin-left: 1px;
+    flex-shrink: 0;
+}
+
+@keyframes cursorBlink {
+    0%, 50% { opacity: 1; }
+    50.01%, 100% { opacity: 0; }
+}
+
+/* ============================================
+   CRT Scanlines Overlay
+   Subtle horizontal scanlines like a real CRT
+   ============================================ */
+.terminal-app .terminal-scanlines {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 10;
+    background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 1px,
+        rgba(0, 0, 0, 0.15) 1px,
+        rgba(0, 0, 0, 0.15) 2px
+    );
+    mix-blend-mode: multiply;
+}
+
+/* ============================================
+   Screen Flicker Effect
+   Subtle brightness flicker like old CRTs
+   ============================================ */
+.terminal-app .terminal-scanlines {
+    animation: screenFlicker 8s linear infinite;
+}
+
+@keyframes screenFlicker {
+    0%   { opacity: 0.97; }
+    5%   { opacity: 1; }
+    10%  { opacity: 0.98; }
+    15%  { opacity: 1; }
+    20%  { opacity: 0.96; }
+    25%  { opacity: 1; }
+    50%  { opacity: 0.99; }
+    75%  { opacity: 0.97; }
+    80%  { opacity: 1; }
+    90%  { opacity: 0.98; }
+    100% { opacity: 0.97; }
+}
+
+/* ============================================
+   Phosphor Afterglow / Fade Effect
+   Text lines have a subtle phosphor persistence
+   ============================================ */
+.terminal-app .terminal-output > div {
+    transition: opacity 0.05s ease-in;
+}
+
+.terminal-app .terminal-output > div.term-line-new {
+    animation: phosphorGlow 0.3s ease-out;
+}
+
+@keyframes phosphorGlow {
+    0%   { text-shadow: 0 0 8px rgba(0, 255, 0, 0.8), 0 0 15px rgba(0, 255, 0, 0.3); }
+    100% { text-shadow: 0 0 3px rgba(0, 255, 0, 0.35); }
+}
+
+/* ============================================
+   Boot Sequence Styling
+   Amber/green phosphor during BIOS POST
+   ============================================ */
+.terminal-app .term-boot-line {
+    color: #c0c0c0;
+    text-shadow: 0 0 3px rgba(192, 192, 192, 0.3);
+}
+
+.terminal-app .term-boot-ok {
+    color: #00ff00;
+}
+
+.terminal-app .term-boot-header {
+    color: #ffffff;
+    text-shadow: 0 0 4px rgba(255, 255, 255, 0.3);
+}
+
+.terminal-app .term-boot-value {
+    color: #ffff00;
+}
+
+/* ============================================
+   Vignette Effect
+   Darkened edges like looking at a curved CRT
+   ============================================ */
+.terminal-app .terminal-vignette {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 11;
+    background: radial-gradient(
+        ellipse at center,
+        transparent 60%,
+        rgba(0, 0, 0, 0.35) 100%
+    );
+}
+
+/* ============================================
+   Amber Mode (color variant)
+   ============================================ */
+.terminal-app.amber-mode {
+    color: #ffb000 !important;
+    text-shadow: 0 0 3px rgba(255, 176, 0, 0.4);
+}
+
+.terminal-app.amber-mode .terminal-prompt,
+.terminal-app.amber-mode .terminal-input {
+    color: #ffb000 !important;
+}
+
+.terminal-app.amber-mode .terminal-cursor {
+    background: #ffb000;
+}
+
+.terminal-app.amber-mode .terminal-output > div.term-line-new {
+    animation: phosphorGlowAmber 0.3s ease-out;
+}
+
+@keyframes phosphorGlowAmber {
+    0%   { text-shadow: 0 0 8px rgba(255, 176, 0, 0.8), 0 0 15px rgba(255, 176, 0, 0.3); }
+    100% { text-shadow: 0 0 3px rgba(255, 176, 0, 0.35); }
+}
+
+/* ============================================
+   White Phosphor Mode (IBM PC style)
+   ============================================ */
+.terminal-app.white-mode {
+    color: #e0e0e0 !important;
+    text-shadow: 0 0 2px rgba(224, 224, 224, 0.3);
+}
+
+.terminal-app.white-mode .terminal-prompt,
+.terminal-app.white-mode .terminal-input {
+    color: #e0e0e0 !important;
+}
+
+.terminal-app.white-mode .terminal-cursor {
+    background: #e0e0e0;
+}
+
+/* ============================================
+   Typing indicator animation
+   ============================================ */
+.terminal-app .term-typing-indicator {
+    display: inline-block;
+    animation: typingDots 1.5s steps(4, end) infinite;
+    overflow: hidden;
+    vertical-align: bottom;
+    width: 0;
+}
+
+@keyframes typingDots {
+    0%   { width: 0; }
+    25%  { width: 8px; }
+    50%  { width: 16px; }
+    75%  { width: 24px; }
+    100% { width: 0; }
+}
+
+/* ============================================
+   Scanreg / Defrag progress bar styling
+   ============================================ */
+.terminal-app .term-progress-bar {
+    display: inline-block;
+    color: #00ff00;
+    font-family: inherit;
+    letter-spacing: 0;
+}
+
+.terminal-app .term-progress-block {
+    color: #00ff00;
+    text-shadow: 0 0 4px rgba(0, 255, 0, 0.5);
+}
+
+.terminal-app .term-progress-empty {
+    color: #333333;
+}

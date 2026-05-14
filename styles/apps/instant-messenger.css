@@ -1,0 +1,584 @@
+/* ============================================
+   Instant Messenger App - 90s AIM/ICQ/MSN Style
+   Win95 themed with proper 3D beveled borders
+   ============================================ */
+
+/* === Container === */
+.im-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: var(--win95-gray);
+    font-family: var(--win95-font-family);
+    font-size: 13px;
+    color: var(--win95-text-color);
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+/* ============================================
+   SIGN-ON SCREEN
+   ============================================ */
+.im-signon {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    background: linear-gradient(180deg, #336699 0%, #003366 100%);
+    gap: 10px;
+}
+.im-signon-logo {
+    font-size: 48px;
+    margin-bottom: 5px;
+    animation: im-bounce 2s ease-in-out infinite;
+}
+@keyframes im-bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+}
+.im-signon-title {
+    color: #fff;
+    font-size: 22px;
+    font-weight: bold;
+    text-shadow: 2px 2px #000;
+    margin-bottom: 10px;
+    font-family: var(--win95-font-family);
+}
+.im-signon-subtitle {
+    color: #aaccee;
+    font-size: 13px;
+    margin-bottom: 15px;
+}
+.im-signon-box {
+    background: var(--win95-gray);
+    /* Win95 raised border */
+    border-top: 2px solid var(--win95-button-highlight);
+    border-left: 2px solid var(--win95-button-highlight);
+    border-right: 2px solid #000;
+    border-bottom: 2px solid #000;
+    padding: 20px;
+    width: 250px;
+}
+.im-signon-field {
+    width: 100%;
+    padding: 5px;
+    margin: 5px 0;
+    /* Win95 sunken field */
+    border-top: 2px solid var(--win95-button-shadow);
+    border-left: 2px solid var(--win95-button-shadow);
+    border-right: 2px solid var(--win95-button-highlight);
+    border-bottom: 2px solid var(--win95-button-highlight);
+    background: var(--win95-input-bg);
+    font-family: var(--win95-font-family);
+    font-size: 13px;
+    box-sizing: border-box;
+}
+.im-signon-btn {
+    width: 100%;
+    padding: 6px;
+    margin-top: 10px;
+    background: var(--win95-button-face);
+    /* Win95 raised button */
+    border-top: 2px solid var(--win95-button-highlight);
+    border-left: 2px solid var(--win95-button-highlight);
+    border-right: 2px solid #000;
+    border-bottom: 2px solid #000;
+    box-shadow: 1px 1px 0 var(--win95-button-shadow);
+    cursor: pointer;
+    font-weight: bold;
+    font-family: var(--win95-font-family);
+    color: var(--win95-text-color);
+}
+.im-signon-btn:active {
+    border-top: 2px solid #000;
+    border-left: 2px solid #000;
+    border-right: 2px solid var(--win95-button-highlight);
+    border-bottom: 2px solid var(--win95-button-highlight);
+    box-shadow: none;
+    transform: translate(1px, 1px);
+}
+.im-signon-label {
+    font-size: 13px;
+    color: var(--win95-text-color);
+    font-weight: bold;
+}
+
+/* ============================================
+   MAIN LAYOUT
+   ============================================ */
+.im-main {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+/* ============================================
+   BUDDY LIST PANEL
+   ============================================ */
+.im-buddy-panel {
+    width: 200px;
+    min-width: 180px;
+    background: var(--win95-gray);
+    border-right: 1px solid var(--win95-button-shadow);
+    display: flex;
+    flex-direction: column;
+}
+.im-buddy-header {
+    background: linear-gradient(180deg, var(--win95-blue), #000040);
+    color: var(--win95-window-title-text);
+    padding: 6px 10px;
+    font-weight: bold;
+    font-size: 13px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.im-my-status {
+    font-size: 13px;
+    color: #aad;
+    cursor: pointer;
+}
+.im-buddy-toolbar {
+    display: flex;
+    background: var(--win95-gray);
+    border-bottom: 1px solid var(--win95-button-shadow);
+    padding: 3px;
+    gap: 3px;
+}
+.im-toolbar-btn {
+    padding: 2px 6px;
+    font-size: 13px;
+    font-family: var(--win95-font-family);
+    background: var(--win95-button-face);
+    /* Win95 raised button */
+    border-top: 1px solid var(--win95-button-highlight);
+    border-left: 1px solid var(--win95-button-highlight);
+    border-right: 1px solid var(--win95-button-shadow);
+    border-bottom: 1px solid var(--win95-button-shadow);
+    cursor: pointer;
+    color: var(--win95-text-color);
+}
+.im-toolbar-btn:hover {
+    background: #d4d4d4;
+}
+.im-toolbar-btn:active {
+    border-top: 1px solid var(--win95-button-shadow);
+    border-left: 1px solid var(--win95-button-shadow);
+    border-right: 1px solid var(--win95-button-highlight);
+    border-bottom: 1px solid var(--win95-button-highlight);
+}
+.im-buddy-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 2px;
+    /* Win95 sunken field */
+    background: var(--win95-input-bg);
+    margin: 3px;
+    border-top: 2px solid var(--win95-button-shadow);
+    border-left: 2px solid var(--win95-button-shadow);
+    border-right: 2px solid var(--win95-button-highlight);
+    border-bottom: 2px solid var(--win95-button-highlight);
+}
+.im-group-header {
+    font-weight: bold;
+    font-size: 13px;
+    color: var(--win95-text-color);
+    padding: 4px 5px;
+    cursor: pointer;
+    user-select: none;
+}
+.im-group-header:hover {
+    background: #f0f0f0;
+}
+.im-buddy {
+    display: flex;
+    align-items: center;
+    padding: 3px 5px 3px 15px;
+    cursor: pointer;
+    gap: 6px;
+    font-size: 13px;
+}
+.im-buddy:hover {
+    background: var(--win95-selection-bg);
+    color: var(--win95-selection-text);
+}
+.im-buddy.active {
+    background: var(--win95-selection-bg);
+    color: var(--win95-selection-text);
+}
+.im-buddy-icon {
+    width: 14px;
+    height: 14px;
+    font-size: 13px;
+    flex-shrink: 0;
+}
+.im-buddy-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.im-buddy-idle {
+    font-size: 13px;
+    color: var(--win95-button-shadow);
+}
+.im-buddy.active .im-buddy-idle,
+.im-buddy:hover .im-buddy-idle {
+    color: #cce;
+}
+.im-online-count {
+    font-size: 13px;
+    color: var(--win95-button-shadow);
+    padding: 5px 10px;
+    border-top: 1px solid var(--win95-button-shadow);
+    background: var(--win95-gray);
+}
+
+/* ============================================
+   CONVERSATION PANEL
+   ============================================ */
+.im-convo-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: var(--win95-gray);
+}
+.im-convo-header {
+    background: var(--win95-gray);
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--win95-button-shadow);
+    font-weight: bold;
+    font-size: 13px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: var(--win95-text-color);
+}
+.im-convo-close {
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--win95-text-color);
+    padding: 0 4px;
+    /* Win95 close button */
+    background: var(--win95-button-face);
+    border-top: 1px solid var(--win95-button-highlight);
+    border-left: 1px solid var(--win95-button-highlight);
+    border-right: 1px solid var(--win95-button-shadow);
+    border-bottom: 1px solid var(--win95-button-shadow);
+    line-height: 1;
+}
+.im-convo-close:hover {
+    background: #d4d4d4;
+}
+.im-convo-close:active {
+    border-top: 1px solid var(--win95-button-shadow);
+    border-left: 1px solid var(--win95-button-shadow);
+    border-right: 1px solid var(--win95-button-highlight);
+    border-bottom: 1px solid var(--win95-button-highlight);
+}
+.im-convo-empty {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--win95-button-shadow);
+    font-style: italic;
+    font-size: 13px;
+    flex-direction: column;
+    gap: 10px;
+    background: var(--win95-gray);
+}
+.im-convo-empty-logo {
+    font-size: 48px;
+    opacity: 0.3;
+}
+.im-convo-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px;
+    font-size: 13px;
+    /* Win95 sunken field */
+    background: var(--win95-input-bg);
+    margin: 4px;
+    border-top: 2px solid var(--win95-button-shadow);
+    border-left: 2px solid var(--win95-button-shadow);
+    border-right: 2px solid var(--win95-button-highlight);
+    border-bottom: 2px solid var(--win95-button-highlight);
+}
+.im-msg {
+    margin-bottom: 4px;
+    word-wrap: break-word;
+}
+.im-msg-name {
+    font-weight: bold;
+}
+.im-msg-name.me {
+    color: #0000cc;
+}
+.im-msg-name.them {
+    color: #cc0000;
+}
+.im-msg-time {
+    color: var(--win95-button-shadow);
+    font-size: 13px;
+}
+.im-msg-system {
+    color: var(--win95-button-shadow);
+    font-style: italic;
+    font-size: 13px;
+    margin: 6px 0;
+}
+.im-typing-indicator {
+    padding: 2px 8px;
+    font-size: 13px;
+    color: var(--win95-button-shadow);
+    font-style: italic;
+    height: 14px;
+}
+.im-convo-input-area {
+    display: flex;
+    border-top: 1px solid var(--win95-button-shadow);
+    background: var(--win95-gray);
+    padding: 4px;
+    gap: 4px;
+}
+.im-convo-input {
+    flex: 1;
+    padding: 6px;
+    /* Win95 sunken field */
+    border-top: 2px solid var(--win95-button-shadow);
+    border-left: 2px solid var(--win95-button-shadow);
+    border-right: 2px solid var(--win95-button-highlight);
+    border-bottom: 2px solid var(--win95-button-highlight);
+    background: var(--win95-input-bg);
+    font-family: var(--win95-font-family);
+    font-size: 13px;
+    resize: none;
+    height: 40px;
+    color: var(--win95-text-color);
+}
+.im-convo-send {
+    padding: 6px 14px;
+    background: var(--win95-button-face);
+    /* Win95 raised button */
+    border-top: 2px solid var(--win95-button-highlight);
+    border-left: 2px solid var(--win95-button-highlight);
+    border-right: 2px solid #000;
+    border-bottom: 2px solid #000;
+    box-shadow: 1px 1px 0 var(--win95-button-shadow);
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 13px;
+    font-family: var(--win95-font-family);
+    align-self: stretch;
+    color: var(--win95-text-color);
+}
+.im-convo-send:active {
+    border-top: 2px solid #000;
+    border-left: 2px solid #000;
+    border-right: 2px solid var(--win95-button-highlight);
+    border-bottom: 2px solid var(--win95-button-highlight);
+    box-shadow: none;
+    transform: translate(1px, 1px);
+}
+.im-convo-toolbar {
+    display: flex;
+    padding: 3px 5px;
+    gap: 8px;
+    background: var(--win95-gray);
+    border-top: 1px solid var(--win95-button-highlight);
+    border-bottom: 1px solid var(--win95-button-shadow);
+    font-size: 13px;
+}
+.im-convo-tool {
+    cursor: pointer;
+    opacity: 0.5;
+}
+.im-convo-tool:hover {
+    opacity: 1;
+}
+
+/* ============================================
+   AWAY MESSAGE BAR
+   ============================================ */
+.im-away-bar {
+    background: #ffffcc;
+    padding: 4px 10px;
+    font-size: 13px;
+    border-bottom: 1px solid var(--win95-button-shadow);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    color: var(--win95-text-color);
+}
+.im-away-bar button {
+    font-size: 13px;
+    padding: 1px 6px;
+    cursor: pointer;
+    background: var(--win95-button-face);
+    border-top: 1px solid var(--win95-button-highlight);
+    border-left: 1px solid var(--win95-button-highlight);
+    border-right: 1px solid var(--win95-button-shadow);
+    border-bottom: 1px solid var(--win95-button-shadow);
+    font-family: var(--win95-font-family);
+    color: var(--win95-text-color);
+}
+.im-away-bar button:active {
+    border-top: 1px solid var(--win95-button-shadow);
+    border-left: 1px solid var(--win95-button-shadow);
+    border-right: 1px solid var(--win95-button-highlight);
+    border-bottom: 1px solid var(--win95-button-highlight);
+}
+
+/* ============================================
+   BUDDY PROFILE POPUP
+   ============================================ */
+.im-profile-popup {
+    position: absolute;
+    background: #ffffee;
+    /* Win95 raised dialog */
+    border-top: 2px solid var(--win95-button-highlight);
+    border-left: 2px solid var(--win95-button-highlight);
+    border-right: 2px solid #000;
+    border-bottom: 2px solid #000;
+    padding: 12px;
+    width: 220px;
+    font-size: 13px;
+    z-index: 100;
+    box-shadow: 3px 3px 6px rgba(0,0,0,0.3);
+    display: none;
+}
+.im-profile-name {
+    font-weight: bold;
+    font-size: 13px;
+    margin-bottom: 8px;
+    color: var(--win95-blue);
+}
+.im-profile-field {
+    margin-bottom: 4px;
+}
+.im-profile-label {
+    font-weight: bold;
+    color: var(--win95-button-shadow);
+}
+.im-profile-close {
+    position: absolute;
+    top: 4px;
+    right: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--win95-button-shadow);
+    /* Win95 close button */
+    background: var(--win95-button-face);
+    border-top: 1px solid var(--win95-button-highlight);
+    border-left: 1px solid var(--win95-button-highlight);
+    border-right: 1px solid var(--win95-button-shadow);
+    border-bottom: 1px solid var(--win95-button-shadow);
+    padding: 0 3px;
+    line-height: 1;
+}
+.im-profile-close:hover {
+    background: #d4d4d4;
+}
+.im-warn-bar {
+    font-size: 13px;
+    color: #c00;
+    padding: 0 10px 4px;
+}
+
+/* ============================================
+   WIN95 SCROLLBAR STYLING
+   ============================================ */
+.im-container ::-webkit-scrollbar {
+    width: 16px;
+}
+.im-container ::-webkit-scrollbar-track {
+    background: var(--win95-gray);
+    border: 1px solid var(--win95-button-shadow);
+}
+.im-container ::-webkit-scrollbar-thumb {
+    background: var(--win95-gray);
+    border-top: 2px solid var(--win95-button-highlight);
+    border-left: 2px solid var(--win95-button-highlight);
+    border-right: 2px solid #000;
+    border-bottom: 2px solid #000;
+}
+.im-container ::-webkit-scrollbar-button {
+    background: var(--win95-gray);
+    border-top: 1px solid var(--win95-button-highlight);
+    border-left: 1px solid var(--win95-button-highlight);
+    border-right: 1px solid var(--win95-button-shadow);
+    border-bottom: 1px solid var(--win95-button-shadow);
+    height: 16px;
+}
+
+/* ============================================
+   POLISH OVERRIDES (post-tightening)
+   ============================================ */
+.im-signon-title { font-size: 22px; }
+.im-signon-subtitle { font-size: 12px; }
+.im-signon-logo { font-size: 48px; }
+.im-signon-saveme {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin-top: 8px;
+    font-size: 12px;
+    color: var(--win95-text-color);
+}
+.im-signon-saveme input { margin: 0; }
+
+/* Buddy list group headers can stay legible */
+.im-buddy-group-header {
+    font-size: 12px !important;
+    font-weight: bold;
+}
+
+/* Convo header should look like a window title */
+.im-convo-header {
+    font-size: 12px;
+}
+
+/* Make warning bar pop more */
+.im-warn-bar {
+    background: linear-gradient(180deg, #ffe066 0%, #f5c533 100%);
+    color: #663300;
+    font-weight: bold;
+    text-align: center;
+    padding: 3px 6px;
+    border-bottom: 1px solid #aa6600;
+    text-shadow: 1px 1px 0 rgba(255,255,255,0.4);
+}
+
+/* Tool buttons in convo toolbar */
+.im-convo-toolbar {
+    padding: 2px 4px;
+    display: flex;
+    gap: 4px;
+    background: var(--win95-gray);
+    border-bottom: 1px solid var(--win95-button-shadow);
+}
+.im-convo-tool {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    cursor: pointer;
+    user-select: none;
+    border: 1px solid transparent;
+}
+.im-convo-tool:hover {
+    border-top: 1px solid var(--win95-button-highlight);
+    border-left: 1px solid var(--win95-button-highlight);
+    border-right: 1px solid #000;
+    border-bottom: 1px solid #000;
+    background: var(--win95-button-face);
+}
+.im-convo-tool:active {
+    border-top: 1px solid #000;
+    border-left: 1px solid #000;
+    border-right: 1px solid var(--win95-button-highlight);
+    border-bottom: 1px solid var(--win95-button-highlight);
+}

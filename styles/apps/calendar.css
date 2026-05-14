@@ -1,0 +1,868 @@
+/* ============================================
+   Calendar Popup
+   ============================================ */
+.calendar-popup {
+    position: fixed;
+    bottom: 55px;
+    right: 5px;
+    background: var(--win95-gray);
+    border: 2px outset var(--win95-gray);
+    padding: 10px;
+    z-index: 10000;
+    display: none;
+}
+
+.calendar-popup.active {
+    display: block;
+}
+
+.calendar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    font-weight: bold;
+}
+
+.calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+    text-align: center;
+}
+
+.calendar-day {
+    padding: 5px;
+    font-size: 15px;
+}
+
+.calendar-day.header {
+    font-weight: bold;
+    color: var(--win95-blue);
+}
+
+.calendar-day.today {
+    background: var(--win95-blue);
+    color: white;
+}
+
+/* ============================================
+   Calendar App
+   ============================================ */
+.calendar-app {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: var(--win95-gray);
+    font-size: 15px;
+}
+
+.calendar-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px;
+    background: var(--win95-gray);
+    border-bottom: 2px solid var(--win95-dark);
+}
+
+.cal-nav-btn {
+    width: 28px;
+    height: 28px;
+    background: var(--win95-gray);
+    border: 2px outset var(--win95-gray);
+    cursor: pointer;
+    font-size: 15px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.cal-nav-btn:active {
+    border-style: inset;
+}
+
+.cal-month-year {
+    flex: 1;
+    text-align: center;
+    font-weight: bold;
+    font-size: 16px;
+}
+
+.cal-today-btn {
+    padding: 4px 12px;
+    background: var(--win95-gray);
+    border: 2px outset var(--win95-gray);
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 15px;
+}
+
+.cal-today-btn:active {
+    border-style: inset;
+}
+
+.calendar-grid-container {
+    padding: 8px;
+}
+
+.calendar-weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    background: var(--win95-blue);
+    color: white;
+    font-weight: bold;
+}
+
+.cal-weekday {
+    padding: 6px 4px;
+    text-align: center;
+    font-size: 15px;
+}
+
+.calendar-days {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    border: 2px inset var(--win95-gray);
+    background: white;
+}
+
+.cal-day {
+    min-height: 36px;
+    padding: 2px;
+    border: 1px solid #e0e0e0;
+    cursor: pointer;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.cal-day:hover {
+    background: #e8e8ff;
+}
+
+.cal-day.other-month {
+    background: #f0f0f0;
+    color: #999;
+}
+
+.cal-day.today .day-number {
+    background: var(--win95-blue);
+    color: white;
+    border-radius: 50%;
+    width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.cal-day.selected {
+    background: #cce5ff;
+    outline: 2px solid var(--win95-blue);
+    outline-offset: -2px;
+}
+
+.cal-day.has-events::after {
+    content: '';
+    position: absolute;
+    bottom: 2px;
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+.day-number {
+    font-size: 15px;
+}
+
+.event-dots {
+    display: flex;
+    gap: 2px;
+    margin-top: 2px;
+}
+
+.event-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+}
+
+.calendar-events-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    border-top: 2px solid var(--win95-light);
+    min-height: 120px;
+}
+
+.events-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 10px;
+    background: var(--win95-gray);
+    border-bottom: 1px solid var(--win95-dark);
+    font-weight: bold;
+    font-size: 15px;
+}
+
+.add-event-btn {
+    padding: 3px 10px;
+    background: var(--win95-gray);
+    border: 2px outset var(--win95-gray);
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 15px;
+}
+
+.add-event-btn:active {
+    border-style: inset;
+}
+
+.events-list {
+    flex: 1;
+    overflow-y: auto;
+    background: white;
+    border: 2px inset var(--win95-gray);
+    margin: 4px;
+}
+
+.no-events {
+    padding: 20px;
+    text-align: center;
+    color: #666;
+    font-style: italic;
+}
+
+.event-item {
+    display: flex;
+    align-items: stretch;
+    padding: 6px 8px;
+    border-bottom: 1px solid #e0e0e0;
+    gap: 8px;
+}
+
+.event-item:hover {
+    background: #f5f5f5;
+}
+
+.event-color-bar {
+    width: 4px;
+    border-radius: 2px;
+}
+
+.event-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.event-item-title {
+    font-weight: bold;
+    font-size: 15px;
+    margin-bottom: 2px;
+}
+
+.event-item-time {
+    font-size: 15px;
+    color: #666;
+}
+
+.event-item-desc {
+    font-size: 15px;
+    color: #888;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.event-edit-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    opacity: 0.5;
+    padding: 0 4px;
+}
+
+.event-item:hover .event-edit-btn {
+    opacity: 1;
+}
+
+/* Event Dialog */
+.event-dialog-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.4);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+}
+
+.event-dialog-overlay.active {
+    display: flex;
+}
+
+.event-dialog {
+    background: var(--win95-gray);
+    border: 2px outset var(--win95-gray);
+    width: 320px;
+    box-shadow: 4px 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.event-dialog-title {
+    background: linear-gradient(90deg, var(--win95-blue) 0%, #1084d0 100%);
+    color: white;
+    padding: 4px 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-weight: bold;
+    font-size: 15px;
+}
+
+.dialog-close {
+    background: var(--win95-gray);
+    border: 2px outset var(--win95-gray);
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 15px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.dialog-close:active {
+    border-style: inset;
+}
+
+.event-dialog-body {
+    padding: 12px;
+}
+
+.event-form-group {
+    margin-bottom: 10px;
+}
+
+.event-form-group label {
+    display: block;
+    margin-bottom: 4px;
+    font-size: 15px;
+}
+
+.event-input,
+.event-textarea {
+    width: 100%;
+    padding: 4px 6px;
+    border: 2px inset var(--win95-gray);
+    font-family: inherit;
+    font-size: 15px;
+    box-sizing: border-box;
+}
+
+.event-textarea {
+    resize: none;
+}
+
+.event-colors {
+    display: flex;
+    gap: 6px;
+}
+
+.event-color {
+    width: 24px;
+    height: 24px;
+    cursor: pointer;
+    border: 2px outset var(--win95-gray);
+}
+
+.event-color:hover,
+.event-color.selected {
+    border: 2px inset var(--win95-gray);
+    outline: 2px solid gold;
+}
+
+.event-dialog-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 8px 12px 12px;
+}
+
+/* ============================================
+   Clock App
+   ============================================ */
+.clock-app {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: var(--win95-gray);
+}
+
+.clock-tabs {
+    display: flex;
+    gap: 2px;
+    padding: 4px 4px 0;
+    background: var(--win95-gray);
+}
+
+.clock-tab {
+    padding: 6px 12px;
+    background: var(--win95-gray);
+    border: 2px solid;
+    border-color: var(--win95-light) var(--win95-dark) var(--win95-gray) var(--win95-light);
+    font-family: inherit;
+    font-size: 15px;
+    cursor: pointer;
+    margin-bottom: -2px;
+}
+
+.clock-tab.active {
+    background: var(--win95-gray);
+    border-bottom-color: var(--win95-gray);
+    position: relative;
+    z-index: 1;
+}
+
+.clock-panel {
+    display: none;
+    flex: 1;
+    flex-direction: column;
+    border: 2px solid;
+    border-color: var(--win95-light) var(--win95-dark) var(--win95-dark) var(--win95-light);
+    padding: 15px;
+    margin: 0 4px 4px;
+    overflow: hidden;
+}
+
+.clock-panel.active {
+    display: flex;
+}
+
+/* Analog Clock */
+.analog-clock {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 15px;
+}
+
+.clock-face {
+    width: 180px;
+    height: 180px;
+    border-radius: 50%;
+    background: white;
+    border: 4px solid var(--win95-dark);
+    position: relative;
+    box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.1);
+}
+
+.clock-face::before {
+    content: '';
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    right: 10px;
+    bottom: 10px;
+    border-radius: 50%;
+    border: 2px solid #e0e0e0;
+}
+
+.clock-marks {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 100%;
+    height: 100%;
+    transform: translate(-50%, -50%);
+}
+
+.clock-marks::before {
+    content: '12';
+    position: absolute;
+    top: 15px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-weight: bold;
+    font-size: 15px;
+}
+
+.clock-marks::after {
+    content: '6';
+    position: absolute;
+    bottom: 15px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-weight: bold;
+    font-size: 15px;
+}
+
+.clock-hand {
+    position: absolute;
+    bottom: 50%;
+    left: 50%;
+    transform-origin: bottom center;
+    border-radius: 2px;
+}
+
+.hour-hand {
+    width: 6px;
+    height: 50px;
+    background: #333;
+    margin-left: -3px;
+}
+
+.minute-hand {
+    width: 4px;
+    height: 65px;
+    background: #333;
+    margin-left: -2px;
+}
+
+.second-hand {
+    width: 2px;
+    height: 70px;
+    background: #cc0000;
+    margin-left: -1px;
+}
+
+.clock-center {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 12px;
+    height: 12px;
+    background: #333;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 10;
+}
+
+.digital-clock-display {
+    text-align: center;
+    font-size: 36px;
+    font-family: 'Courier New', monospace;
+    font-weight: bold;
+    margin-bottom: 8px;
+    padding: 8px;
+    background: #000;
+    color: #00ff00;
+    border: 2px inset var(--win95-gray);
+}
+
+.clock-date {
+    text-align: center;
+    font-size: 15px;
+    color: #444;
+}
+
+/* Alarm Tab */
+.alarm-list {
+    flex: 1;
+    overflow-y: auto;
+    background: white;
+    border: 2px inset var(--win95-gray);
+    margin-bottom: 10px;
+    min-height: 150px;
+}
+
+.no-alarms {
+    padding: 30px;
+    text-align: center;
+    color: #666;
+}
+
+.alarm-item {
+    display: flex;
+    align-items: center;
+    padding: 10px;
+    border-bottom: 1px solid #e0e0e0;
+    gap: 12px;
+}
+
+.alarm-item.disabled {
+    opacity: 0.5;
+}
+
+.alarm-toggle {
+    cursor: pointer;
+}
+
+.toggle-switch {
+    width: 40px;
+    height: 20px;
+    background: #808080;
+    border-radius: 10px;
+    position: relative;
+    transition: background 0.2s;
+}
+
+.toggle-switch::after {
+    content: '';
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 16px;
+    height: 16px;
+    background: white;
+    border-radius: 50%;
+    transition: left 0.2s;
+}
+
+.toggle-switch.on {
+    background: var(--win95-blue);
+}
+
+.toggle-switch.on::after {
+    left: 22px;
+}
+
+.alarm-details {
+    flex: 1;
+}
+
+.alarm-time {
+    font-size: 20px;
+    font-weight: bold;
+}
+
+.alarm-name {
+    font-size: 15px;
+    color: #666;
+}
+
+.alarm-delete {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 16px;
+    opacity: 0.5;
+}
+
+.alarm-item:hover .alarm-delete {
+    opacity: 1;
+}
+
+.alarm-add {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px;
+    background: #f0f0f0;
+    border: 2px inset var(--win95-gray);
+}
+
+.alarm-time-input {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.alarm-num {
+    width: 50px;
+    padding: 4px;
+    text-align: center;
+    font-size: 18px;
+    font-family: inherit;
+    border: 2px inset var(--win95-gray);
+}
+
+.alarm-select {
+    padding: 4px;
+    font-family: inherit;
+    font-size: 15px;
+    border: 2px inset var(--win95-gray);
+}
+
+.alarm-label-input {
+    flex: 1;
+    padding: 4px 8px;
+    font-family: inherit;
+    font-size: 15px;
+    border: 2px inset var(--win95-gray);
+}
+
+/* Alarm Alert */
+.alarm-alert {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+}
+
+.alarm-alert.active {
+    display: flex;
+    animation: alarmPulse 0.5s ease-in-out infinite alternate;
+}
+
+@keyframes alarmPulse {
+    from { background: rgba(255, 0, 0, 0.3); }
+    to { background: rgba(255, 0, 0, 0.6); }
+}
+
+.alarm-alert-content {
+    background: var(--win95-gray);
+    border: 2px outset var(--win95-gray);
+    padding: 30px;
+    text-align: center;
+}
+
+.alarm-alert-icon {
+    font-size: 64px;
+    animation: alarmShake 0.3s ease-in-out infinite;
+}
+
+@keyframes alarmShake {
+    0%, 100% { transform: rotate(-10deg); }
+    50% { transform: rotate(10deg); }
+}
+
+.alarm-alert-text {
+    font-size: 24px;
+    font-weight: bold;
+    margin: 15px 0;
+}
+
+/* Stopwatch Tab */
+.stopwatch-display {
+    text-align: center;
+    font-size: 42px;
+    font-family: 'Courier New', monospace;
+    font-weight: bold;
+    padding: 15px;
+    background: #000;
+    color: #00ff00;
+    border: 2px inset var(--win95-gray);
+    margin-bottom: 15px;
+}
+
+.stopwatch-controls {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.sw-btn {
+    min-width: 100px;
+}
+
+.lap-list {
+    flex: 1;
+    overflow-y: auto;
+    background: white;
+    border: 2px inset var(--win95-gray);
+}
+
+.lap-placeholder {
+    padding: 20px;
+    text-align: center;
+    color: #666;
+}
+
+.lap-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 12px;
+    border-bottom: 1px solid #e0e0e0;
+    font-family: 'Courier New', monospace;
+    font-size: 15px;
+}
+
+.lap-number {
+    font-weight: bold;
+}
+
+.lap-diff {
+    color: #008000;
+}
+
+.lap-total {
+    color: #000080;
+}
+
+/* Timer Tab */
+.timer-display {
+    text-align: center;
+    font-size: 56px;
+    font-family: 'Courier New', monospace;
+    font-weight: bold;
+    padding: 20px;
+    background: #000;
+    color: #00ff00;
+    border: 2px inset var(--win95-gray);
+    margin-bottom: 10px;
+}
+
+.timer-progress-container {
+    height: 20px;
+    background: white;
+    border: 2px inset var(--win95-gray);
+    margin-bottom: 15px;
+}
+
+.timer-progress {
+    height: 100%;
+    background: linear-gradient(90deg, var(--win95-blue), #1084d0);
+    width: 0%;
+    transition: width 0.1s linear;
+}
+
+.timer-preset {
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    margin-bottom: 15px;
+}
+
+.preset-btn {
+    padding: 6px 12px;
+    background: var(--win95-gray);
+    border: 2px outset var(--win95-gray);
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 15px;
+}
+
+.preset-btn:active {
+    border-style: inset;
+}
+
+.timer-input-row {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 15px;
+}
+
+.timer-num {
+    width: 50px;
+    padding: 6px;
+    text-align: center;
+    font-size: 18px;
+    font-family: inherit;
+    border: 2px inset var(--win95-gray);
+}
+
+.timer-controls {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+}
+
+.timer-btn {
+    min-width: 100px;
+}
+

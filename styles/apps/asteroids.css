@@ -1,0 +1,114 @@
+/* ============================================
+   Asteroids Game
+   ============================================ */
+.asteroids-container {
+    background: #000;
+    height: 100%;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.asteroids-hud {
+    color: #0f0;
+    font-family: 'Courier New', monospace;
+    font-weight: bold;
+    padding: 6px 10px;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px;
+    border-bottom: 2px solid #333;
+    background: #050505;
+    font-size: 12px;
+    line-height: 1.4;
+    flex-shrink: 0;
+}
+
+.ast-hud-col      { display: flex; flex-direction: column; min-width: 0; }
+.ast-hud-center   { text-align: center; }
+.ast-hud-right    { text-align: right; }
+
+.ast-val            { font-weight: bold; letter-spacing: 0.5px; }
+.ast-val-cyan       { color: #0ff; text-shadow: 0 0 4px rgba(0, 255, 255, 0.4); }
+.ast-val-yellow     { color: #ff0; text-shadow: 0 0 4px rgba(255, 255, 0, 0.4); }
+.ast-val-magenta    { color: #f0f; text-shadow: 0 0 4px rgba(255, 0, 255, 0.4); }
+.ast-val-red        { color: #f55; text-shadow: 0 0 4px rgba(255, 60, 60, 0.4); }
+
+.ast-combo {
+    color: #f80;
+    display: none;
+    text-shadow: 0 0 6px rgba(255, 140, 0, 0.5);
+    animation: ast-combo-flash 0.6s ease-in-out infinite alternate;
+}
+
+.ast-powerup {
+    color: #0f0;
+    display: none;
+    text-shadow: 0 0 6px rgba(0, 255, 0, 0.4);
+}
+
+@keyframes ast-combo-flash {
+    from { opacity: 0.7; }
+    to   { opacity: 1.0; }
+}
+
+.asteroids-canvas-wrapper {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    align-items: stretch;
+    justify-content: stretch;
+    background: #000;
+}
+
+.asteroids-canvas-wrapper canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    image-rendering: pixelated;
+}
+
+.asteroids-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #0a0a0a;
+    color: #888;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    text-align: center;
+    padding: 5px 8px;
+    border-top: 1px solid #333;
+    flex-shrink: 0;
+}
+
+.ast-controls-hint {
+    flex: 1;
+    text-align: center;
+    color: #6a6;
+    letter-spacing: 0.6px;
+}
+
+.ast-btn {
+    padding: 4px 10px;
+    background: #1a1a1a;
+    border: 2px solid;
+    border-color: #4f4 #0a3a0a #0a3a0a #4f4;
+    color: #4f4;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    font-weight: bold;
+    letter-spacing: 1px;
+    cursor: pointer;
+    text-shadow: 0 0 4px rgba(80, 255, 80, 0.5);
+}
+
+.ast-btn:hover {
+    background: #2a2a2a;
+}
+
+.ast-btn:active {
+    border-color: #0a3a0a #4f4 #4f4 #0a3a0a;
+    background: #0a1a0a;
+}

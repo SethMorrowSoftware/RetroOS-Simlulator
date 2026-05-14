@@ -1,0 +1,299 @@
+/* ============================================
+   FreeCell Game
+   ============================================ */
+.freecell-app {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: #008000;
+    position: relative;
+}
+
+.freecell-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    background: var(--win95-gray);
+    border-bottom: 2px solid white;
+}
+
+.fc-btn {
+    padding: 4px 12px;
+    background: var(--win95-gray);
+    border: 2px outset var(--win95-gray);
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 15px;
+}
+
+.fc-btn:active:not(:disabled) {
+    border-style: inset;
+}
+
+.fc-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.fc-spacer {
+    flex: 1;
+}
+
+.fc-stats {
+    display: flex;
+    gap: 15px;
+}
+
+.fc-stat {
+    background: #000;
+    color: #0f0;
+    font-family: 'Courier New', monospace;
+    font-size: 15px;
+    padding: 4px 10px;
+    border: 2px inset #808080;
+}
+
+.freecell-board {
+    flex: 1;
+    padding: 15px;
+    overflow: hidden;
+}
+
+.fc-top-row {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 20px;
+}
+
+.fc-cells,
+.fc-foundations {
+    display: flex;
+    gap: 8px;
+}
+
+.fc-cell {
+    width: 75px;
+    height: 105px;
+    border-radius: 5px;
+    position: relative;
+}
+
+.free-cell {
+    background: rgba(0, 80, 0, 0.5);
+    border: 2px dashed rgba(255, 255, 255, 0.3);
+}
+
+.foundation {
+    background: rgba(0, 80, 0, 0.5);
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.fc-suit-hint {
+    font-size: 36px;
+    opacity: 0.3;
+    color: white;
+}
+
+.fc-tableau {
+    display: flex;
+    justify-content: space-between;
+    height: calc(100% - 145px);
+}
+
+.fc-column {
+    width: 11%;
+    min-height: 50px;
+    position: relative;
+}
+
+.fc-card {
+    width: 75px;
+    height: 105px;
+    background: white;
+    border: 1px solid #333;
+    border-radius: 5px;
+    position: absolute;
+    left: 0;
+    cursor: pointer;
+    box-shadow: 1px 1px 3px rgba(0, 0, 0, 0.3);
+    transition: transform 0.1s, box-shadow 0.1s;
+    user-select: none;
+}
+
+.fc-card:hover {
+    box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.fc-card.selected {
+    transform: translateY(-5px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.4);
+    outline: 3px solid gold;
+}
+
+.fc-card.red {
+    color: #cc0000;
+}
+
+.fc-card.black {
+    color: #000;
+}
+
+.fc-card-corner {
+    position: absolute;
+    font-size: 15px;
+    font-weight: bold;
+    line-height: 1;
+}
+
+.fc-card-corner.top-left {
+    top: 5px;
+    left: 5px;
+}
+
+.fc-card-corner.bottom-right {
+    bottom: 5px;
+    right: 5px;
+    transform: rotate(180deg);
+}
+
+.fc-card-center {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 32px;
+}
+
+/* FreeCell in free cells and foundations */
+.free-cell .fc-card,
+.foundation .fc-card {
+    top: 0;
+    left: 0;
+}
+
+/* Win Screen */
+.fc-win-screen {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.8);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+}
+
+.fc-win-screen.active {
+    display: flex;
+}
+
+.fc-win-content {
+    background: linear-gradient(180deg, #ffd700 0%, #ff8c00 100%);
+    border: 4px outset #ffd700;
+    padding: 40px 60px;
+    text-align: center;
+    box-shadow: 0 0 50px rgba(255, 215, 0, 0.5);
+}
+
+.fc-win-title {
+    font-size: 36px;
+    font-weight: bold;
+    margin-bottom: 20px;
+    text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.3);
+}
+
+.fc-win-stats {
+    font-size: 16px;
+    margin-bottom: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.fc-win-stat-row {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 12px;
+    padding: 4px 12px;
+    background: rgba(0, 0, 0, 0.18);
+    border: 1px solid rgba(0, 0, 0, 0.25);
+    border-radius: 3px;
+}
+
+.fc-win-lbl {
+    text-align: right;
+    font-weight: bold;
+    color: #5a3500;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    font-size: 12px;
+}
+
+.fc-win-val {
+    text-align: center;
+    font-family: 'Courier New', monospace;
+    font-weight: bold;
+    font-size: 20px;
+    color: #2a1500;
+    min-width: 50px;
+}
+
+.fc-win-best {
+    text-align: left;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    color: #6a4500;
+    opacity: 0.85;
+}
+
+.fc-win-record {
+    background: #fff;
+    color: #884c00;
+    padding: 4px 12px;
+    border: 2px solid #b88c00;
+    border-radius: 3px;
+    font-size: 13px;
+    font-weight: bold;
+    letter-spacing: 2px;
+    box-shadow: 0 0 12px rgba(255, 200, 60, 0.7);
+    margin-bottom: 12px;
+    animation: fc-record-pulse 0.7s ease-in-out infinite alternate;
+}
+.fc-win-record.hidden { display: none; }
+
+@keyframes fc-record-pulse {
+    from { box-shadow: 0 0 8px rgba(255, 200, 60, 0.45); }
+    to   { box-shadow: 0 0 22px rgba(255, 200, 60, 0.95); }
+}
+
+.fc-win-btn {
+    font-size: 16px;
+    padding: 8px 24px;
+}
+
+/* Victory Animation */
+.fc-victory-card {
+    position: absolute;
+    top: -50px;
+    font-size: 40px;
+    animation: cardFall linear forwards;
+    pointer-events: none;
+}
+
+@keyframes cardFall {
+    0% {
+        transform: translateY(0) rotate(0deg);
+        opacity: 1;
+    }
+    100% {
+        transform: translateY(600px) rotate(720deg);
+        opacity: 0;
+    }
+}

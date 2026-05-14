@@ -1,0 +1,77 @@
+/* ============================================
+   Display Properties Effects
+   ============================================ */
+
+/* Disable animations */
+body.no-animations .window {
+    transition: none !important;
+}
+body.no-animations .window.minimizing {
+    animation: none !important;
+}
+body.no-animations .window.maximizing {
+    animation: none !important;
+}
+body.no-animations * {
+    animation-duration: 0s !important;
+    transition-duration: 0s !important;
+}
+
+/* Disable menu shadows */
+body.no-shadows .window-menu,
+body.no-shadows .submenu,
+body.no-shadows .context-menu,
+body.no-shadows .start-menu {
+    box-shadow: none !important;
+}
+
+/* Disable smooth scrolling */
+body.no-smooth-scroll,
+body.no-smooth-scroll * {
+    scroll-behavior: auto !important;
+}
+
+/* Icon size: Small */
+body.icon-size-small .icon {
+    width: 70px;
+    padding: 6px;
+}
+body.icon-size-small .icon-image {
+    width: 32px;
+    height: 32px;
+    font-size: 32px;
+}
+body.icon-size-small .icon-label {
+    font-size: 12px;
+    max-width: 65px;
+}
+
+/* Icon size: Medium (default) */
+body.icon-size-medium .icon {
+    width: 100px;
+    padding: 10px;
+}
+body.icon-size-medium .icon-image {
+    width: 48px;
+    height: 48px;
+    font-size: 48px;
+}
+body.icon-size-medium .icon-label {
+    font-size: 16px;
+    max-width: 90px;
+}
+
+/* Icon size: Large */
+body.icon-size-large .icon {
+    width: 130px;
+    padding: 12px;
+}
+body.icon-size-large .icon-image {
+    width: 64px;
+    height: 64px;
+    font-size: 64px;
+}
+body.icon-size-large .icon-label {
+    font-size: 18px;
+    max-width: 120px;
+}

@@ -1,0 +1,194 @@
+/* ============================================
+   Selection Box
+   ============================================ */
+.selection-box {
+    position: fixed;
+    border: 1px dotted #fff;
+    background-color: rgba(0, 0, 128, 0.3);
+    pointer-events: none;
+    z-index: 9999;
+    display: none;
+}
+
+.selection-box.active {
+    display: block;
+}
+
+/* ============================================
+   Drag and Drop Indicators
+   ============================================ */
+.desktop.drop-target {
+    outline: 3px dashed #ffffff;
+    outline-offset: -10px;
+    background-color: rgba(0, 128, 128, 0.3);
+}
+
+.icon.dragging {
+    opacity: 0.6;
+    transform: scale(1.05);
+    z-index: 10000;
+}
+
+.icon[draggable="true"] {
+    cursor: grab;
+}
+
+.icon[draggable="true"]:active {
+    cursor: grabbing;
+}
+
+/* Global drop target styling */
+.drop-target {
+    background: rgba(0, 0, 128, 0.15) !important;
+    outline: 2px dashed var(--win95-blue) !important;
+    outline-offset: -2px;
+}
+
+/* Drag over folder/drive styling */
+.mycomputer-item.drop-target,
+.mycomputer-list-item.drop-target,
+.drive-item.drop-target,
+.folder-item.drop-target,
+.directory-item.drop-target {
+    background: rgba(0, 0, 128, 0.2) !important;
+    outline: 2px dashed var(--win95-blue) !important;
+    outline-offset: -2px;
+    transform: scale(1.02);
+    transition: transform 0.1s ease, background 0.1s ease;
+}
+
+.mycomputer-item.drop-target .mycomputer-item-icon,
+.mycomputer-list-item.drop-target .mycomputer-list-icon {
+    transform: scale(1.15);
+    transition: transform 0.15s ease;
+}
+
+/* Desktop icon (recycle bin) drop target */
+.icon.drop-target {
+    background: rgba(0, 0, 128, 0.3) !important;
+    outline: 2px dashed var(--win95-blue) !important;
+    outline-offset: 2px;
+    transform: scale(1.1);
+    transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.icon.drop-target .icon-image {
+    transform: scale(1.2);
+    transition: transform 0.15s ease;
+}
+
+/* Dragging items styling */
+.mycomputer-item.dragging,
+.mycomputer-list-item.dragging {
+    opacity: 0.5;
+    transform: scale(0.95);
+}
+
+/* Drop feedback toast */
+.drop-feedback {
+    position: fixed;
+    bottom: 70px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    padding: 10px 20px;
+    background: var(--win95-gray);
+    border: 2px outset var(--win95-gray);
+    font-size: 14px;
+    z-index: 100000;
+    opacity: 0;
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    box-shadow: 2px 2px 8px rgba(0,0,0,0.3);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.drop-feedback.active {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+}
+
+.drop-feedback-success {
+    border-left: 4px solid #008000;
+}
+
+.drop-feedback-success::before {
+    content: '✓';
+    color: #008000;
+    font-weight: bold;
+}
+
+.drop-feedback-error {
+    border-left: 4px solid #cc0000;
+}
+
+.drop-feedback-error::before {
+    content: '✗';
+    color: #cc0000;
+    font-weight: bold;
+}
+
+.drop-feedback-info {
+    border-left: 4px solid var(--win95-blue);
+}
+
+.drop-feedback-info::before {
+    content: 'ℹ';
+    color: var(--win95-blue);
+    font-weight: bold;
+}
+
+/* ============================================
+   Wait Cursor for Loading States
+   ============================================ */
+body.loading,
+body.loading * {
+    cursor: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"><circle cx="16" cy="16" r="12" fill="none" stroke="%23000" stroke-width="2"/><path d="M16 8 L16 16 L22 16" fill="none" stroke="%23000" stroke-width="2"/></svg>') 16 16, wait !important;
+}
+
+/* ============================================
+   Mobile Responsive
+   ============================================ */
+@media (max-width: 768px) {
+    .window {
+        max-width: 95vw !important;
+        max-height: 80vh !important;
+    }
+
+    .window-content {
+        max-height: 60vh;
+        overflow: auto;
+    }
+
+    .icon {
+        width: 80px;
+    }
+
+    .icon-image {
+        width: 40px;
+        height: 40px;
+        font-size: 40px;
+    }
+
+    .icon-label {
+        font-size: 14px;
+    }
+
+    .start-menu {
+        width: calc(100vw - 4px);
+        max-height: calc(100vh - 60px);
+    }
+
+    .start-menu-content {
+        max-height: calc(100vh - 80px);
+    }
+
+    .start-submenu {
+        max-height: 70vh;
+        max-width: 90vw;
+    }
+
+    .quick-launch {
+        display: none;
+    }
+}

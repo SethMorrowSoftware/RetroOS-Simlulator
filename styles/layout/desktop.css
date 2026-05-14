@@ -1,0 +1,11 @@
+/* ============================================
+   Desktop
+   ============================================ */
+.desktop {
+    padding: 10px;
+    height: calc(100vh - 36px);
+    position: relative;
+    background-image: var(--wallpaper-url, none);
+    background-size: cover;
+    background-position: center;
+}
