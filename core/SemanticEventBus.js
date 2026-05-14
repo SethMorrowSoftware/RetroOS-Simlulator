@@ -1209,6 +1209,12 @@ export const Events = {
     SCREENSAVER_START: 'system:screensaver:start',
     SCREENSAVER_END: 'system:screensaver:end',
 
+    // User session lifecycle
+    USER_LOGIN: 'user:login',
+    USER_LOGOUT: 'user:logout',
+    USER_SWITCH: 'user:switch',
+    AUTH_EXPIRED: 'auth:expired',
+
     // Achievement events
     ACHIEVEMENT_UNLOCK: 'achievement:unlock',
     ACHIEVEMENT_PROGRESS: 'achievement:progress',

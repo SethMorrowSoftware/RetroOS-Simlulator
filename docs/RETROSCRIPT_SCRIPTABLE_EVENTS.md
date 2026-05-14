@@ -1221,13 +1221,42 @@ emit macro:play macroId="my-macro" speed=2.0
 
 ## Session & User Events
 
+The canonical user-session events. Listen for these to react to login/logout/user-switch without watching individual subsystems. All four are emitted by `core/SessionManager.js` (logout/switch) and by the boot/logoff paths in `index.js` and `features/SystemDialogs.js` (login).
+
 | Event | Description | Payload |
 |-------|-------------|---------|
-| `session:start` | Session started | `sessionId`, `timestamp` |
-| `session:end` | Session ended | `sessionId`, `duration`, `reason?` |
+| `user:login` | A user has logged in. Storage is already rescoped and `StateManager.initialize()` has run. | `username`, `mode?` (`'login'` / `'signup'` / `'guest'`) |
+| `user:logout` | User session ended. Realtime channels, presence, multiplayer, and the session token have already been torn down. | `reason?` (e.g. `'user_requested'`, `'logoff'`, `'auth_expired'`) |
+| `user:switch` | Active user changed. Same teardown as logout has run; storage has been rescoped to the new user. | `previous?`, `next?` |
+| `auth:expired` | Server returned 401. The token has been cleared; the user should be prompted to reauthenticate. | `endpoint?` |
+
+### Analytics events (separate from session lifecycle)
+
+| Event | Description | Payload |
+|-------|-------------|---------|
+| `session:start` | Analytics session started | `sessionId`, `timestamp` |
+| `session:end` | Analytics session ended | `sessionId`, `duration`, `reason?` |
 | `session:activity` | Activity recorded | `sessionId`, `activity`, `timestamp` |
 | `user:action` | User action (analytics) | `actionType`, `target?`, `data?` |
 | `user:preference:change` | Preference changed | `key`, `value`, `oldValue?` |
+
+### Example
+
+```retro
+on user:login {
+  print "Welcome, " + $event.username
+  # Fetch user-scoped data, render personalized desktop, etc.
+}
+
+on user:logout {
+  print "Goodbye"
+  # Drop any in-memory caches that belong to the outgoing user
+}
+
+on auth:expired {
+  alert "Your session has expired. Please log in again."
+}
+```
 
 ---
 
@@ -1520,11 +1549,11 @@ These functions are available in RetroScript via `call functionName(args)`.
 
 ---
 
-## Legacy Event Mapping
+## Legacy Event Mapping (deprecated)
 
-These old event names are automatically mapped to their semantic equivalents:
+> ⚠️ **Do not use these names in new scripts.** They are auto-rewritten to the semantic names below for backwards compatibility, but the mapping table is on the roadmap for removal (see `docs/UNIFIED_ROADMAP.md`). Grepping for the new names will not find usages that use the legacy form.
 
-| Legacy Name | Maps To |
+| Legacy Name (avoid) | Use Instead |
 |-------------|---------|
 | `startmenu:toggle` | `ui:menu:start:toggle` |
 | `contextmenu:show` | `ui:menu:context:show` |

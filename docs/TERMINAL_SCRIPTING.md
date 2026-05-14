@@ -110,6 +110,8 @@ on app:terminal:command {
 
 - Most terminal built-ins require an open terminal instance.
 - `terminalOpen` should be used first in automation scripts.
+- **Terminal is currently a singleton.** Calling `terminalOpen` while a terminal already exists focuses the existing window; it does not create a second one. The Terminal app keeps `commandHistory`, `currentPath`, `aliases`, and environment variables on the class itself, so two windows would share state. Singleton mode is the current safe behavior. A future change (tracked in `docs/UNIFIED_ROADMAP.md`) will migrate per-window state to `setInstanceState()` and allow multiple terminals.
 - File built-ins resolve relative paths against terminal cwd when terminal is open.
+- File built-ins are subject to the script-engine path allowlist (see `SCRIPTING_GUIDE.md` §10). Operations outside `C:/Users/User/...`, `C:/Windows/`, or the server-shared roots will throw a `RuntimeError`.
 - State helpers return safe fallbacks (`null`, `{}`, `[]`, `false`) if terminal is unavailable.
 

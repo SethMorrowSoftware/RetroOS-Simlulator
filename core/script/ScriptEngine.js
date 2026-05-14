@@ -27,6 +27,7 @@ import { Interpreter } from './interpreter/Interpreter.js';
 import { SafetyLimits, DEFAULT_LIMITS } from './utils/SafetyLimits.js';
 import { registerAllBuiltins } from './builtins/index.js';
 import { ScriptError, ParseError, RuntimeError } from './errors/ScriptError.js';
+import { validateScriptPath as _validateScriptPath } from './utils/PathValidation.js';
 
 /**
  * ScriptEngine class - main API for script execution
@@ -109,6 +110,16 @@ class ScriptEngineClass {
         if (this.interpreter) {
             this.interpreter.context = this.context;
         }
+    }
+
+    /**
+     * Validate a script-driven file path against an allowlist of safe roots.
+     * Public wrapper around utils/PathValidation.validateScriptPath so
+     * external callers (admin tools, tests) can use the same boundary the
+     * Interpreter applies internally to write/read/delete/mkdir.
+     */
+    validateScriptPath(path, options = {}) {
+        return _validateScriptPath(path, options);
     }
 
     /**

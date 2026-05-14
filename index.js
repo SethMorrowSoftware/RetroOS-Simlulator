@@ -1346,6 +1346,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         StateManager.setState('user.userName', loginResult.username, true);
         StateManager.setState('user.loginMode', loginResult.mode, true);
 
+        // Announce login so subscribers (multiplayer, presence, plugins) can
+        // initialize once the user is authenticated and storage is scoped.
+        EventBus.emit(Events.USER_LOGIN, {
+            username: loginResult.username,
+            mode: loginResult.mode
+        });
+
         // Re-apply user-specific settings (wallpaper, color scheme, etc.)
         applySettings();
 

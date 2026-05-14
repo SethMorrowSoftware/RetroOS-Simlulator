@@ -98,7 +98,18 @@ class MultiplayerClientClass {
         }
 
         try {
-            this.ws = new WebSocket(`${wsUrl}?token=${encodeURIComponent(this.token)}`);
+            // Pass the session token via Sec-WebSocket-Protocol (the only
+            // request header the browser lets JS control on a WS upgrade).
+            // Putting it in the URL leaks it into proxy access logs and
+            // browser history. Tokens are hex strings (backend/bootstrap.php
+            // generateToken), so they are already valid HTTP token chars and
+            // don't need URL encoding.
+            //
+            // We also offer 'illuminatos' as a second protocol so the server
+            // can echo *that* back in Sec-WebSocket-Protocol — keeping the
+            // token out of response headers and satisfying browsers that
+            // require the server to select one of the offered protocols.
+            this.ws = new WebSocket(wsUrl, [`token.${this.token}`, 'illuminatos']);
         } catch (err) {
             console.warn('[MultiplayerClient] WebSocket creation failed:', err.message);
             this._scheduleReconnect();

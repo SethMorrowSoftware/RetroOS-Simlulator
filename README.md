@@ -34,23 +34,25 @@ IlluminatOS! is a browser-hosted OS simulation with:
 Boot health diagnostics are collected per-component and exposed at `window.__OS_BOOT_HEALTH`.
 
 ### Core systems
-- `core/EventBus.js` + `core/SemanticEventBus.js`: semantic pub/sub layer with middleware, request/response, channels, and async streams
-- `core/CommandBus.js`: scriptable system command endpoint
+- `core/SemanticEventBus.js`: the single event bus — pub/sub with middleware, request/response, channels, async streams, schema validation, legacy name mapping. (`core/EventBus.js` is a re-export so old imports keep working.)
+- `core/CommandBus.js`: scriptable system command endpoint (a thin parallel to the event bus; consolidation is on the roadmap).
 - `core/FileSystemManager.js`: virtual filesystem and file operations (with server-backed file sync)
-- `core/StateManager.js`: runtime state + persistence hooks
-- `core/WindowManager.js`: window lifecycle and focus/z-order management
-- `core/FeatureRegistry.js` + `core/FeatureBase.js`: feature lifecycle/runtime toggling
+- `core/StateManager.js`: runtime state + persistence hooks; `resetVolatile()` clears user-scoped in-memory state for clean user-switch
+- `core/SessionManager.js`: **single owner of the logout / user-switch cascade** — sequences realtime/presence/token/state teardown so subscribers never see a half-torn-down session
+- `core/WindowManager.js`: window lifecycle, focus/z-order, deterministic modal cleanup (no listener races on rapid close)
+- `core/FeatureRegistry.js` + `core/FeatureBase.js`: feature lifecycle/runtime toggling; serialized enable/disable, isolated-failure dependent disable, no init reset on disable
 - `core/PluginLoader.js`: plugin manifest, dynamic load/unload
-- `core/ConfigLoader.js`: configuration loading with backend/default fallback
+- `core/ConfigLoader.js`: configuration loading with backend/default fallback; session token API
 - `core/RealtimeClient.js`: SSE real-time event bridge (v2 API)
 - `core/NarrativeStateManager.js`: campaign/scene/objective/flag/clue state with multiplayer sync
-- `core/MultiplayerClient.js`: WebSocket client with auto-reconnect, room/presence management
+- `core/MultiplayerClient.js`: WebSocket client with auto-reconnect, room/presence management; **token passed via `Sec-WebSocket-Protocol`, never in the URL**
 - `core/PresenceManager.js`: online user tracking, status, and typing indicators
 - `core/GameSession.js`: multiplayer game lifecycle (lobby, turn management, state sync)
 - `core/TelemetryCollector.js`: event capture, scene funnels, puzzle analytics
 - `core/ReplayEngine.js`: deterministic replay from telemetry streams
 - `core/MediaAssetManager.js` + `core/MediaCueGraph.js`: multimedia asset pipeline and cue orchestration
 - `core/script/*`: RetroScript lexer/parser/interpreter/builtins
+- `core/script/utils/PathValidation.js`: **single allowlist** for script-driven file ops (also used by the SSE remote FS handler)
 
 ### Major extension points
 - **Apps:** `/apps/*.js`, registered in `apps/AppRegistry.js`
@@ -165,6 +167,8 @@ curl 'http://localhost:8000/api/queue.php?action=status'
 - `CLAUDE.md` — project instructions and conventions for contributors (and AI assistants)
 - `DEVELOPER_GUIDE.md` — authoritative guide for adding apps, features, plugins, and script-driven experiences
 - `SCRIPTING_GUIDE.md` — RetroScript language, runtime, events, and patterns
+- `docs/UNIFIED_ROADMAP.md` — the plan for converging on a single unified API surface (sequenced waves, success criteria, deferred items)
+- `docs/ARCHITECTURE_AUDIT.md` — original architecture audit; resolved items are annotated, open items link to the roadmap
 - `docs/RETROSCRIPT_SCRIPTABLE_EVENTS.md` — complete event, command, and query reference for scripting
 - `docs/TERMINAL_SCRIPTING.md` — terminal-specific scripting built-ins and workflows
 - `docs/GREENGEEKS_RESELLER_VPS_WEBSOCKET_SETUP.md` — GreenGeeks reseller VPS deployment guide for the WebSocket sidecar
@@ -231,10 +235,17 @@ curl 'http://localhost:8000/api/queue.php?action=status'
 - Backend v2 adds MySQL-backed user accounts, real-time SSE events, webhooks, themes, announcements, file uploads, and audit logging.
 - Multiplayer is provided by a PHP WebSocket sidecar that authenticates against the PHP API. When unavailable, all apps degrade gracefully to single-player mode.
 - Multiplayer client defaults to same-origin `/ws` (or configurable `multiplayer.websocketPath`) for reverse-proxy-friendly HTTPS deployments; set `multiplayer.websocketUrl` for explicit endpoints.
+- **WebSocket authentication** is via `Sec-WebSocket-Protocol: token.<hex>`; the legacy `?token=` query string is still accepted server-side but new clients should not use it.
+- **User session lifecycle** is unified through `SessionManager` (`logout()` / `switchUser()`). Listening for `user:login` / `user:logout` / `user:switch` / `auth:expired` events is the canonical hook for session-scoped resources.
+- **Feature lifecycle**: `FeatureBase.disable()` does not reset `initialized`. Concurrent `enable()`/`disable()` calls are serialized via a per-feature lifecycle queue. Dependent disable in `FeatureRegistry` isolates per-feature failures so one broken cleanup doesn't half-disable the graph.
+- **Multi-window apps** must use `setInstanceState()` / `getInstanceState()`. Apps that still hold per-window data on `this` (currently Terminal) are forced `singleton: true` until migrated.
+- **Modal cleanup** runs synchronously inside `WindowManager.close()` via a per-window callback map — no more one-shot listener races on rapid close.
 - Plugin loading uses a config-driven manifest generated during boot.
 - RetroScript and app/plugin systems are fully integrated through event + command layers.
-- The event schema is modularized into domain-specific files under `core/schema/` (window, app, system, UI, desktop, sound, filesystem, game, dialog, notification, feature, settings, SSE, narrative, multimedia events).
-- A backend test suite (`test-backend.php`) provides smoke tests for all API endpoints.
+- The event schema is modularized into domain-specific files under `core/schema/` (window, app, system, UI, desktop, sound, filesystem, game, dialog, notification, feature, settings, SSE, narrative, multimedia, and user-session events).
+- A backend test suite (`test-backend.php`) and a RetroScript engine harness (`scripts/test-retroscript.mjs`) provide automated smoke coverage.
 - Boot health diagnostics track per-component status, duration, and errors for debugging.
-- SSE filesystem commands are restricted to allowed path prefixes (`/C/server/`, `/C/shared/`, `/C/public/`) for security.
+- **Script-driven and SSE-driven file operations** share one allowlist (`core/script/utils/PathValidation.js`). Adding a new safe root requires only one edit.
 - Multiplayer state sync uses a re-broadcast guard (`_isProcessingRemoteUpdate`) to prevent infinite loops.
+
+See `docs/UNIFIED_ROADMAP.md` for what's still planned (SubscriptionManager, CommandBus → SemanticEventBus consolidation, EventTopology, fetchWithAuth, full per-window state for Terminal, etc.) and the order in which it lands.

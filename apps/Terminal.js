@@ -25,7 +25,14 @@ class Terminal extends AppBase {
             minWidth: 480,
             minHeight: 320,
             resizable: true,
-            category: 'systemtools'
+            category: 'systemtools',
+            // Terminal keeps commandHistory, currentPath, aliases, envVars, and the
+            // active multiplayer session on `this` rather than via setInstanceState.
+            // Opening two terminals would share that state (cd in one would move
+            // the other's prompt; command history would bleed). Until those fields
+            // are migrated to per-window instance state, force singleton so only
+            // one terminal window can exist at a time.
+            singleton: true
         });
 
         this.commandHistory = [];

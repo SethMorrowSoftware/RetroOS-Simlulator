@@ -93,12 +93,14 @@ bash scripts/lint-innerhtml.sh        # Detect unsafe innerHTML usage
 ### Frontend
 
 - **Event-driven**: Central `EventBus` (pub/sub) with `SemanticEventBus` for schema-validated events
-- **State management**: `StateManager` with reactive subscriptions
+- **State management**: `StateManager` with reactive subscriptions and `resetVolatile()` for clean user-switch
 - **Singletons**: Core systems exported as `export default new ClassName()`
-- **AppBase**: All apps extend `AppBase` with lifecycle methods (`onOpen`, `onClose`, `onFocus`, `onBlur`, `onMount`). Supports multi-instance windows
-- **FeatureBase**: Background features extend `FeatureBase` with `initialize()`, `enable()`, `disable()`, `cleanup()`
-- **CommandBus**: Command routing and execution
-- **Virtual filesystem**: `FileSystemManager` with permissions, locking, events
+- **AppBase**: All apps extend `AppBase` with lifecycle methods (`onOpen`, `onClose`, `onFocus`, `onBlur`, `onMount`). Multi-instance apps **must** use `setInstanceState()` / `getInstanceState()` — apps that still hold per-window data on `this` must declare `singleton: true` until migrated.
+- **FeatureBase**: Background features extend `FeatureBase` with `initialize()`, `enable()`, `disable()`, `cleanup()`. `disable()` does **not** reset `initialized` — re-enable will not re-run `initialize()`; subclasses that genuinely need re-init must override `disable()` to clear it explicitly. Concurrent enable/disable calls are serialized by an internal lifecycle queue, so two clicks can't double-run `initialize()`.
+- **CommandBus**: Command routing and execution (currently parallel to `SemanticEventBus`; see roadmap for planned consolidation).
+- **SessionManager**: Single owner of the logout / user-switch cascade. Always call `SessionManager.logout()` or `SessionManager.switchUser(newUser)` instead of tearing down realtime/presence/state by hand. Cascade order is: `MultiplayerClient.disconnect` → `closeRealtime` → `PresenceManager.destroy` → `setSessionToken(null)` → `StateManager.resetVolatile`, then `user:logout` / `user:switch` emitted for subscribers.
+- **Virtual filesystem**: `FileSystemManager` with permissions, locking, events.
+- **Script path validation**: `core/script/utils/PathValidation.validateScriptPath()` is the single allowlist for script-driven file ops; reuse it instead of inlining new prefix lists.
 
 ### Backend
 
@@ -108,12 +110,26 @@ bash scripts/lint-innerhtml.sh        # Detect unsafe innerHTML usage
 - **Middleware chain**: Auth, rate limiting, JSON parsing, CORS
 - **Three-tier config**: `defaults.json` → system_config DB → user_config DB (deep merged)
 - **Event-driven**: `EventService::dispatch()` → DB log → webhooks → SSE
+- **WebSocket auth**: Tokens travel via `Sec-WebSocket-Protocol: token.<hex>` (the only request header browsers let JS set on a WS upgrade). The server (`websocket/server.php`) still accepts `Authorization: Bearer` and legacy `?token=` query params for compatibility, but new clients must use the subprotocol form so tokens stay out of URLs / proxy logs / browser history.
 
 ### Data flow
 ```
 User Interaction → UI Handler → EventBus.emit() → StateManager update
 → StorageManager persist → Subscriber callbacks → UI re-render
 ```
+
+### User session lifecycle
+
+The session lifecycle is unified through `SessionManager` plus four canonical events:
+
+| Event | When it fires | Purpose |
+|---|---|---|
+| `user:login` | After token set, storage rescoped, `StateManager.initialize()` complete | Subscribers can safely hit the network as the new user |
+| `user:logout` | After realtime/presence/token/state teardown | Late subscribers can drop session caches |
+| `user:switch` | After teardown but before new scope is hydrated | Subscribers can clear caches before rehydrate |
+| `auth:expired` | Server returned 401; token cleared | Show reauth UI (handler not yet implemented — see roadmap) |
+
+Never tear down `MultiplayerClient`, `RealtimeClient`, or `PresenceManager` directly from a UI handler — go through `SessionManager`.
 
 ## Coding Conventions
 
@@ -150,6 +166,8 @@ User Interaction → UI Handler → EventBus.emit() → StateManager update
 - **Never** interpolate user input into SQL — use prepared statements
 - **Never** set `.innerHTML` with unescaped user data — use `escapeHtml()`
 - **Never** commit `backend/env.php`, `config/admin-credentials.php`, or `config/overrides.json`
+- **Never** put session tokens in URLs (query strings, fragments). For WebSocket auth, pass the token via `Sec-WebSocket-Protocol: token.<hex>`.
+- **Always** route script-initiated file ops through `validateScriptPath()` (or `ScriptEngine.validateScriptPath()`). Don't inline a new allowlist.
 - Config section validation strips HTML, blocks `url()`, `javascript:`, `expression()` in CSS
 - WebSocket messages are rate-limited (30/sec) and size-limited (64 KB)
 - API rate limiting is per-user/IP with configurable windows
@@ -166,9 +184,12 @@ User Interaction → UI Handler → EventBus.emit() → StateManager update
 
 ### New Feature
 1. Create `features/MyFeature.js` extending `FeatureBase`
-2. Implement `initialize()`, `enable()`, `disable()`, `cleanup()`
-3. Register in `features/` index
-4. Provide metadata: id, name, description, icon, category
+2. Implement `initialize()`. Don't reimplement enable/disable unless you have a specific reason — the base class handles state, lifecycle locking, and cleanup wiring.
+3. Override `cleanup()` (called from `disable()`) to release listeners/timers/DOM. Anything you register through `this.subscribe(...)` / `this.addHandler(...)` is auto-cleaned.
+4. Register in `features/` index (or via plugin manifest).
+5. Provide metadata: id, name, description, icon, category, optional `dependencies`, optional `settings` schema for the UI.
+
+> ⚠️ Do **not** assume `initialize()` will re-run if your feature is toggled off and back on. It only runs once per process. If you need re-init semantics, override `disable()` to set `this.initialized = false` before calling `super.disable()`.
 
 ### New Plugin
 1. Create `plugins/features/my-plugin/index.js` with manifest
@@ -186,39 +207,54 @@ User Interaction → UI Handler → EventBus.emit() → StateManager update
 | File | Purpose |
 |------|---------|
 | `index.js` | Boot sequence and initialization |
-| `core/EventBus.js` | Central event system |
-| `core/StateManager.js` | Reactive state store |
-| `core/WindowManager.js` | Window lifecycle management |
+| `core/EventBus.js` | Re-export of `SemanticEventBus` (single canonical event bus) |
+| `core/SemanticEventBus.js` | Pub/sub + schema validation + middleware + legacy mapping |
+| `core/StateManager.js` | Reactive state store; `resetVolatile()` clears user-scoped in-memory state |
+| `core/SessionManager.js` | Logout / user-switch cascade owner |
+| `core/WindowManager.js` | Window lifecycle, modal stack, deterministic modal cleanup |
 | `core/FileSystemManager.js` | Virtual filesystem |
-| `core/ConfigLoader.js` | Backend config + session init |
-| `core/MultiplayerClient.js` | WebSocket client with auto-reconnect |
+| `core/ConfigLoader.js` | Backend config + session token API |
+| `core/MultiplayerClient.js` | WebSocket client (subprotocol auth, auto-reconnect) |
+| `core/RealtimeClient.js` | SSE bridge for backend v2 events |
+| `core/PresenceManager.js` | Online users + typing state |
 | `core/script/ScriptEngine.js` | RetroScript engine coordinator |
+| `core/script/utils/PathValidation.js` | Single allowlist for script file-op paths |
 | `apps/AppBase.js` | Base class for all applications |
-| `features/FeatureBase.js` | Base class for all features |
+| `core/FeatureBase.js` | Base class for all features (lifecycle queue, no init reset on disable) |
+| `core/FeatureRegistry.js` | Feature registration, isolated-failure dependent disable |
 | `api/v2/index.php` | API v2 router (all backend routes) |
 | `backend/bootstrap.php` | Backend initialization + helpers |
 | `backend/Router.php` | Lightweight REST router |
 | `backend/Middleware.php` | Auth, rate limiting, CORS |
 | `backend/Database.php` | PDO singleton wrapper |
-| `websocket/server.php` | WebSocket server entry point |
+| `websocket/server.php` | WebSocket server entry point (subprotocol auth) |
+| `websocket/WebSocketFrame.php` | RFC 6455 framing + auth header parsing |
 | `setup.php` | First-time setup wizard |
 | `autoexec.retro` | Default startup automation script |
 
 ## Event System
 
-Events use namespaced format: `window:open`, `app:close`, `ui:menu:start:toggle`, etc. Schemas are defined in `core/schema/` with validation. The SemanticEventBus provides middleware, logging, and legacy event mapping.
+Events use namespaced format: `window:open`, `app:close`, `ui:menu:start:toggle`, etc. Schemas live in `core/schema/` with validation. `SemanticEventBus` provides middleware, logging, request/response, channels, and legacy name mapping. There is no separate `EventBus` implementation — `core/EventBus.js` is a re-export so old imports keep working.
+
+The canonical user-session events are `user:login`, `user:logout`, `user:switch`, `auth:expired` (see `core/schema/system.js`).
+
+> ⚠️ Avoid relying on `LEGACY_EVENT_MAPPING` in new code. Use the new names directly (`ui:menu:start:toggle`, `system:ready`, `feature:pet:toggle`, etc.). The mapping table in `SemanticEventBus.js` is for compatibility with already-written code and is on the roadmap for removal.
 
 ## RetroScript
 
 Custom scripting language (`.retro` files) for automation. See `SCRIPTING_GUIDE.md` for full documentation. Engine lives in `core/script/` with lexer, parser, and interpreter.
+
+Script file ops (`write` / `read` / `delete` / `mkdir`) validate paths against the shared allowlist in `core/script/utils/PathValidation.js`. The allowlist also covers the SSE-driven remote FS ops in `index.js`. Don't inline new prefix arrays — add to `PathValidation` and have both call-sites use it.
 
 ## Existing Documentation
 
 - `README.md` — Project overview, run instructions, app/feature catalog
 - `DEVELOPER_GUIDE.md` — Extension development guide (apps, features, plugins, RetroScript)
 - `SCRIPTING_GUIDE.md` — Complete RetroScript language reference
+- `docs/UNIFIED_ROADMAP.md` — Plan for converging on the unified API (sequenced waves, deferred items, success criteria)
+- `docs/ARCHITECTURE_AUDIT.md` — Original architecture audit + which findings are resolved
 - `docs/RETROSCRIPT_SCRIPTABLE_EVENTS.md` — Exhaustive event/command/query reference for scripts
 - `docs/TERMINAL_SCRIPTING.md` — Terminal-specific RetroScript built-ins and workflows
 - `docs/GREENGEEKS_RESELLER_VPS_WEBSOCKET_SETUP.md` — Production WebSocket sidecar deployment guide
 
-Historical planning and phase-audit docs have been removed; this file, `README.md`, and `DEVELOPER_GUIDE.md` are the source of truth for architecture and conventions.
+This file, `README.md`, `DEVELOPER_GUIDE.md`, and `docs/UNIFIED_ROADMAP.md` are the source of truth for architecture and conventions. Historical planning docs have been folded into the roadmap or removed.

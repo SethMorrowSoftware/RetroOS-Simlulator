@@ -173,6 +173,35 @@ class StateManagerClass {
     }
 
     /**
+     * Clear in-memory state that is scoped to a user session, without touching
+     * persisted storage. Call this on logout / user-switch so the new user's
+     * StateManager.initialize() starts from a clean slate and doesn't briefly
+     * see the previous user's icons, windows, or UI flags. Settings stay at
+     * their defaults; persisted values rehydrate on the next initialize().
+     */
+    resetVolatile() {
+        this.state.icons = [];
+        this.state.filePositions = {};
+        this.state.windows = [];
+        this.state.menuItems = [];
+        this.state.recycledItems = [];
+        this.state.achievements = [];
+        this.state.user = {
+            isAdmin: false,
+            hasVisited: false,
+            userName: 'Guest',
+            loginMode: 'guest'
+        };
+        this.state.ui = {
+            activeWindow: null,
+            startMenuOpen: false,
+            contextMenuOpen: false,
+            clippyVisible: false
+        };
+        this.windowZIndex = 1000;
+    }
+
+    /**
      * Get state value by path
      * @param {string} path - Dot-notation path (e.g., 'settings.sound')
      * @returns {*} State value

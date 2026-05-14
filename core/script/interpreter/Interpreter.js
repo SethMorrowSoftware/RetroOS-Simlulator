@@ -9,6 +9,7 @@ import Environment from './Environment.js';
 import { SafetyLimits } from '../utils/SafetyLimits.js';
 import { RuntimeError, TimeoutError, RecursionError, ScriptReferenceError } from '../errors/ScriptError.js';
 import * as AST from '../ast/index.js';
+import { validateScriptPath } from '../utils/PathValidation.js';
 
 /**
  * Control flow signals
@@ -574,7 +575,8 @@ export class Interpreter {
         }
 
         const content = await this.visitExpression(stmt.content);
-        const path = await this.visitExpression(stmt.path);
+        const rawPath = await this.visitExpression(stmt.path);
+        const path = validateScriptPath(rawPath, { line: stmt.line });
         FileSystem.writeFile(path, this.stringify(content));
     }
 
@@ -584,7 +586,8 @@ export class Interpreter {
             throw new RuntimeError('FileSystemManager not available', { line: stmt.line });
         }
 
-        const path = await this.visitExpression(stmt.path);
+        const rawPath = await this.visitExpression(stmt.path);
+        const path = validateScriptPath(rawPath, { line: stmt.line });
         const content = FileSystem.readFile(path);
         this.currentEnv.set(stmt.varName, content);
     }
@@ -593,7 +596,8 @@ export class Interpreter {
         const FileSystem = this.context.FileSystemManager;
         if (!FileSystem) return;
 
-        const path = await this.visitExpression(stmt.path);
+        const rawPath = await this.visitExpression(stmt.path);
+        const path = validateScriptPath(rawPath, { line: stmt.line });
         FileSystem.createDirectory(path);
     }
 
@@ -601,7 +605,8 @@ export class Interpreter {
         const FileSystem = this.context.FileSystemManager;
         if (!FileSystem) return;
 
-        const path = await this.visitExpression(stmt.path);
+        const rawPath = await this.visitExpression(stmt.path);
+        const path = validateScriptPath(rawPath, { line: stmt.line });
         try {
             FileSystem.deleteFile(path);
         } catch (e) {

@@ -463,16 +463,42 @@ while ($running) {
             $key = trim($matches[1]);
             $acceptKey = base64_encode(sha1($key . '258EAFA5-E914-47DA-95CA-5AB5DC65C5B3', true));
 
+            // If the client offered the 'illuminatos' subprotocol, echo it
+            // back in the upgrade response. This keeps strict browsers happy
+            // when we authenticate via the token.* subprotocol — the server
+            // MUST pick a protocol from the offered list, and we want to
+            // avoid echoing the token entry (which would put the token in
+            // response headers).
+            $responseProtocolHeader = '';
+            if (preg_match('/Sec-WebSocket-Protocol:\s*([^\r\n]+)/i', $httpHeader, $protoMatches)) {
+                $offered = array_map('trim', explode(',', $protoMatches[1]));
+                if (in_array('illuminatos', $offered, true)) {
+                    $responseProtocolHeader = "Sec-WebSocket-Protocol: illuminatos\r\n";
+                }
+            }
+
             $response = "HTTP/1.1 101 Switching Protocols\r\n" .
                 "Upgrade: websocket\r\n" .
                 "Connection: Upgrade\r\n" .
-                "Sec-WebSocket-Accept: $acceptKey\r\n\r\n";
+                "Sec-WebSocket-Accept: $acceptKey\r\n" .
+                $responseProtocolHeader .
+                "\r\n";
 
             @fwrite($socket, $response);
 
-            // Extract token from query params or Authorization header
-            $params = WebSocketFrame::parseQueryParams($httpHeader);
-            $token = $params['token'] ?? WebSocketFrame::parseAuthHeader($httpHeader) ?? '';
+            // Token sources, in order of preference:
+            //   1. Sec-WebSocket-Protocol: token.<jwt>   (preferred; tokens
+            //      stay out of URLs / proxy logs / browser history)
+            //   2. Authorization: Bearer <jwt>           (programmatic clients)
+            //   3. ?token=<jwt> query param              (legacy; deprecated)
+            $token = WebSocketFrame::parseSubprotocolToken($httpHeader);
+            if (!$token) {
+                $token = WebSocketFrame::parseAuthHeader($httpHeader);
+            }
+            if (!$token) {
+                $params = WebSocketFrame::parseQueryParams($httpHeader);
+                $token = $params['token'] ?? '';
+            }
 
             if (!$token) {
                 $closeFrame = WebSocketFrame::encodeClose(4001, 'Authentication required');

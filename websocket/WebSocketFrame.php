@@ -110,6 +110,37 @@ class WebSocketFrame
     }
 
     /**
+     * Parse a token from the Sec-WebSocket-Protocol header.
+     *
+     * Browsers don't let JS set arbitrary headers on the upgrade request,
+     * but they DO let JS pass a subprotocol list as the second argument
+     * to `new WebSocket(url, protocols)`. We use the convention
+     * `token.<JWT>` so the token never appears in the URL (where it would
+     * leak into proxy logs, browser history, and server access logs).
+     *
+     * The corresponding selected subprotocol must be echoed back in the
+     * 101 response, but for `token.*` we treat the whole entry as opaque
+     * and don't echo it (it's not a real protocol).
+     *
+     * @param string $httpHeader Raw HTTP header
+     * @return string|null Token portion of a `token.<value>` entry, or null
+     */
+    public static function parseSubprotocolToken(string $httpHeader): ?string
+    {
+        if (!preg_match('/Sec-WebSocket-Protocol:\s*([^\r\n]+)/i', $httpHeader, $matches)) {
+            return null;
+        }
+        $entries = array_map('trim', explode(',', $matches[1]));
+        foreach ($entries as $entry) {
+            if (strncmp($entry, 'token.', 6) === 0) {
+                $tok = substr($entry, 6);
+                return $tok !== '' ? $tok : null;
+            }
+        }
+        return null;
+    }
+
+    /**
      * Decode a WebSocket frame from raw data.
      *
      * @param string $data Raw data from socket

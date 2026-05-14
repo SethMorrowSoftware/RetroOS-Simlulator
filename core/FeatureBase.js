@@ -71,6 +71,22 @@ class FeatureBase {
 
         // Hook system for extensibility
         this.hooks = new Map(); // hookName -> [handlers]
+
+        // Serializes concurrent enable()/disable() calls so init can't run twice
+        this._lifecycleQueue = Promise.resolve();
+    }
+
+    /**
+     * Run a lifecycle transition serially. Concurrent enable()/disable() calls
+     * are queued so initialize() / cleanup() never overlap.
+     * @private
+     */
+    _runLifecycle(fn) {
+        const next = this._lifecycleQueue.then(fn, fn);
+        // Swallow rejections in the queue so a failed transition doesn't poison
+        // every subsequent call, but still surface the error to the caller.
+        this._lifecycleQueue = next.catch(() => {});
+        return next;
     }
 
     // ===== LIFECYCLE METHODS (Override in subclass) =====
@@ -89,41 +105,43 @@ class FeatureBase {
      * Called when user enables the feature in settings
      */
     async enable() {
-        try {
-            if (!this.initialized) {
-                // Emit initialize event
-                EventBus.emit(Events.FEATURE_INITIALIZE, {
+        return this._runLifecycle(async () => {
+            try {
+                if (!this.initialized) {
+                    // Emit initialize event
+                    EventBus.emit(Events.FEATURE_INITIALIZE, {
+                        featureId: this.id,
+                        config: this.config
+                    });
+
+                    await this.initialize();
+                    this.initialized = true;
+
+                    // Emit ready event
+                    EventBus.emit(Events.FEATURE_READY, {
+                        featureId: this.id
+                    });
+                }
+
+                this.enabled = true;
+                this.saveEnabledState(true);
+
+                // Emit enable event
+                EventBus.emit(Events.FEATURE_ENABLE, {
                     featureId: this.id,
-                    config: this.config
+                    name: this.name
                 });
 
-                await this.initialize();
-                this.initialized = true;
-
-                // Emit ready event
-                EventBus.emit(Events.FEATURE_READY, {
-                    featureId: this.id
+                console.log(`[${this.name}] Enabled`);
+            } catch (error) {
+                EventBus.emit(Events.FEATURE_ERROR, {
+                    featureId: this.id,
+                    error: error.message,
+                    fatal: false
                 });
+                throw error;
             }
-
-            this.enabled = true;
-            this.saveEnabledState(true);
-
-            // Emit enable event
-            EventBus.emit(Events.FEATURE_ENABLE, {
-                featureId: this.id,
-                name: this.name
-            });
-
-            console.log(`[${this.name}] Enabled`);
-        } catch (error) {
-            EventBus.emit(Events.FEATURE_ERROR, {
-                featureId: this.id,
-                error: error.message,
-                fatal: false
-            });
-            throw error;
-        }
+        });
     }
 
     /**
@@ -131,27 +149,33 @@ class FeatureBase {
      * Called when user disables the feature in settings
      */
     async disable() {
-        try {
-            this.cleanup();
-            this.enabled = false;
-            this.initialized = false;
-            this.saveEnabledState(false);
+        return this._runLifecycle(async () => {
+            try {
+                this.cleanup();
+                this.enabled = false;
+                // Note: do NOT reset this.initialized here. Resetting it caused
+                // a subsequent enable() to re-run initialize() on top of the
+                // existing (already-subscribed) state, leaking listeners. If a
+                // feature genuinely needs a re-init on enable, it should
+                // override disable() and re-run initialize() explicitly.
+                this.saveEnabledState(false);
 
-            // Emit disable event
-            EventBus.emit(Events.FEATURE_DISABLE, {
-                featureId: this.id,
-                name: this.name
-            });
+                // Emit disable event
+                EventBus.emit(Events.FEATURE_DISABLE, {
+                    featureId: this.id,
+                    name: this.name
+                });
 
-            console.log(`[${this.name}] Disabled`);
-        } catch (error) {
-            EventBus.emit(Events.FEATURE_ERROR, {
-                featureId: this.id,
-                error: error.message,
-                fatal: false
-            });
-            throw error;
-        }
+                console.log(`[${this.name}] Disabled`);
+            } catch (error) {
+                EventBus.emit(Events.FEATURE_ERROR, {
+                    featureId: this.id,
+                    error: error.message,
+                    fatal: false
+                });
+                throw error;
+            }
+        });
     }
 
     /**

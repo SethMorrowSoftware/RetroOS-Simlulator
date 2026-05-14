@@ -32,6 +32,8 @@ class WindowManagerClass {
         this.snapPreview = null;
         // Modal window stack — topmost modal blocks input to all windows below it
         this._modalStack = [];
+        // Per-window modal cleanup callbacks invoked by close()
+        this._modalCleanups = new Map();
         // Bound handlers for cleanup
         this.boundDragMove = this.handleDragMove.bind(this);
         this.boundDragEnd = this.handleDragEnd.bind(this);
@@ -486,6 +488,18 @@ class WindowManagerClass {
 
         // Get window data for callback
         const windowData = StateManager.getWindow(id);
+
+        // Modal cleanup is invoked deterministically here (rather than via a
+        // WINDOW_CLOSE listener) so two modals closing in rapid succession
+        // can't race on a one-shot listener and leave _modalStack out of sync.
+        if (this._modalCleanups && this._modalCleanups.has(id)) {
+            try {
+                this._modalCleanups.get(id)();
+            } catch (e) {
+                console.error('[WindowManager] Modal cleanup failed:', e);
+            }
+            this._modalCleanups.delete(id);
+        }
 
         // Play close sound
         EventBus.emit(Events.SOUND_PLAY, { type: 'close' });
@@ -1192,19 +1206,17 @@ class WindowManagerClass {
         this._modalStack.push(id);
         this._updateModalOverlay();
 
-        // Override close to also pop from modal stack
-        const originalClose = config.onClose;
         StateManager.updateWindow(id, { modal: true });
 
-        // Listen for close to clean up modal state
-        const closeHandler = (data) => {
-            if (data.id === id) {
-                this._modalStack = this._modalStack.filter(m => m !== id);
-                this._updateModalOverlay();
-                EventBus.off(Events.WINDOW_CLOSE, closeHandler);
-            }
-        };
-        EventBus.on(Events.WINDOW_CLOSE, closeHandler);
+        // Modal cleanup runs synchronously inside close() (see WindowManager.close).
+        // This replaces the previous one-shot WINDOW_CLOSE listener pattern, which
+        // could race when two modals closed in the same tick — both listeners would
+        // observe each other's emit and pop the wrong id, leaving _modalStack out
+        // of sync and the overlay blocking input.
+        this._modalCleanups.set(id, () => {
+            this._modalStack = this._modalStack.filter(m => m !== id);
+            this._updateModalOverlay();
+        });
 
         return windowEl;
     }
