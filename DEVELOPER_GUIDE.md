@@ -31,7 +31,7 @@ IlluminatOS has four extension layers:
 
 All layers interconnect via:
 - Semantic events (`EventBus`)
-- Command execution (`CommandBus`)
+- Command execution (`EventBus.registerCommand` / `EventBus.executeCommand`, with platform handlers registered by `CommandRegistry`)
 - Shared filesystem (`FileSystemManager`)
 - Shared state (`StateManager`)
 
@@ -92,7 +92,7 @@ Boot orchestration lives in `index.js`:
 - Config loading (`ConfigLoader`)
 - User session + real-time SSE init (v2 API only, via `RealtimeClient`)
 - App registration (`AppRegistry`)
-- Core service initialization (`StorageManager`, `StateManager`, `WindowManager`, `CommandBus`, `ScriptEngine`)
+- Core service initialization (`StorageManager`, `StateManager`, `WindowManager`, `CommandRegistry`, `ScriptEngine`)
 - Filesystem synchronization (desktop icons + installed apps)
 - Feature registration (`FeatureRegistry`)
 - Plugin loading + plugin feature registration (`PluginLoader`)
@@ -113,7 +113,7 @@ Each phase is tracked by the boot health diagnostics system, recording status, d
 - `core/PluginLoader.js`: plugin manifest loading
 - `core/script/ScriptEngine.js`: RetroScript runtime
 - `core/script/utils/PathValidation.js`: single allowlist for script-driven file ops (also used by SSE remote FS handler in `index.js`)
-- `core/CommandBus.js`: ⚠️ deprecated facade — delegates to `SemanticEventBus.commandHandlers`. Both APIs share the same registry. Use `EventBus.registerCommand()` / `EventBus.executeCommand()` directly for new code. The script engine no longer imports `CommandBus`.
+- `core/CommandRegistry.js`: wires every platform-level command handler (`command:fs:*`, `command:window:*`, `command:terminal:*`, `command:dialog:*`, `command:app:*`, `command:setting:*`, `command:sound:play`, etc.), the `query:*` listeners, and the `timer:*` / `macro:*` lifecycle state. New code calls `EventBus.registerCommand()` / `EventBus.executeCommand()` directly — `CommandRegistry` is the wiring layer, not a separate API.
 - `core/HealthMonitor.js`: live runtime health snapshot at `window.__OS_HEALTH`.
 - `core/SubscriptionManager.js`: owner-scoped subscription tracker. `runAs(ownerId, fn)` sets the active owner; `unsubscribeAll(ownerId)` releases.
 - `core/EventTopology.js`: single source-of-truth list of cross-process events (`{ backend, frontend?, transports }`). Consumed by `RealtimeClient` and (later) `MultiplayerClient`.
@@ -385,7 +385,7 @@ EventBus.registerCommand('myapp:doThing', async (payload) => {
 await EventBus.executeCommand('myapp:doThing', { foo: 1 });
 ```
 
-`CommandBus.register()` / `CommandBus.execute()` still work — they're a thin facade that delegates to the unified API — but `CommandBus.js` is `@deprecated`. The script engine no longer takes `CommandBus` in its context (every visitor and builtin goes through `context.EventBus.executeCommand`), and `apps/ScriptRunner.js` no longer imports the file. Boot still calls `CommandBus.initialize()` because that's where the `command:fs:*` / `command:window:*` / `command:terminal:*` handler set is registered — full file removal is the F1 follow-up in `docs/MIGRATION_ROADMAP.md`. Use the bus directly for new code.
+The script engine no longer takes `CommandBus` in its context (every visitor and builtin goes through `context.EventBus.executeCommand`). Boot calls `CommandRegistry.initialize()` from `core/CommandRegistry.js` — that's where the `command:fs:*` / `command:window:*` / `command:terminal:*` handler set is registered. Use the bus directly for new code; `CommandBus.js` no longer exists.
 
 Common command surfaces: app lifecycle actions, window actions, filesystem actions, dialog/notification/sound/system settings actions. If you add app-specific script control, register commands from the app and document them.
 

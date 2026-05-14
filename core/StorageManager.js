@@ -70,7 +70,12 @@ class StorageManagerClass {
             // W3.1 — writes dropped because they arrived during a remote
             // snapshot hydration.
             hydrationDrops: 0,
-            lastHydrationDrop: null
+            lastHydrationDrop: null,
+            // F3 — writes captured before login resolves (queued under user
+            // scope once `setUserScope(name)` runs). `preLoginReplays` tracks
+            // how many were successfully written to the user-scoped prefix.
+            preLoginWrites: 0,
+            preLoginReplays: 0
         };
 
         // W3.1 — hydration guard. UserStateSync.pullRemoteSnapshot wraps its
@@ -78,6 +83,17 @@ class StorageManagerClass {
         // direct UI writes via .set() are dropped (with a warning) so the
         // incoming snapshot isn't immediately overwritten by stale UI state.
         this._isHydrating = false;
+
+        // F3 — pre-login queue. Writes happening before `setUserScope(name)`
+        // is called are intended for the eventual user's storage; queue them
+        // (keyed by unprefixed key) instead of letting them leak into
+        // global storage where they'd be orphaned by the post-login reload.
+        // On login, the queue is replayed under the new user prefix and
+        // cleared. On logout, pre-login mode is re-entered with an empty
+        // queue. `setGlobal()` bypasses this entirely — it's the explicit
+        // path for genuinely cross-user writes.
+        this._isPreLogin = true;
+        this._preLoginQueue = new Map();
 
         // Invalidate cache when another tab writes to localStorage
         this._boundStorageHandler = (e) => {
@@ -98,6 +114,8 @@ class StorageManagerClass {
      * @param {string} username - The logged-in user's name (or null to reset to global)
      */
     setUserScope(username) {
+        const wasPreLogin = this._isPreLogin;
+
         // Clear cache when switching user scope since keys change
         this._cache.clear();
 
@@ -107,10 +125,62 @@ class StorageManagerClass {
             this.userScope = safeUser;
             this.prefix = `${this.basePrefix}u_${safeUser}_`;
             console.log(`[StorageManager] User scope set: ${safeUser}`);
+
+            // F3 — replay any pre-login writes under the new user prefix so
+            // they don't get orphaned in global storage. Replay is
+            // *set-if-missing*: pre-login writes are boot-time defaults
+            // (default FS, default icons, etc.), so a returning user's
+            // existing data must not be clobbered. Keys the user already
+            // has are left alone; keys they don't have receive the queued
+            // default.
+            if (wasPreLogin && this._preLoginQueue.size > 0) {
+                let replayed = 0;
+                let skipped = 0;
+                for (const [unprefixedKey, value] of this._preLoginQueue) {
+                    const newPrefixedKey = this.getKey(unprefixedKey);
+                    if (_hasUnsafeKeys(value)) {
+                        this._recordUnsafeKeyRejection(newPrefixedKey, 'replay');
+                        continue;
+                    }
+                    const existsForUser = this.available
+                        ? localStorage.getItem(newPrefixedKey) !== null
+                        : this.memoryFallback.has(newPrefixedKey);
+                    if (existsForUser) {
+                        skipped += 1;
+                        continue;
+                    }
+                    try {
+                        const serialized = JSON.stringify(value);
+                        if (this.available) {
+                            localStorage.setItem(newPrefixedKey, serialized);
+                            this._cache.set(newPrefixedKey, JSON.parse(serialized));
+                        } else {
+                            this.memoryFallback.set(newPrefixedKey, value);
+                        }
+                        replayed += 1;
+                    } catch (err) {
+                        console.error(`[StorageManager] Failed to replay pre-login write "${unprefixedKey}":`, err);
+                    }
+                }
+                this.telemetry.preLoginReplays += replayed;
+                if (replayed > 0 || skipped > 0) {
+                    console.log(`[StorageManager] Pre-login replay under "${safeUser}": ${replayed} written, ${skipped} skipped (user already had data).`);
+                }
+                if (replayed > 0) {
+                    this._notifyRemoteChange();
+                }
+            }
+            this._preLoginQueue.clear();
+            this._isPreLogin = false;
         } else {
+            // Logout (or initial null scope). Re-enter pre-login mode so the
+            // next set of writes (until the next login) is queued instead
+            // of leaking to global storage.
             this.userScope = null;
             this.prefix = this.basePrefix;
-            console.log('[StorageManager] User scope cleared (global)');
+            this._isPreLogin = true;
+            this._preLoginQueue.clear();
+            console.log('[StorageManager] User scope cleared (global, pre-login mode re-entered)');
         }
     }
 
@@ -193,6 +263,16 @@ class StorageManagerClass {
      * @returns {*} Parsed value
      */
     get(key, defaultValue = null) {
+        // F3 — pre-login queue hit: serve queued value so set/get pairs work
+        // before login (the queue entry was the most recent intended write).
+        if (this._isPreLogin && this._preLoginQueue.has(key)) {
+            const queued = this._preLoginQueue.get(key);
+            if (queued !== null && typeof queued === 'object') {
+                try { return structuredClone(queued); } catch { return queued; }
+            }
+            return queued;
+        }
+
         const prefixedKey = this.getKey(key);
         try {
             if (this.available) {
@@ -261,6 +341,20 @@ class StorageManagerClass {
             return false;
         }
 
+        // F3 — before login resolves, queue the write under the unprefixed
+        // key instead of letting it land in global storage. setUserScope()
+        // replays the queue under the new user prefix on login. Tests and
+        // reads in the meantime see the queued value via get().
+        if (this._isPreLogin) {
+            try {
+                this._preLoginQueue.set(key, structuredClone(value));
+            } catch {
+                this._preLoginQueue.set(key, value);
+            }
+            this.telemetry.preLoginWrites += 1;
+            return true;
+        }
+
         try {
             const serialized = JSON.stringify(value);
 
@@ -305,6 +399,14 @@ class StorageManagerClass {
      * @param {string} key - Key name
      */
     remove(key) {
+        // F3 — pre-login: if the key is in the queue, drop it there so the
+        // remove isn't shadowed by a later replay. Don't touch localStorage —
+        // pre-login writes never reached it.
+        if (this._isPreLogin && this._preLoginQueue.has(key)) {
+            this._preLoginQueue.delete(key);
+            return;
+        }
+
         const prefixedKey = this.getKey(key);
 
         this._cache.delete(prefixedKey);
@@ -324,8 +426,14 @@ class StorageManagerClass {
      * @returns {boolean}
      */
     has(key) {
+        // F3 — queued pre-login writes count as "present" so caller logic
+        // that reads after a write (e.g. defaults-or-stored patterns) works.
+        if (this._isPreLogin && this._preLoginQueue.has(key)) {
+            return true;
+        }
+
         const prefixedKey = this.getKey(key);
-        
+
         if (this.available) {
             return localStorage.getItem(prefixedKey) !== null;
         } else {
@@ -363,6 +471,10 @@ class StorageManagerClass {
      */
     clear() {
         this._cache.clear();
+
+        // F3 — also drop any queued pre-login writes so they don't get
+        // replayed on next login.
+        this._preLoginQueue.clear();
 
         if (this.available) {
             const keysToRemove = [];
@@ -649,8 +761,27 @@ class StorageManagerClass {
             unsafeKeyRejections: 0,
             lastUnsafeKeyRejection: null,
             hydrationDrops: 0,
-            lastHydrationDrop: null
+            lastHydrationDrop: null,
+            preLoginWrites: 0,
+            preLoginReplays: 0
         };
+    }
+
+    /**
+     * Whether pre-login mode is active (writes are being queued for the
+     * eventual user scope). Useful for HealthMonitor diagnostics.
+     * @returns {boolean}
+     */
+    isPreLogin() {
+        return this._isPreLogin;
+    }
+
+    /**
+     * Number of writes currently queued for post-login replay.
+     * @returns {number}
+     */
+    pendingPreLoginWrites() {
+        return this._preLoginQueue.size;
     }
 
     /**
@@ -665,6 +796,13 @@ class StorageManagerClass {
 
 // Singleton instance
 const StorageManager = new StorageManagerClass();
+
+// Expose under the debug object so HealthMonitor's storage section
+// (`__OS_HEALTH.storage`) can pull telemetry without an explicit import.
+if (typeof window !== 'undefined') {
+    window.__RETROS_DEBUG = window.__RETROS_DEBUG || {};
+    window.__RETROS_DEBUG.storageManager = StorageManager;
+}
 
 export { StorageManager };
 export default StorageManager;

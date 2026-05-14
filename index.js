@@ -18,7 +18,7 @@ import EventBus, { Events } from './core/EventBus.js';
 import WindowManager from './core/WindowManager.js';
 import FileSystemManager from './core/FileSystemManager.js';
 import MediaScanner from './core/MediaScanner.js';
-import CommandBus from './core/CommandBus.js';
+import CommandRegistry from './core/CommandRegistry.js';
 import ScriptEngine from './core/script/ScriptEngine.js';
 
 // === UI RENDERERS ===
@@ -349,7 +349,7 @@ async function initializeOS(onProgress = () => {}) {
     await trackInit('ReplayEngine', () => ReplayEngine.initialize(), { critical: false });
 
     // Initialize scripting infrastructure
-    await trackInit('CommandBus', () => CommandBus.initialize());
+    await trackInit('CommandRegistry', () => CommandRegistry.initialize());
     await trackInit('ScriptEngine', () => ScriptEngine.initialize({
         FileSystemManager,
         EventBus,
@@ -385,6 +385,12 @@ async function initializeOS(onProgress = () => {}) {
 
         // Save the updated filesystem
         FileSystemManager.saveFileSystem();
+
+        // F2 — install the runtime FS → state reconciler so a `.lnk` created
+        // in Desktop/ at runtime (terminal, script, drag-and-drop) surfaces
+        // as a desktop icon without a reload. Idempotent and survives
+        // user-switch cascades.
+        StateManager.installDesktopIconReconciler(FileSystemManager);
     }, { critical: false });
 
     // === Phase 1.55: Server File Sync ===

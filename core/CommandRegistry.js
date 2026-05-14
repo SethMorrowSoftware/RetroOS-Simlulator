@@ -1,32 +1,23 @@
 /**
- * CommandBus - Command execution layer for scripting support
+ * CommandRegistry - Registers platform command handlers and owns timer +
+ * macro lifecycle state for the RetroScript engine.
  *
- * @deprecated Use `SemanticEventBus.registerCommand()` and
- *             `SemanticEventBus.executeCommand()` directly. This file is now
- *             a thin facade that delegates to `SemanticEventBus.commandHandlers`
- *             and exists so existing imports keep working. It will be removed
- *             in Wave 4 of the unification roadmap.
+ * The unified command/query registry lives on `SemanticEventBus` —
+ * `EventBus.registerCommand(name, handler)` / `EventBus.executeCommand(name, payload)`
+ * are the public API. This module is the wiring layer: it groups every
+ * platform-level handler (`command:fs:*`, `command:window:*`,
+ * `command:terminal:*`, `command:dialog:*`, `command:app:*`,
+ * `command:setting:*`, etc.) plus the `query:*` listeners and the
+ * `timer:*` / `macro:*` lifecycle handlers in one place so they can be
+ * initialised once at boot.
  *
- * The `handlers` Map is intentionally a *reference* to
- * `SemanticEventBus.commandHandlers` — both objects see the same registrations,
- * so `CommandBus.execute('foo')` and `SemanticEventBus.executeCommand('foo')`
- * are equivalent. Timer/macro state remains here (those are CommandBus
- * features, not part of the unified bus surface).
+ * Usage:
+ *   import CommandRegistry from './CommandRegistry.js';
+ *   CommandRegistry.initialize();
  *
- * Original responsibility (now shared with SemanticEventBus):
- *   - Commands trigger actions (command:app:launch, command:fs:write, etc.)
- *   - Queries retrieve state (query:windows, query:fs:list, etc.)
- *   - All commands support requestId for async response tracking
- *
- * Usage (legacy — still works):
- *   import CommandBus from './CommandBus.js';
- *   CommandBus.initialize();
- *   CommandBus.execute('app:launch', { appId: 'notepad' });
- *
- * Usage (preferred for new code):
+ *   // Anywhere in the codebase:
  *   import EventBus from './EventBus.js';
- *   EventBus.registerCommand('app:launch', async (payload) => { ... });
- *   await EventBus.executeCommand('app:launch', { appId: 'notepad' });
+ *   await EventBus.executeCommand('fs:read', { path: 'C:/Users/User/foo.txt' });
  */
 
 import EventBus from './EventBus.js';
@@ -37,17 +28,16 @@ import { validateScriptPath } from './script/utils/PathValidation.js';
 
 /**
  * Validate a path passed to a `command:fs:*` handler against the same
- * allowlist that script-driven file ops use (W3.10).
+ * allowlist that script-driven file ops use.
  *
- * Before this guard, a script could escape the script-engine path check by
+ * Without this guard, a script could escape the script-engine path check by
  * emitting `command:fs:write { path: "C:/anything" }` instead of using the
- * `write` statement — the CommandBus handler reached straight into
- * `FileSystemManager` with no validation. This wrapper closes that hole:
- * the script and command surfaces now share one boundary.
+ * `write` statement — the handler reached straight into `FileSystemManager`
+ * with no validation. The script and command surfaces share one boundary.
  *
  * The underlying validator throws a RuntimeError; we rethrow as a plain
- * Error here so the CommandBus error envelope ({ success: false, error })
- * carries a clean message instead of a ScriptError with line:0 column:0.
+ * Error so the command error envelope ({ success: false, error }) carries a
+ * clean message instead of a ScriptError with line:0 column:0.
  *
  * @param {string} path
  * @param {string} commandName - e.g. 'fs:write', for the error message
@@ -62,28 +52,26 @@ function validateCommandFsPath(path, commandName) {
     }
 }
 
-class CommandBusClass {
+class CommandRegistryClass {
     constructor() {
-        // Share the command registry with SemanticEventBus so the two surfaces
-        // see the same handler set. Any registration via CommandBus.register
-        // is visible to SemanticEventBus.executeCommand and vice versa.
-        this.handlers = EventBus.commandHandlers;
         this.timers = new Map();
         this.macros = new Map();
         this.isRecording = false;
         this.currentMacro = null;
         this.recordedEvents = [];
+        this.recordStartTime = 0;
+        this._macroSubscription = null;
         this.initialized = false;
     }
 
     /**
-     * Initialize CommandBus - register all command handlers
+     * Register every platform-level command, query, timer, and macro
+     * handler with the unified registry on `SemanticEventBus`.
      */
     initialize() {
         if (this.initialized) return;
         this.initialized = true;
 
-        // Register command handlers
         this._registerAppCommands();
         this._registerWindowCommands();
         this._registerFsCommands();
@@ -94,110 +82,40 @@ class CommandBusClass {
         this._registerTimerHandlers();
         this._registerMacroHandlers();
 
-        // Listen for all command:* events and route to registered handlers.
-        // App-specific commands (e.g. command:inbox:deliverMessage) are handled
-        // directly by AppBase.registerCommand() via their own EventBus subscriptions,
-        // so we only execute commands that CommandBus itself has registered.
+        // Route `command:<name>` events emitted via EventBus.emit() into the
+        // unified registry. App-scoped commands (e.g. `command:inbox:deliverMessage`)
+        // are handled directly by their owning app via AppBase.registerCommand
+        // and are silently ignored here.
         EventBus.on('command:*', (payload, metadata, event) => {
             const commandName = event.name.replace('command:', '');
-            if (this.handlers.has(commandName)) {
-                this.execute(commandName, payload);
+            if (EventBus.commandHandlers.has(commandName)) {
+                EventBus.executeCommand(commandName, payload);
             }
-            // Silently ignore app-specific commands — they're handled by AppBase
         });
 
-        console.log('[CommandBus] Initialized with handlers:', [...this.handlers.keys()]);
-    }
-
-    /**
-     * Register a command handler.
-     * @deprecated Use `EventBus.registerCommand(command, handler)` directly.
-     *             Both surfaces share the same registry, so existing callers
-     *             continue to work — this facade returns the unregister
-     *             function from the unified API.
-     * @param {string} command - Command name (without 'command:' prefix)
-     * @param {Function} handler - Handler function (payload, requestId) => result
-     * @returns {Function} Unregister function
-     */
-    register(command, handler) {
-        return EventBus.registerCommand(command, handler);
-    }
-
-    /**
-     * Execute a command.
-     * @deprecated Use `EventBus.executeCommand(command, payload)` directly.
-     * @param {string} command - Command name
-     * @param {object} payload - Command payload
-     * @returns {Promise} Result of the command
-     */
-    async execute(command, payload = {}) {
-        return EventBus.executeCommand(command, payload);
-    }
-
-    /**
-     * Execute a command and wait for result (Promise-based)
-     * @param {string} command - Command name
-     * @param {object} payload - Command payload
-     * @param {number} timeout - Timeout in ms
-     * @returns {Promise} Result of the command
-     */
-    async executeAsync(command, payload = {}, timeout = 5000) {
-        const requestId = `cmd_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        const requestPayload = { ...payload, requestId };
-
-        return new Promise((resolve, reject) => {
-            const timeoutId = setTimeout(() => {
-                unsubscribe();
-                reject(new Error(`Command timeout: ${command}`));
-            }, timeout);
-
-            const unsubscribe = EventBus.on('action:result', (result) => {
-                if (result.requestId === requestId) {
-                    clearTimeout(timeoutId);
-                    unsubscribe();
-                    if (result.success) {
-                        resolve(result.data);
-                    } else {
-                        reject(new Error(result.error));
-                    }
-                }
-            });
-
-            this.execute(command, requestPayload);
-        });
-    }
-
-    /**
-     * Send action result event
-     * @private
-     */
-    _sendResult(requestId, success, data = null, error = null) {
-        EventBus.emit('action:result', { requestId, success, data, error });
+        console.log('[CommandRegistry] Initialized with handlers:', [...EventBus.commandHandlers.keys()]);
     }
 
     // ==========================================
     // APP COMMANDS
     // ==========================================
     _registerAppCommands() {
-        this.register('app:launch', async (payload) => {
+        EventBus.registerCommand('app:launch', async (payload) => {
             const { appId, params } = payload;
-            // Dynamic import to avoid circular dependency
             const AppRegistry = (await import('../apps/AppRegistry.js')).default;
 
-            // Use AppRegistry.launch which handles everything
             const success = AppRegistry.launch(appId, params);
             if (!success) {
                 throw new Error(`Failed to launch app: ${appId}`);
             }
 
-            // Get the app to find window ID
             const app = AppRegistry.get(appId);
             const windowId = app?._currentWindowId || app?.windowId;
 
             return { appId, windowId, success: true };
         });
 
-        this.register('app:close', async (payload) => {
+        EventBus.registerCommand('app:close', async (payload) => {
             const { windowId } = payload;
             WindowManager.close(windowId);
             return { windowId };
@@ -208,31 +126,31 @@ class CommandBusClass {
     // WINDOW COMMANDS
     // ==========================================
     _registerWindowCommands() {
-        this.register('window:focus', async (payload) => {
+        EventBus.registerCommand('window:focus', async (payload) => {
             const { windowId } = payload;
             WindowManager.focus(windowId);
             return { windowId };
         });
 
-        this.register('window:minimize', async (payload) => {
+        EventBus.registerCommand('window:minimize', async (payload) => {
             const { windowId } = payload;
             WindowManager.minimize(windowId);
             return { windowId };
         });
 
-        this.register('window:maximize', async (payload) => {
+        EventBus.registerCommand('window:maximize', async (payload) => {
             const { windowId } = payload;
             WindowManager.maximize(windowId);
             return { windowId };
         });
 
-        this.register('window:restore', async (payload) => {
+        EventBus.registerCommand('window:restore', async (payload) => {
             const { windowId } = payload;
             WindowManager.restore(windowId);
             return { windowId };
         });
 
-        this.register('window:close', async (payload) => {
+        EventBus.registerCommand('window:close', async (payload) => {
             const { windowId } = payload;
             WindowManager.close(windowId);
             return { windowId };
@@ -243,59 +161,55 @@ class CommandBusClass {
     // FILESYSTEM COMMANDS
     // ==========================================
     _registerFsCommands() {
-        this.register('fs:read', async (payload) => {
+        EventBus.registerCommand('fs:read', async (payload) => {
             const path = validateCommandFsPath(payload.path, 'fs:read');
             const content = FileSystemManager.readFile(path);
             return { path, content };
         });
 
-        this.register('fs:write', async (payload) => {
+        EventBus.registerCommand('fs:write', async (payload) => {
             const path = validateCommandFsPath(payload.path, 'fs:write');
             FileSystemManager.writeFile(path, payload.content);
-            // Note: FileSystemManager already emits FS_FILE_WRITE — no duplicate emit here
             return { path, written: true };
         });
 
-        this.register('fs:delete', async (payload) => {
+        EventBus.registerCommand('fs:delete', async (payload) => {
             const path = validateCommandFsPath(payload.path, 'fs:delete');
             const node = FileSystemManager.getNode(path);
             if (!node) {
                 throw new Error(`Path not found: ${path}`);
             }
-            // Detect directories by presence of 'children' property (getNode returns raw FS nodes)
             if (node.children !== undefined || node.type === 'directory') {
                 FileSystemManager.deleteDirectory(path);
             } else {
                 FileSystemManager.deleteFile(path);
             }
-            // Note: FileSystemManager already emits FS_FILE_DELETE — no duplicate emit here
             return { path, deleted: true };
         });
 
-        this.register('fs:mkdir', async (payload) => {
+        EventBus.registerCommand('fs:mkdir', async (payload) => {
             const path = validateCommandFsPath(payload.path, 'fs:mkdir');
             FileSystemManager.createDirectory(path);
-            // Note: FileSystemManager already emits FS_DIR_CREATE — no duplicate emit here
             return { path, created: true };
         });
 
-        this.register('fs:copy', async (payload) => {
-            // Validate both endpoints so an attacker can't smuggle a write
-            // by validating one path and operating on another.
+        EventBus.registerCommand('fs:copy', async (payload) => {
+            // Validate both endpoints so an attacker can't smuggle a write by
+            // validating one path and operating on another.
             const source = validateCommandFsPath(payload.source, 'fs:copy(source)');
             const destination = validateCommandFsPath(payload.destination, 'fs:copy(destination)');
             FileSystemManager.copyItem(source, destination);
             return { source, destination, copied: true };
         });
 
-        this.register('fs:move', async (payload) => {
+        EventBus.registerCommand('fs:move', async (payload) => {
             const source = validateCommandFsPath(payload.source, 'fs:move(source)');
             const destination = validateCommandFsPath(payload.destination, 'fs:move(destination)');
             FileSystemManager.moveItem(source, destination);
             return { source, destination, moved: true };
         });
 
-        this.register('fs:reset', async () => {
+        EventBus.registerCommand('fs:reset', async () => {
             FileSystemManager.reset();
             return { reset: true };
         });
@@ -305,7 +219,7 @@ class CommandBusClass {
     // DIALOG COMMANDS
     // ==========================================
     _registerDialogCommands() {
-        this.register('dialog:show', async (payload) => {
+        EventBus.registerCommand('dialog:show', async (payload) => {
             const { type, message, title, options } = payload;
 
             switch (type) {
@@ -322,7 +236,7 @@ class CommandBusClass {
             }
         });
 
-        this.register('notification:show', async (payload) => {
+        EventBus.registerCommand('notification:show', async (payload) => {
             EventBus.emit('notification:show', payload);
             return { shown: true };
         });
@@ -332,15 +246,15 @@ class CommandBusClass {
     // SYSTEM COMMANDS
     // ==========================================
     _registerSystemCommands() {
-        this.register('sound:play', async (payload) => {
+        EventBus.registerCommand('sound:play', async (payload) => {
             EventBus.emit('sound:play', payload);
             return { played: true };
         });
 
-        this.register('setting:set', async (payload) => {
+        EventBus.registerCommand('setting:set', async (payload) => {
             const { key, value } = payload;
 
-            // Validate key to prevent path traversal out of settings namespace
+            // Reject keys that could traverse out of the settings namespace.
             if (typeof key !== 'string' || !key || /[^a-zA-Z0-9._-]/.test(key) || key.includes('..')) {
                 throw new Error(`Invalid setting key: ${key}`);
             }
@@ -350,12 +264,12 @@ class CommandBusClass {
             return { key, value, set: true };
         });
 
-        this.register('desktop:refresh', async (payload) => {
+        EventBus.registerCommand('desktop:refresh', async () => {
             EventBus.emit('desktop:refresh');
             return { refreshed: true };
         });
 
-        this.register('achievement:unlock', async (payload) => {
+        EventBus.registerCommand('achievement:unlock', async (payload) => {
             const { achievementId } = payload;
             StateManager.unlockAchievement(achievementId);
             return { achievementId, unlocked: true };
@@ -366,9 +280,6 @@ class CommandBusClass {
     // TERMINAL COMMANDS
     // ==========================================
     _registerTerminalCommands() {
-        /**
-         * Helper to get Terminal instance
-         */
         const getTerminal = async () => {
             const AppRegistry = (await import('../apps/AppRegistry.js')).default;
             const terminal = AppRegistry.get('terminal');
@@ -380,9 +291,6 @@ class CommandBusClass {
             return null;
         };
 
-        /**
-         * Ensure terminal is open
-         */
         const ensureTerminal = async () => {
             let terminal = await getTerminal();
             if (!terminal) {
@@ -394,8 +302,7 @@ class CommandBusClass {
             return terminal;
         };
 
-        // Execute a command in terminal
-        this.register('terminal:execute', async (payload) => {
+        EventBus.registerCommand('terminal:execute', async (payload) => {
             const { command, windowId } = payload;
             const terminal = await getTerminal();
 
@@ -403,7 +310,6 @@ class CommandBusClass {
                 throw new Error('No terminal window open');
             }
 
-            // If windowId specified, check it matches
             if (windowId && terminal._currentWindowId !== windowId) {
                 throw new Error('Terminal window not found');
             }
@@ -415,8 +321,7 @@ class CommandBusClass {
             };
         });
 
-        // Execute multiple commands in sequence
-        this.register('terminal:executeSequence', async (payload) => {
+        EventBus.registerCommand('terminal:executeSequence', async (payload) => {
             const { commands } = payload;
             const terminal = await getTerminal();
 
@@ -432,8 +337,7 @@ class CommandBusClass {
             return { outputs };
         });
 
-        // Print text to terminal
-        this.register('terminal:print', async (payload) => {
+        EventBus.registerCommand('terminal:print', async (payload) => {
             const { text, color } = payload;
             const terminal = await getTerminal();
 
@@ -445,8 +349,7 @@ class CommandBusClass {
             return { printed: true };
         });
 
-        // Print HTML to terminal
-        this.register('terminal:printHtml', async (payload) => {
+        EventBus.registerCommand('terminal:printHtml', async (payload) => {
             const { html } = payload;
             const terminal = await getTerminal();
 
@@ -458,8 +361,7 @@ class CommandBusClass {
             return { printed: true };
         });
 
-        // Clear terminal screen
-        this.register('terminal:clear', async (payload) => {
+        EventBus.registerCommand('terminal:clear', async () => {
             const terminal = await getTerminal();
 
             if (!terminal) {
@@ -470,8 +372,7 @@ class CommandBusClass {
             return { cleared: true };
         });
 
-        // Change directory
-        this.register('terminal:cd', async (payload) => {
+        EventBus.registerCommand('terminal:cd', async (payload) => {
             const { path } = payload;
             const terminal = await getTerminal();
 
@@ -483,8 +384,7 @@ class CommandBusClass {
             return { path: terminal.currentPath.join('\\') };
         });
 
-        // Get current path
-        this.register('terminal:getPath', async (payload) => {
+        EventBus.registerCommand('terminal:getPath', async () => {
             const terminal = await getTerminal();
 
             if (!terminal) {
@@ -497,8 +397,7 @@ class CommandBusClass {
             };
         });
 
-        // Get terminal state
-        this.register('terminal:getState', async (payload) => {
+        EventBus.registerCommand('terminal:getState', async () => {
             const terminal = await getTerminal();
 
             if (!terminal) {
@@ -516,8 +415,7 @@ class CommandBusClass {
             };
         });
 
-        // Get command history
-        this.register('terminal:getHistory', async (payload) => {
+        EventBus.registerCommand('terminal:getHistory', async () => {
             const terminal = await getTerminal();
 
             if (!terminal) {
@@ -527,8 +425,7 @@ class CommandBusClass {
             return { history: [...terminal.commandHistory] };
         });
 
-        // Get last output
-        this.register('terminal:getOutput', async (payload) => {
+        EventBus.registerCommand('terminal:getOutput', async () => {
             const terminal = await getTerminal();
 
             if (!terminal) {
@@ -538,8 +435,7 @@ class CommandBusClass {
             return { output: terminal.lastOutput };
         });
 
-        // Set environment variable
-        this.register('terminal:setEnvVar', async (payload) => {
+        EventBus.registerCommand('terminal:setEnvVar', async (payload) => {
             const { name, value } = payload;
             const terminal = await getTerminal();
 
@@ -551,8 +447,7 @@ class CommandBusClass {
             return { name: String(name).toUpperCase(), value: String(value) };
         });
 
-        // Get environment variable
-        this.register('terminal:getEnvVar', async (payload) => {
+        EventBus.registerCommand('terminal:getEnvVar', async (payload) => {
             const { name } = payload;
             const terminal = await getTerminal();
 
@@ -566,8 +461,7 @@ class CommandBusClass {
             };
         });
 
-        // Get all environment variables
-        this.register('terminal:getEnvVars', async (payload) => {
+        EventBus.registerCommand('terminal:getEnvVars', async () => {
             const terminal = await getTerminal();
 
             if (!terminal) {
@@ -577,8 +471,7 @@ class CommandBusClass {
             return { envVars: { ...terminal.envVars } };
         });
 
-        // Create alias
-        this.register('terminal:createAlias', async (payload) => {
+        EventBus.registerCommand('terminal:createAlias', async (payload) => {
             const { name, command } = payload;
             const terminal = await getTerminal();
 
@@ -590,8 +483,7 @@ class CommandBusClass {
             return { name: String(name).toLowerCase(), command: String(command) };
         });
 
-        // Get all aliases
-        this.register('terminal:getAliases', async (payload) => {
+        EventBus.registerCommand('terminal:getAliases', async () => {
             const terminal = await getTerminal();
 
             if (!terminal) {
@@ -601,17 +493,15 @@ class CommandBusClass {
             return { aliases: { ...terminal.aliases } };
         });
 
-        // Enable god mode — requires the konami code to have been entered first
-        // (terminal.godMode must already be true from user interaction)
-        this.register('terminal:enableGodMode', async (payload) => {
+        // God mode can only be activated via the konami code in the terminal;
+        // this command exists for status queries, not programmatic activation.
+        EventBus.registerCommand('terminal:enableGodMode', async () => {
             const terminal = await getTerminal();
 
             if (!terminal) {
                 throw new Error('No terminal window open');
             }
 
-            // God mode can only be activated via the konami code in the terminal.
-            // This command exists for querying status, not for programmatic activation.
             if (!terminal.godMode) {
                 throw new Error('God mode can only be activated via the terminal');
             }
@@ -619,8 +509,7 @@ class CommandBusClass {
             return { godMode: terminal.godMode };
         });
 
-        // Start matrix effect
-        this.register('terminal:startMatrix', async (payload) => {
+        EventBus.registerCommand('terminal:startMatrix', async () => {
             const terminal = await getTerminal();
 
             if (!terminal) {
@@ -631,8 +520,7 @@ class CommandBusClass {
             return { started: true };
         });
 
-        // Run a script file
-        this.register('terminal:runScript', async (payload) => {
+        EventBus.registerCommand('terminal:runScript', async (payload) => {
             const { scriptPath } = payload;
             const terminal = await getTerminal();
 
@@ -651,8 +539,7 @@ class CommandBusClass {
             return { scriptPath: filePath };
         });
 
-        // Open terminal (launch if not open)
-        this.register('terminal:open', async (payload) => {
+        EventBus.registerCommand('terminal:open', async (payload) => {
             const { initialCommand } = payload;
             const terminal = await ensureTerminal();
 
@@ -669,8 +556,7 @@ class CommandBusClass {
             return { windowId: terminal._currentWindowId };
         });
 
-        // Focus terminal window
-        this.register('terminal:focus', async (payload) => {
+        EventBus.registerCommand('terminal:focus', async () => {
             const terminal = await getTerminal();
 
             if (!terminal || !terminal._currentWindowId) {
@@ -681,8 +567,7 @@ class CommandBusClass {
             return { focused: true };
         });
 
-        // Check if terminal is open
-        this.register('terminal:isOpen', async (payload) => {
+        EventBus.registerCommand('terminal:isOpen', async () => {
             const terminal = await getTerminal();
             return { open: terminal !== null };
         });
@@ -692,7 +577,6 @@ class CommandBusClass {
     // QUERY HANDLERS
     // ==========================================
     _registerQueryHandlers() {
-        // Listen for query events
         EventBus.on('query:windows', (payload) => {
             const { requestId } = payload;
             const windows = StateManager.getState('windows') || [];
@@ -793,16 +677,11 @@ class CommandBusClass {
     // ==========================================
 
     /**
-     * Validate that a timer-fired event name is safe to emit.
-     * Blocks privileged event namespaces that scripts must not trigger
-     * indirectly via delayed execution.
-     * @param {string} eventName
-     * @returns {boolean}
-     * @private
+     * Block scripts from indirectly emitting privileged event namespaces via
+     * delayed `timer:set` callbacks.
      */
     _isTimerEventAllowed(eventName) {
         if (typeof eventName !== 'string' || !eventName.trim()) return false;
-        // Block privileged namespaces that bypass normal command/auth checks
         const BLOCKED_PREFIXES = ['command:', 'macro:', 'system:', 'plugin:', 'app:'];
         const lower = eventName.toLowerCase();
         return !BLOCKED_PREFIXES.some(prefix => lower.startsWith(prefix));
@@ -812,14 +691,11 @@ class CommandBusClass {
         EventBus.on('timer:set', (payload) => {
             const { timerId, delay, event, payload: eventPayload, repeat } = payload;
 
-            // Validate the optional event name before scheduling to prevent
-            // scripts from injecting privileged events via timer callbacks
             if (event && !this._isTimerEventAllowed(event)) {
-                console.warn(`[CommandBus] timer:set blocked disallowed event name: "${event}"`);
+                console.warn(`[CommandRegistry] timer:set blocked disallowed event name: "${event}"`);
                 return;
             }
 
-            // Clear existing timer with same ID
             if (this.timers.has(timerId)) {
                 const existing = this.timers.get(timerId);
                 if (existing.intervalId) clearInterval(existing.intervalId);
@@ -868,10 +744,8 @@ class CommandBusClass {
             this.recordedEvents = [];
             this.recordStartTime = Date.now();
 
-            // Subscribe to recordable events
             this._macroSubscription = EventBus.on('*', (eventPayload, metadata, event) => {
                 if (!this.isRecording) return;
-                // Only record command events
                 if (event.name.startsWith('command:')) {
                     this.recordedEvents.push({
                         event: event.name,
@@ -894,7 +768,6 @@ class CommandBusClass {
                 this._macroSubscription = null;
             }
 
-            // Save the macro
             this.macros.set(this.currentMacro, [...this.recordedEvents]);
 
             EventBus.emit('macro:recorded', {
@@ -911,7 +784,7 @@ class CommandBusClass {
             const events = this.macros.get(macroId);
 
             if (!events || events.length === 0) {
-                console.warn(`[CommandBus] Macro not found or empty: ${macroId}`);
+                console.warn(`[CommandRegistry] Macro not found or empty: ${macroId}`);
                 return;
             }
 
@@ -932,59 +805,27 @@ class CommandBusClass {
     }
 
     // ==========================================
-    // HELPER METHODS
+    // INTROSPECTION HELPERS
     // ==========================================
 
-    /**
-     * Get list of registered commands
-     * @returns {string[]} Command names
-     */
-    getCommands() {
-        return [...this.handlers.keys()];
-    }
-
-    /**
-     * Check if a command is registered
-     * @param {string} command - Command name
-     * @returns {boolean}
-     */
-    hasCommand(command) {
-        return this.handlers.has(command);
-    }
-
-    /**
-     * Get list of active timers
-     * @returns {string[]} Timer IDs
-     */
     getActiveTimers() {
         return [...this.timers.keys()];
     }
 
-    /**
-     * Get list of saved macros
-     * @returns {string[]} Macro IDs
-     */
     getSavedMacros() {
         return [...this.macros.keys()];
     }
 
-    /**
-     * Get a macro's recorded events
-     * @param {string} macroId - Macro ID
-     * @returns {Array|null} Recorded events
-     */
     getMacro(macroId) {
         return this.macros.get(macroId) || null;
     }
 }
 
-// Create singleton instance
-const CommandBus = new CommandBusClass();
+const CommandRegistry = new CommandRegistryClass();
 
-// Add to global debug object
 if (typeof window !== 'undefined') {
     window.__RETROS_DEBUG = window.__RETROS_DEBUG || {};
-    window.__RETROS_DEBUG.commandBus = CommandBus;
+    window.__RETROS_DEBUG.commandRegistry = CommandRegistry;
 }
 
-export default CommandBus;
+export default CommandRegistry;
