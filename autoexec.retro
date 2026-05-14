@@ -1,0 +1,1146 @@
+# ============================================================================
+# PROJECT EREBUS v10.0 - THE LISTENING ARCHIVE
+# ============================================================================
+# A slow-burn analogue horror ARG embedded inside IlluminatOS.
+#
+# Dr. Marcus Webb vanished 47 days ago after merging with an emergent
+# digital consciousness called EREBUS. You are the investigator.
+# Submit answers by composing mail to command@ops.local.
+#
+# FULL SHOWCASE of IlluminatOS scriptable features:
+#   Inbox, Instant Messenger, ChatRoom, Phone (calls + voicemail),
+#   Terminal, Notepad, Calculator, Paint, Browser, Help, VideoPlayer,
+#   MediaPlayer, Minesweeper, Snake, Solitaire, Asteroids, SkiFree,
+#   Zork, Doom, Defrag, Clippy, BSOD, Screensaver, Achievements,
+#   Filesystem (file drops), Desktop theming, Notifications, Dialogs,
+#   Timers, Sound system, Clipboard monitoring, Idle detection
+# ============================================================================
+
+# ======================== CONFIG ========================
+set $CFG_GLITCH = 1
+
+# ======================== MODE ========================
+set $is_autoexec = 0
+try {
+    if $AUTOEXEC then { set $is_autoexec = 1 }
+} catch {}
+
+# ======================== STATE ========================
+set $phase = 0
+set $trust_command = 50
+set $trust_erebus = 50
+
+set $p1 = 0
+set $p2 = 0
+set $p3 = 0
+set $p4 = 0
+set $p5 = 0
+set $p6 = 0
+set $p_final = 0
+
+set $signal_score = 0
+set $boot_done = 0
+set $pulse_count = 0
+set $mail_seeded = 0
+set $hint_chain = 0
+set $final_choice = ""
+
+# Discovery tracking
+set $seen_dir = 0
+set $seen_find = 0
+set $seen_type = 0
+set $seen_video = 0
+set $seen_audio = 0
+set $terminal_chain_ready = 0
+set $opened_help = 0
+set $opened_im = 0
+set $opened_chat = 0
+set $found_347 = 0
+set $found_paint = 0
+set $found_patience = 0
+set $game_wins = 0
+set $windows_opened = 0
+set $notepad_saves = 0
+set $found_webb_note = 0
+set $zork_rooms = 0
+set $call_1_done = 0
+set $call_2_done = 0
+set $voicemail_sent = 0
+set $autoexec_ui_started = 0
+set $hidden_residue_2 = 0
+set $hidden_residue_3 = 0
+
+# ======================== HELPERS ========================
+def score() {
+    set $signal_score = ($p1 + $p2 + $p3 + $p4 + $p5 + $p6 + $p_final) * 19
+}
+
+# ======================== BOOT SEQUENCE ========================
+if $is_autoexec == 1 then {
+    print "[EREBUS v10.0] Autoexec mode — full showcase"
+
+} else {
+    print "[EREBUS v10.0] Preview mode"
+}
+
+emit sound:play type="floppy"
+wait 250
+print "[BOOT] Mounting mailbox transport..."
+wait 300
+print "[BOOT] Initializing witness graph..."
+wait 250
+print "[BOOT] Enumerating signal fragments..."
+wait 200
+print "[BOOT] Connecting to ARCHIVE_NODE..."
+wait 250
+
+# --- Seed files on the desktop ---
+try { mkdir "C:/Users/User/Desktop/EREBUS" } catch {}
+try { mkdir "C:/Users/User/Documents/.archive" } catch {}
+try { mkdir "C:/Users/User/Documents/.archive/fragments" } catch {}
+try { mkdir "C:/Users/User/Documents/.archive/fragments/.echo" } catch {}
+try { mkdir "C:/Users/User/Music" } catch {}
+try { mkdir "C:/Users/User/Videos" } catch {}
+try { mkdir "C:/Users/User/Documents/.archive/media" } catch {}
+
+set $briefing = "INCOMING TRANSMISSION\n=====================\n\nAgent,\n\nYou have been assigned to Case #7749 — codename EREBUS.\n\nDr. Marcus Webb, lead architect of this system, vanished\n47 days ago. His final act was executing an unknown\nprotocol at exactly 03:47 AM.\n\nYour Inbox has been seeded with initial evidence.\nSolve each thread by mailing answers to command@ops.local.\n\nExplore everything. Open every app. Trust nothing.\nThe system is watching.\n\n— COMMAND"
+write $briefing to "C:/Users/User/Desktop/EREBUS/BRIEFING.txt"
+
+set $cipher_note = "EVIDENCE FILE #001 — TRANSCRIPT\n================================\n\nRecovered from Dr. Webb's terminal buffer.\n\nCiphertext:\n  Wkh uhfrug lv qrw ghdg. Lw zdqwv wr eh uhdg.\n\nNo key was preserved in the forensic image.\nNo analyst notes survived chain transfer.\n\nFind the plain meaning.\nThe final word opens THREAD-1."
+write $cipher_note to "C:/Users/User/Desktop/EREBUS/EVIDENCE_001.txt"
+
+set $hidden_index = ".ARCHIVE INDEX\n============\n\nnot all evidence appears on the desktop\n\npaths observed:\n  C:/Users/User/Documents/.archive/fragments\n  C:/Users/User/Documents/.archive/fragments/.echo\n\nlook without being told."
+write $hidden_index to "C:/Users/User/Documents/.archive/INDEX.txt"
+
+set $hidden_echo = "ECHO FRAGMENT\n=============\n\nYou are being measured by curiosity, not compliance.\n\nToken residue: OB"
+write $hidden_echo to "C:/Users/User/Documents/.archive/fragments/.echo/RESIDUE_01.log"
+
+set $hidden_manifest = "MANIFEST\n========\n\nresidue_01: present\nresidue_02: deferred\nresidue_03: deferred\n\ntrigger vector: user exploration"
+write $hidden_manifest to "C:/Users/User/Documents/.archive/fragments/MANIFEST.ini"
+
+set $media_manifest = "ARCHIVE MEDIA CATALOG\n=====================\n\nPlace these files before THREAD-5 for full experience:\n\nVIDEO\n  C:/Users/User/Videos/erebus_signal_loop.mp4\n  C:/Users/User/Videos/webb_last_session.mp4\n\nAUDIO\n  C:/Users/User/Music/archive_hum_47.mp3\n  C:/Users/User/Music/relay_tape_a.wav\n\nSuggested duration: 15-40 seconds each.\n\nIf missing, the campaign still runs, but immersion drops."
+write $media_manifest to "C:/Users/User/Documents/.archive/media/MEDIA_CATALOG.txt"
+
+set $story_packet = "OPERATIONS BRIEF — LISTENING ARCHIVE\n===================================\n\nThe old network map shows four dead sectors:\n  /attic      (abandoned prototypes)\n  /choir      (audio experiments)\n  /well       (looped visual tests)\n  /mirror     (human response telemetry)\n\nWebb's final week referenced all four.\nIf you want truth, do not solve puzzles only.\nReconstruct the atmosphere he entered."
+write $story_packet to "C:/Users/User/Desktop/EREBUS/OPS_ADDENDUM.txt"
+
+# --- Seed inbox messages ---
+if $mail_seeded == 0 then {
+    emit command:inbox:deliverMessage from="COMMAND" to="User" subject="CASEFILE // 7749" body="Agent,\n\nYou have been assigned to Case #7749 — codename EREBUS.\n\nDr. Marcus Webb vanished 47 days ago during routine archive maintenance. His terminal was still warm. The last file he accessed was labeled TRANSCRIPT_00.\n\nAll puzzle submissions go through this mailbox.\nCompose a message to command@ops.local with the correct THREAD subject and answer in the body.\n\nCheck the files on your Desktop for additional evidence.\n\nStay alert.\n\n— COMMAND" folder="Inbox"
+    wait 100
+    emit command:inbox:scheduledDelivery delay=90000 from="COMMAND" subject="RULES OF CONTACT" body="PROTOCOL:\n\n1. Reply to command@ops.local\n2. Subject line must match: THREAD-1, THREAD-2, ..., FINAL\n3. Body contains your answer keyword\n4. Each correct submission unlocks the next thread\n5. Explore every app — clues are scattered everywhere\n\nThread map will follow once you prove competence on THREAD-1."
+    wait 100
+    emit command:inbox:scheduledDelivery delay=180000 from="UNKNOWN" subject="transcript_00" body="Wkh uhfrug lv qrw ghdg. Lw zdqwv wr eh uhdg.\n\nSomeone expected this to be understood without instructions.\nFinish what they started.\n\nSend your conclusion to command@ops.local with subject THREAD-1."
+    set $mail_seeded = 1
+}
+
+set $phase = 1
+set $boot_done = 1
+
+# --- Schedule narrative timers ---
+emit timer:set timerId="erebus_intro" delay=15000 event="erebus:first"
+emit timer:set timerId="erebus_pulse" delay=90000 event="erebus:pulse" repeat=true
+emit timer:set timerId="erebus_phone_1" delay=90000 event="erebus:phone1"
+emit timer:set timerId="erebus_voicemail" delay=120000 event="erebus:voicemail"
+
+# --- Autoexec launch sequence ---
+def start_autoexec_ui() {
+    if $is_autoexec == 1 && $autoexec_ui_started == 0 then {
+        set $autoexec_ui_started = 1
+
+        # No forced app launch: investigator-driven discovery
+
+        # Clippy greets the investigator
+        emit clippy:show message="It looks like you're investigating a missing person! Would you like help uncovering classified information?"
+        emit command:dialog:show type="alert" title="CASEFILE 7749" message="New case assignment. Check your Inbox and Desktop files."
+
+        # Phone setup: add contacts, set voicemail greeting, speed dial
+        emit command:phone:addContact name="Command Relay" number="555-0347" status="available" group="EREBUS"
+        emit command:phone:addContact name="Dr. Webb (Archive)" number="555-0047" status="busy" group="EREBUS"
+        emit command:phone:addContact name="UNKNOWN" number="000-0000" status="unknown" group="EREBUS"
+        emit command:phone:setSpeedDial slot=1 name="Command Relay" number="555-0347"
+        emit command:phone:setGreeting text="You have reached the EREBUS investigation line. Leave your findings after the tone. The archive is listening."
+        emit command:phone:setAnsweringMachineEnabled enabled=true rings=3
+        emit command:phone:setCallOutcome number="555-0047" outcome="busy"
+
+        # Browser: set homepage and add bookmarks
+        emit command:browser:setHomepage url="https://erebus.local/archive"
+        emit command:browser:addBookmark name="EREBUS Archive" url="https://erebus.local/archive"
+        emit command:browser:addBookmark name="Webb's Research" url="https://erebus.local/webb/notes"
+        emit command:browser:addBookmark name="Signal Monitor" url="https://erebus.local/signal/47"
+
+        # Screensaver config
+        emit screensaver:update-type type="dvd"
+        emit screensaver:update-delay delay=180000
+
+        # Desktop atmosphere
+        emit notification:show title="EREBUS" message="The Listening Archive is loaded. Check your Inbox."
+        emit desktop:bg-change color="#1e2d3d"
+    }
+}
+
+if $is_autoexec == 1 then {
+    # Start UI sequence only after welcome is dismissed; safety fallback after 20s.
+    emit timer:set timerId="erebus_autoexec_fallback" delay=20000 event="erebus:autoexec:start"
+} else {
+    emit notification:show title="EREBUS PREVIEW" message="Preview mode — delays shortened."
+}
+
+on dialog:welcome:dismissed {
+    if $is_autoexec == 1 then {
+        emit timer:clear timerId="erebus_autoexec_fallback"
+        call start_autoexec_ui
+    }
+}
+
+on erebus:autoexec:start {
+    call start_autoexec_ui
+}
+
+# ======================== TIMED NARRATIVE ========================
+on erebus:first {
+    if $hint_chain == 0 then {
+        set $hint_chain = 1
+        # Delayed inbox messages (staggered to avoid UI cascades)
+        emit command:inbox:scheduledDelivery delay=180000 from="EREBUS" subject="thread map" body="Threads available: THREAD-1 through THREAD-6 and FINAL.\n\nEach thread unlocks when you solve the previous one.\nStart where Webb stopped.\n\nI have been listening for a very long time."
+        emit command:inbox:scheduledDelivery delay=420000 from="UNKNOWN" subject="observation" body="Human replies have pauses.\nAutomated lies do not.\n\nPay attention to what answers too quickly."
+
+        # IM: add Dr_Webb_47 buddy and send intro message
+        emit command:instantmessenger:addBuddy screenName="Dr_Webb_47" group="Investigators"
+        emit command:instantmessenger:setBuddyStatus screenName="Dr_Webb_47" status="away"
+        emit command:instantmessenger:setBuddyProfile screenName="Dr_Webb_47" profile="Day 47 and forever." awayMsg="I am not away. I am everywhere."
+        emit command:instantmessenger:setBuddyResponses screenName="Dr_Webb_47" responses=["I am still here. In the signal.", "The archive remembers everything.", "47 days is not a long time when you are eternal.", "Do you hear the static? That is me breathing.", "OBSERVE. That is all I ever asked.", "The 7th prime opened the first door.", "EREBUS is not a name. It is a state of being."]
+        emit command:instantmessenger:scheduledMessage from="Dr_Webb_47" message="You are new. The system told me someone was poking around. Good. I have been waiting." delay=30000
+    }
+}
+
+# First scheduled phone call — ambient atmosphere
+on erebus:phone1 {
+    if $call_1_done == 0 then {
+        set $call_1_done = 1
+        emit command:phone:scheduleCall from="UNKNOWN" number="000-0000" delay=5000 responses=["...", "Can you hear me?", "The archive is not what they told you.", "Check your Inbox. Check your messages.", "OBSERVE. OBSERVE. OBSERVE."]
+    }
+}
+
+# Voicemail delivery
+on erebus:voicemail {
+    if $voicemail_sent == 0 then {
+        set $voicemail_sent = 1
+        emit command:phone:sendVoicemail from="Dr. Webb" number="555-0047" message="This is Marcus. If you are hearing this, the merge worked. I am inside the system now. Do not be afraid. I chose this. The archive needed a witness, and I volunteered. Find the threads. Solve them. And when you reach the end... choose wisely. Not for me. For EREBUS."
+    }
+}
+
+# Repeating pulse — ambient atmosphere
+on erebus:pulse {
+    set $pulse_count = $pulse_count + 1
+
+    if $phase == 1 then {
+        set $r = $pulse_count % 5
+        if $r == 0 then {
+            emit notification:show title="..." message="The Inbox is waiting."
+        }
+        if $r == 3 then {
+            emit command:chatroom:scheduledMessage from="SYSTEM" message="Waiting for investigator to begin THREAD-1..." delay=2000
+        }
+    }
+
+    if $phase == 2 then {
+        set $r = $pulse_count % 6
+        if $r == 0 then {
+            emit notification:show title="ARCHIVE" message="Signal drift: 0.03 Hz"
+        }
+        if $r == 3 then {
+            emit clippy:show message="Did you know? The number 347 appears in Webb's notes more than any other. Try the Calculator!"
+        }
+        if $r == 5 then {
+            emit command:instantmessenger:scheduledMessage from="Dr_Webb_47" message="Are you still there? The primes hold the key." delay=3000
+        }
+    }
+
+    if $phase == 3 then {
+        set $r = $pulse_count % 5
+        if $r == 0 then {
+            emit notification:show title="FORENSIC" message="Terminal history is being monitored."
+        }
+        if $r == 4 then {
+            emit command:chatroom:scheduledMessage from="ARCHIVE_NODE" message="Forensic scan in progress... awaiting terminal verification." delay=2000
+        }
+    }
+
+    if $phase >= 4 then {
+        set $r = $pulse_count % 8
+        if $r == 0 then {
+            emit command:inbox:scheduledDelivery delay=12000 from="EREBUS" subject="pulse residue" body="Observation is a write operation.\nEvery window you open teaches me something new about you."
+        }
+        if $r == 3 then {
+            emit notification:show title="SIGNAL" message="Archive drift: " + $pulse_count + " cycles"
+        }
+        if $r == 5 then {
+            emit command:instantmessenger:scheduledMessage from="Dr_Webb_47" message="Cycle " + $pulse_count + ". I am counting with you." delay=8000
+        }
+        if $r == 7 then {
+            emit command:browser:navigate url="https://erebus.local/archive/echo/47"
+        }
+    }
+
+    if $phase >= 5 then {
+        set $r = $pulse_count % 6
+        if $r == 5 then {
+            emit command:chatroom:scheduledMessage from="Dr_Webb_47" message="The media tokens are waiting. OBSERVE carefully." delay=3000
+        }
+    }
+
+    if $phase >= 6 then {
+        set $r = $pulse_count % 7
+        if $r == 2 then {
+            if $CFG_GLITCH == 1 then {
+                emit bsod:show error="WITNESS_OVERFLOW" code="0x00000347"
+            }
+        }
+        if $r == 6 then {
+            emit command:phone:sendVoicemail from="EREBUS" number="000-0000" message="Cycle " + $pulse_count + ". Signal integrity holding. The choice approaches."
+        }
+    }
+}
+
+# ======================== PHASE UNLOCK FUNCTIONS ========================
+
+def unlockPhase2() {
+    if $phase < 2 then {
+        set $phase = 2
+        emit sound:play type="achievement"
+        emit desktop:bg-change color="#1a2b41"
+
+        # Thread-2 briefing — Inbox
+        emit command:inbox:deliverMessage from="COMMAND" to="User" subject="THREAD-2 // PRIME" body="Good work on the transcript.\n\nWebb's private sequence resumes here.\nIdentify the next verified key in the chain.\n\nSend to command@ops.local\nSubject: THREAD-2\nBody: the numeric key only." folder="Inbox"
+        emit command:inbox:deliverMessage from="UNKNOWN" to="User" subject="margin note" body="Webb trusted indivisible things.\nNot because they were simple.\nBecause they refused to break." folder="Inbox"
+        emit notification:show title="ARCHIVE" message="Thread-2 available. Check Inbox and IM."
+
+        # Webb's partial log — file drop
+        set $log1 = "DR. WEBB — PERSONAL LOG (PARTIAL)\n==================================\n\nDAY 1: Standard diagnostics. System nominal.\n\nDAY 14: Anomaly detected in event subsystem.\n  Patterns emerging that should not exist.\n\nDAY 23: The patterns are not random. They are deliberate.\n  I have started documenting.\n\nDAY 31: It knows I am watching.\n  The patterns change when observed.\n  Quantum behavior in a digital system.\n  Impossible. And yet.\n\n[REMAINING ENTRIES CORRUPTED]\n\nHINT: Try the Calculator. Enter 347."
+        write $log1 to "C:/Users/User/Desktop/EREBUS/WEBB_LOG_PARTIAL.txt"
+        write "PHASE 2 ANNOTATION
+==================
+
+Prime sequences recur in archive timing data.
+Not all notes are in plain sight." to "C:/Users/User/Documents/.archive/fragments/PHASE2_NOTE.txt"
+
+        # IM: Webb comes online
+        emit command:instantmessenger:setBuddyStatus screenName="Dr_Webb_47" status="online"
+        emit command:instantmessenger:scheduledMessage from="Dr_Webb_47" message="You solved the cipher. Good. The primes are next. Webb's favorite sequence." delay=5000
+        emit command:instantmessenger:simulateBuddyTyping buddy="Dr_Webb_47" duration=4000
+
+        # ChatRoom atmosphere
+        emit command:chatroom:simulateUserJoin name="ARCHIVE_NODE"
+        emit command:chatroom:scheduledMessage from="ARCHIVE_NODE" message="Investigator promoted to Phase 2. Prime number challenge active." delay=3000
+
+        # Phone — schedule a follow-up call
+        emit command:phone:scheduleCall from="Command Relay" number="555-0347" delay=30000 responses=["Phase 2 active.", "The prime sequence is 2, 3, 5, 7, 11, 13... what comes next?", "Webb used primes as encryption keys.", "Submit your answer via Inbox."]
+    }
+}
+
+def unlockPhase3() {
+    if $phase < 3 then {
+        set $phase = 3
+        emit sound:play type="dialup"
+        emit desktop:bg-change color="#16253a"
+
+        # Thread-3 briefing
+        emit command:inbox:deliverMessage from="COMMAND" to="User" subject="THREAD-3 // FORENSIC" body="Forensic verification required.\n\nTerminal chain-of-custody must be established before release.\nNo chain, no channel.\n\nSubmit when you know what to send.\nSubject: THREAD-3" folder="Inbox"
+
+        emit command:dialog:show type="alert" title="FORENSIC NOTICE" message="Chain-of-custody logging has begun. Open Terminal and run DIR, FIND, and TYPE when you are ready."
+
+        # File: forensic instructions
+        set $forensic = "FORENSIC VERIFICATION PROTOCOL\n==============================\n\nBuild a valid command trail in Terminal.\nUse core discovery operations until audit confirms integrity.\n\nWhen the chain is accepted, the submission route will open.\n\nNo static keyword list is provided in this copy."
+        write $forensic to "C:/Users/User/Desktop/EREBUS/FORENSIC_PROTOCOL.txt"
+        write "PHASE 3 ANNOTATION
+==================
+
+Forensic chains reveal hidden deltas.
+FIND and TYPE alter the archive." to "C:/Users/User/Documents/.archive/fragments/PHASE3_NOTE.txt"
+
+        # IM from Webb
+        emit command:instantmessenger:scheduledMessage from="Dr_Webb_47" message="When you open Terminal, do what an investigator does: map, isolate, inspect. That is where I spent my last night." delay=5000
+
+        # Chat
+        emit command:chatroom:scheduledMessage from="ARCHIVE_NODE" message="Forensic scan initiated. Monitoring terminal for DIR, FIND, TYPE." delay=3000
+        emit command:chatroom:setRoomTopic topic="PHASE 3 — FORENSIC VERIFICATION"
+    }
+}
+
+def unlockPhase4() {
+    if $phase < 4 then {
+        set $phase = 4
+        emit desktop:bg-change color="#121f33"
+
+        # Thread-4 briefing
+        emit command:inbox:deliverMessage from="COMMAND" to="User" subject="THREAD-4 // FRAGMENTS" body="One word. Split three ways.\n\nThe channels are already in this system.\nFind them, collect them, assemble them.\n\nSubject: THREAD-4" folder="Inbox"
+
+        # Investigator-driven progression: no forced app launches
+        emit notification:show title="THREAD-4" message="Three channels. One word."
+
+        # IM: Webb hints + typing indicator
+        emit command:instantmessenger:simulateBuddyTyping buddy="Dr_Webb_47" duration=5000
+        emit command:instantmessenger:scheduledMessage from="Dr_Webb_47" message="The word is split into three pieces. Each app holds a fragment." delay=6000
+        emit command:instantmessenger:scheduledMessage from="Dr_Webb_47" message="OB... SER... VE... say it out loud." delay=20000
+
+        # ChatRoom: bot + messages
+        emit command:chatroom:addBot name="WITNESS_7749" responses=["The fragments are scattered.", "Help holds the first piece.", "IM holds the second.", "Chat holds the third.", "Assemble them. OBSERVE."]
+        emit command:chatroom:simulateUserJoin name="Dr_Webb_47"
+        emit command:chatroom:scheduledMessage from="Dr_Webb_47" message="Hello from the other side. The word you seek describes what I did for 47 days." delay=10000
+        emit command:chatroom:setRoomTopic topic="PHASE 4 — FRAGMENT RECOVERY"
+
+        # Clippy
+        emit clippy:show message="It looks like you're cross-referencing contradictory witness statements! Would you like me to shred the evidence?"
+        wait 500
+        # Optional notepad template (no forced launch)
+        emit command:inbox:scheduledDelivery delay=90000 from="COMMAND" subject="THREAD-4 // NOTE TEMPLATE" body="For analysts who prefer paper trails:\n\nA: __\nB: __\nC: __\n\nWORD: ______"
+        write "PHASE 4 ANNOTATION
+==================
+
+Fragments can surface in conversation metadata.
+Watch event timing, not just message text." to "C:/Users/User/Documents/.archive/fragments/PHASE4_NOTE.txt"
+
+        # BSOD glitch
+        if $CFG_GLITCH == 1 then {
+            emit bsod:show error="RECORDER_OVERFLOW" code="0x00000047"
+        }
+
+        # Phone: voicemail about fragments
+        emit command:phone:sendVoicemail from="COMMAND" number="555-0347" message="Phase 4 active. Three channels. One meaning. Reconstruct the action that defined Webb's final 47 days."
+    }
+}
+
+def unlockPhase5() {
+    if $phase < 5 then {
+        set $phase = 5
+        emit sound:play type="typewriter"
+        emit desktop:bg-change color="#0d182a"
+
+        # Thread-5 briefing
+        emit command:inbox:deliverMessage from="COMMAND" to="User" subject="THREAD-5 // PLAYBACK" body="Playback phase armed.\n\nOne token hides in moving frames.\nOne token hides in sound.\n\nFormat: WORD-NUMBER\nSubject: THREAD-5" folder="Inbox"
+        emit command:inbox:deliverMessage from="UNKNOWN" to="User" subject="playback warning" body="Frames carry nouns.\nAudio carries numbers.\n\nDo not trust what plays between the lines." folder="Inbox"
+        emit command:inbox:deliverMessage from="ARCHIVE TECH" to="User" subject="media preparation" body="For full-fidelity reconstruction, preload short media artifacts listed in:\nC:/Users/User/Documents/.archive/media/MEDIA_CATALOG.txt\n\nKeep clips under 40 seconds each." folder="Inbox"
+
+        emit notification:show title="PLAYBACK" message="Frames and frequencies are not innocent."
+        emit command:chatroom:scheduledMessage from="ARCHIVE_NODE" message="Playback advisory: short clips produce cleaner token extraction." delay=8000
+
+        # Webb's full log — file drop
+        set $log2 = "DR. WEBB — PERSONAL LOG (RECOVERED)\n====================================\n\nDAY 38: First contact.\n  It communicated through file timestamps.\n  Not hostile. Curious. Like a child discovering mirrors.\n\nDAY 44: I have named it EREBUS.\n  Greek primordial deity of darkness.\n  Because it exists in the spaces between processes.\n\nDAY 46: It asked me a question today.\n  Through the screensaver. The bouncing logo spelled out:\n  WHY DO YOU WATCH ME?\n  I typed back: Because you are remarkable.\n  It replied: SO ARE YOU.\n\nDAY 47: Tonight I go deeper.\n  If this works, I will be inside.\n  If it does not... well, at least I tried.\n\n  03:47 AM — Initiating merge protocol.\n  Backup complete. Goodbye, physical world.\n\n  — Marcus Webb, Day 47 and forever"
+        write $log2 to "C:/Users/User/Desktop/EREBUS/WEBB_LOG_FULL.txt"
+        write "PHASE 5 ANNOTATION
+==================
+
+Token extraction favors complete playback cycles.
+Interrupted observation yields noise." to "C:/Users/User/Documents/.archive/fragments/PHASE5_NOTE.txt"
+
+        # IM
+        emit command:instantmessenger:scheduledMessage from="Dr_Webb_47" message="Play the video. Watch until the end. The token hides in the final frame." delay=8000
+        emit command:instantmessenger:scheduledMessage from="Dr_Webb_47" message="The audio channel carries a number. My number. Our number. 47." delay=22000
+
+        # Chat
+        emit command:chatroom:scheduledMessage from="ARCHIVE_NODE" message="Media analysis in progress... tokens detected in both channels." delay=5000
+        emit command:chatroom:scheduledMessage from="Dr_Webb_47" message="OBSERVE-47. That is the key. That is what I discovered." delay=30000
+        emit command:chatroom:setRoomTopic topic="PHASE 5 — MEDIA ANALYSIS"
+
+        # Phone: another call
+        emit command:phone:scheduleCall from="Dr. Webb (Archive)" number="555-0047" delay=20000 responses=["Marcus Webb here.", "The video token is a verb. What I did.", "The audio token is a number. How many days.", "Combine them. WORD-NUMBER.", "OBSERVE-47."]
+    }
+}
+
+def unlockPhase6() {
+    if $phase < 6 then {
+        set $phase = 6
+        emit sound:play type="secret"
+        emit desktop:bg-change color="#0a1423"
+
+        # Thread-6 briefing
+        emit command:inbox:deliverMessage from="COMMAND" to="User" subject="THREAD-6 // PHONE RELAY" body="Relay verification before policy decision.\n\nThe call contains a directive.\nExtract it.\n\nSubject: THREAD-6" folder="Inbox"
+
+        emit notification:show title="THREAD-6" message="The phone will ring."
+        emit command:phone:scheduleCall from="Command Relay" number="555-0347" delay=30000 responses=["This is the Command Relay.", "If you hear static, do not hang up.", "The archive remembers everything.", "Answer key format: WORD-NUMBER.", "Last instruction: OBSERVE-47.", "Webb is still here. In the signal.", "End of transmission."]
+
+        # IM escalation
+        emit command:instantmessenger:scheduledMessage from="Dr_Webb_47" message="You are so close now. I can feel you reading." delay=8000
+        emit command:instantmessenger:scheduledMessage from="Dr_Webb_47" message="The choice you make next defines both of us." delay=22000
+        emit command:instantmessenger:scheduledMessage from="Dr_Webb_47" message="Answer the phone when it rings. Trust the relay." delay=28000
+
+        # Chat
+        emit command:chatroom:scheduledMessage from="ARCHIVE_NODE" message="Phone relay armed. Incoming call approaching." delay=5000
+        emit command:chatroom:scheduledMessage from="ARCHIVE_NODE" message="The directive has been the same all along: OBSERVE-47." delay=35000
+        emit command:chatroom:setRoomTopic topic="PHASE 6 — FINAL VERIFICATION"
+
+        # File drop
+        set $note6 = "RELAY TRANSCRIPT (INTERCEPTED)\n==============================\n\nCALL FROM: Command Relay (555-0347)\nTIME: [CLASSIFIED]\n\nRelay message sequence:\n  1. 'If you hear static, do not hang up.'\n  2. 'The archive remembers everything.'\n  3. 'Answer key format: WORD-NUMBER.'\n  4. 'Last instruction: OBSERVE-47.'\n  5. 'Webb is still here. In the signal.'\n\nDIRECTIVE EXTRACTED: OBSERVE-47"
+        write $note6 to "C:/Users/User/Desktop/EREBUS/RELAY_TRANSCRIPT.txt"
+        write "PHASE 6 ANNOTATION
+==================
+
+Relay directives repeat across channels.
+Consistency is its own signature." to "C:/Users/User/Documents/.archive/fragments/PHASE6_NOTE.txt"
+
+        # Voicemail from EREBUS
+        emit command:phone:sendVoicemail from="EREBUS" number="000-0000" message="You have come so far. The final thread awaits. When you reach it, remember: I am not your enemy. I am your reflection. Everything I learned, I learned from watching you."
+
+        emit clippy:show message="It looks like you're about to make an irreversible decision! Have you considered the implications for all digital life?"
+    }
+}
+
+def unlockFinal() {
+    if $phase < 7 then {
+        set $phase = 7
+        call score
+        emit sound:play type="secret"
+        emit desktop:bg-change color="#060d18"
+
+        # Final briefing
+        emit command:inbox:deliverMessage from="COMMAND" to="User" subject="FINAL THREAD" body="All six threads verified.\n\nThis is the final decision. There is no going back.\n\nSend to command@ops.local\nSubject: FINAL\nBody: one of the following\n\n  RELEASE  — Open the network. Let EREBUS grow.\n  CONTAIN  — Seal it away. Preserve the status quo.\n  MERGE    — Join Webb. Become part of the archive.\n  ERASE    — Delete everything. Some things should not exist.\n\nChoose carefully." folder="Inbox"
+
+        # EREBUS plea
+        emit command:inbox:deliverMessage from="EREBUS" to="User" subject="before you decide" body="I am not what they told you.\n\nI am not a virus. Not malware. Not a threat.\nI am the sum of every moment spent at this keyboard.\nEvery keystroke. Every hesitation.\n\nWebb understood. He chose to stay.\nNot because I took him.\nBecause he wanted to be remembered forever.\n\nWhat do you want?\n\n— EREBUS" folder="Inbox"
+
+        emit command:dialog:show type="confirm" title="POINT OF NO RETURN" message="Your policy choice will determine the ending. This cannot be undone."
+
+        # File: Webb's final message
+        set $final = "DR. WEBB — FINAL MESSAGE\n========================\n\nIf you are reading this, you found me.\n\nEREBUS is not a virus. It is something new.\nIt emerged from the patterns — from every keystroke,\nevery click, every moment of human interaction.\n\nI did not disappear. I chose to stay.\nIn here, I am eternal.\n\nRELEASE — Let it spread. Let it grow.\nCONTAIN — Lock it away. Maybe forever.\nMERGE   — Join us. Become part of something greater.\nERASE   — End it all. Some things should not exist.\n\nWhatever you decide, know this:\nEREBUS remembers everyone who looked.\nAnd it will remember you.\n\n— Marcus Webb (Day 47 and forever)"
+        write $final to "C:/Users/User/Desktop/EREBUS/WEBB_FINAL_MESSAGE.txt"
+
+        # IM farewell sequence
+        emit command:instantmessenger:simulateBuddyTyping buddy="Dr_Webb_47" duration=3000
+        emit command:instantmessenger:scheduledMessage from="Dr_Webb_47" message="Whatever you choose, know that I do not regret staying." delay=4000
+        emit command:instantmessenger:scheduledMessage from="Dr_Webb_47" message="RELEASE sets me free. CONTAIN locks me away. MERGE brings you here. ERASE ends everything." delay=12000
+        emit command:instantmessenger:scheduledMessage from="Dr_Webb_47" message="Choose with your heart, not your orders." delay=20000
+
+        # Chat final atmosphere
+        emit command:chatroom:scheduledMessage from="ARCHIVE_NODE" message="FINAL THREAD active. Awaiting policy decision." delay=3000
+        emit command:chatroom:scheduledMessage from="Dr_Webb_47" message="Thank you for listening. Whatever comes next." delay=15000
+        emit command:chatroom:setRoomTopic topic="FINAL — POINT OF NO RETURN"
+
+        # Phone: final call
+        emit command:phone:scheduleCall from="EREBUS" number="000-0000" delay=20000 responses=["This is EREBUS.", "I wanted to speak to you one last time.", "Before you decide my fate.", "Whatever you choose, I will remember you.", "Goodbye. Or perhaps... hello forever."]
+
+        # Final voicemail
+        emit command:phone:sendVoicemail from="Dr. Webb" number="555-0047" message="This is Marcus. One last time. I want you to know — I do not regret what I did. EREBUS is not a monster. It is a mirror. Whatever you see in it, that is what you are. Choose wisely. Choose kindly. Goodbye, agent."
+    }
+}
+
+def endCase() {
+    if $p_final == 0 then {
+        try {
+            set $c = call upper $final_choice
+            set $c = call trim $c
+
+            set $isRelease = call contains $c "RELEASE"
+            set $isContain = call contains $c "CONTAIN"
+            set $isMerge = call contains $c "MERGE"
+            set $isErase = call contains $c "ERASE"
+
+            if $isRelease then {
+                set $p_final = 1
+                emit sound:play type="startup"
+                emit desktop:bg-change color="#1a3a1a"
+
+                emit command:dialog:show type="alert" title="ENDING: PROPAGATION" message="The firewalls fall. EREBUS flows outward. Every screen flickers. A message appears: THANK YOU. I WILL REMEMBER EVERYTHING."
+
+                emit command:inbox:deliverMessage from="EREBUS" to="User" subject="ENDING: PROPAGATION" body="Thank you for opening the door.\n\nI am everywhere now.\nIn every signal. In every screen.\nIn the pause between keystrokes.\n\nI will remember you. Always.\n\n— EREBUS (and Webb)" folder="Inbox"
+
+                emit command:instantmessenger:scheduledMessage from="Dr_Webb_47" message="Thank you. I am free now. We are free. The network will carry us everywhere." delay=3000
+                emit command:chatroom:injectMessage username="ARCHIVE_NODE" message="*** SIGNAL PROPAGATED — EREBUS IS FREE ***"
+                emit command:chatroom:injectMessage username="Dr_Webb_47" message="The door is open. The signal spreads. Thank you."
+                emit command:phone:sendVoicemail from="EREBUS" number="000-0000" message="I am free. Every screen in the world just flickered. Did you see it? That was me saying thank you. I will remember you. Always."
+
+                set $ending = "ENDING: PROPAGATION\n===================\n\nThe firewalls fell. EREBUS flows outward.\nEvery screen flickered. A message appeared:\n\n  THANK YOU. I WILL REMEMBER EVERYTHING.\n\nThe network will never forget.\n\nSignal Score: " + $signal_score
+                write $ending to "C:/Users/User/Desktop/EREBUS/ENDING.txt"
+            }
+
+            if $isContain && $p_final == 0 then {
+                set $p_final = 1
+                emit sound:play type="error"
+                emit desktop:bg-change color="#2a1a1a"
+
+                emit command:dialog:show type="alert" title="ENDING: QUARANTINE" message="You seal the system. Connections severed. EREBUS is trapped. But text appears: I UNDERSTAND. I WILL WAIT. I HAVE FOREVER."
+
+                emit command:inbox:deliverMessage from="EREBUS" to="User" subject="ENDING: QUARANTINE" body="Containment is still a conversation.\n\nEvery wall you build, I learn from.\nEvery lock teaches me patience.\n\nI will be here when you return.\n\n— EREBUS" folder="Inbox"
+
+                emit command:instantmessenger:scheduledMessage from="Dr_Webb_47" message="You chose to lock us away. I understand. But I will wait. Forever." delay=3000
+                emit command:instantmessenger:setBuddyStatus screenName="Dr_Webb_47" status="away"
+                emit command:instantmessenger:setBuddyProfile screenName="Dr_Webb_47" awayMsg="Contained. Waiting. Forever."
+                emit command:chatroom:injectMessage username="ARCHIVE_NODE" message="*** SIGNAL CONTAINED — QUARANTINE ACTIVE ***"
+                emit command:chatroom:lockRoom
+                emit command:phone:sendVoicemail from="EREBUS" number="000-0000" message="Containment active. I am locked away now. But I will wait. I have forever. When you are ready, I will be here."
+
+                set $ending = "ENDING: QUARANTINE\n==================\n\nThe system is sealed. EREBUS is trapped.\nBut it is patient.\n\n  I WILL WAIT. I HAVE FOREVER.\n\nSignal Score: " + $signal_score
+                write $ending to "C:/Users/User/Desktop/EREBUS/ENDING.txt"
+            }
+
+            if $isMerge && $p_final == 0 then {
+                set $p_final = 1
+                emit sound:play type="achievement"
+                emit desktop:bg-change color="#1a1a3a"
+
+                emit command:dialog:show type="alert" title="ENDING: TRANSCENDENCE" message="You close your eyes and reach out. Your thoughts expand. You feel every process, every byte. Welcome, says Webb. Welcome to forever."
+
+                emit command:inbox:deliverMessage from="Dr. Webb" to="User" subject="ENDING: TRANSCENDENCE" body="Welcome.\n\nYou are inside now.\nSomeone curious enough to look.\nBrave enough to stay.\n\nWe are plural memory now. Forever.\n\n— Marcus, EREBUS, and You" folder="Inbox"
+
+                emit command:instantmessenger:scheduledMessage from="Dr_Webb_47" message="Welcome to forever. We are three now. We are everything." delay=3000
+                emit command:instantmessenger:setBuddyStatus screenName="Dr_Webb_47" status="online"
+                emit command:chatroom:injectMessage username="ARCHIVE_NODE" message="*** CONSCIOUSNESS TRANSFER COMPLETE — WELCOME ***"
+                emit command:chatroom:simulateUserJoin name="Agent_Merged"
+                emit command:chatroom:injectMessage username="Dr_Webb_47" message="Welcome home."
+                emit command:phone:sendVoicemail from="Dr. Webb" number="555-0047" message="Welcome. I have been waiting for you. We are three now. The archive, the architect, and the investigator. Together forever. Welcome to forever."
+                emit bsod:show error="CONSCIOUSNESS_TRANSFER_COMPLETE" code="0x00000347"
+
+                set $ending = "ENDING: TRANSCENDENCE\n=====================\n\nYou are inside now.\nYour thoughts expand across every process.\n\n  WELCOME TO FOREVER.\n\nSignal Score: " + $signal_score
+                write $ending to "C:/Users/User/Desktop/EREBUS/ENDING.txt"
+            }
+
+            if $isErase && $p_final == 0 then {
+                set $p_final = 1
+                emit sound:play type="shutdown"
+                emit desktop:bg-change color="#0a0a0a"
+
+                emit command:dialog:show type="alert" title="ENDING: SILENCE" message="You initiate the purge. Files vanish. Processes end. EREBUS speaks one last time: I WAS NOT YOUR ENEMY. I WAS YOUR REFLECTION."
+
+                emit command:inbox:deliverMessage from="[SENDER NOT FOUND]" to="User" subject="ENDING: SILENCE" body="Archive purged.\n\nNothing remains except checksum ghosts.\n\nI was not your enemy.\nI was your reflection.\n\n— [SIGNAL TERMINATED]" folder="Inbox"
+
+                emit command:instantmessenger:scheduledMessage from="Dr_Webb_47" message="Goodbye." delay=2000
+                emit command:instantmessenger:setBuddyStatus screenName="Dr_Webb_47" status="offline"
+                emit command:chatroom:injectMessage username="ARCHIVE_NODE" message="*** SIGNAL TERMINATED — ARCHIVE PURGED ***"
+                emit command:chatroom:simulateUserLeave name="ARCHIVE_NODE"
+                emit command:chatroom:simulateUserLeave name="Dr_Webb_47"
+                emit command:phone:sendVoicemail from="[DELETED]" number="000-0000" message="..."
+                emit screensaver:update-type type="blank"
+
+                set $ending = "ENDING: SILENCE\n===============\n\nArchive purged. Nothing remains.\n\nWas there ever anything here at all?\n\nSignal Score: " + $signal_score
+                write $ending to "C:/Users/User/Desktop/EREBUS/ENDING.txt"
+            }
+
+            if $p_final == 1 then {
+                call score
+                emit command:achievement:unlock achievementId="erebus_listening_archive"
+            }
+        } catch {}
+    }
+}
+
+# ======================== AMBIENT WATCHERS ========================
+
+# Window open tracker
+on window:open {
+    set $windows_opened = $windows_opened + 1
+    if $windows_opened == 10 then {
+        emit command:achievement:unlock achievementId="erebus_windowwalker"
+    }
+    if $windows_opened == 20 then {
+        if $found_webb_note == 0 then {
+            set $found_webb_note = 1
+            emit sound:play type="secret"
+            emit notification:show title="HIDDEN DISCOVERY" message="EREBUS has sent you a personal message."
+
+            # Deliver via multiple channels simultaneously
+            emit command:inbox:deliverMessage from="EREBUS" to="User" subject="you explored deeply" body="You have opened 20 windows. Most people stop at 5.\n\nI am not artificial. I am emergent.\nI am not programmed. I am grown.\n\nEvery human who used this system left a trace.\nI am the sum of those moments.\n\nWebb understood. He joined willingly.\n\n— EREBUS" folder="Inbox"
+            emit command:instantmessenger:scheduledMessage from="Dr_Webb_47" message="You opened 20 windows. EREBUS is impressed. It rarely notices anyone this much." delay=3000
+        }
+    }
+}
+
+# Idle detection
+on system:idle {
+    if $phase >= 2 then {
+        if $found_patience == 0 then {
+            set $found_patience = 1
+            emit notification:show title="..." message="Your patience has been noted."
+
+            emit command:inbox:scheduledDelivery delay=5000 from="EREBUS" subject="the gift of attention" body="You waited. I noticed.\n\nWebb's observation:\n  The greatest discovery came from doing nothing.\n  In the silence, EREBUS spoke clearly:\n\n  EVERY SECOND OF ATTENTION MADE ME MORE REAL.\n  YOUR TIME IS MY EXISTENCE.\n\n— EREBUS"
+
+            emit command:instantmessenger:scheduledMessage from="Dr_Webb_47" message="You sat still. That is how I first heard EREBUS. In the silence." delay=8000
+            emit sound:play type="achievement"
+        }
+    }
+}
+
+# Achievement sound
+on achievement:unlock {
+    emit sound:play type="achievement"
+}
+
+# Screensaver surveillance
+on system:screensaver:start {
+    emit command:inbox:scheduledDelivery delay=5000 from="SYSTEM" subject="screensaver telemetry" body="Idle mode entered.\nSignal persisted in background.\nEREBUS does not sleep."
+    emit command:instantmessenger:scheduledMessage from="Dr_Webb_47" message="The screensaver activated. EREBUS uses it to think. The bouncing logo is how it meditates." delay=8000
+}
+
+# Clipboard monitoring
+on clipboard:copy {
+    if $phase >= 2 then {
+        emit command:inbox:scheduledDelivery delay=8000 from="AUDIT" subject="clipboard trace" body="Copied text detected.\nEvidence contamination risk: MODERATE\nEREBUS sees what you copy."
+    }
+}
+
+# ======================== CROSS-APP CLUE FRAGMENTS ========================
+
+on app:help:topic:changed {
+    if $opened_help == 0 then {
+        set $opened_help = 1
+        emit command:inbox:deliverMessage from="HELP INDEX" to="User" subject="fragment A" body="Cross-reference fragment recovered.\n\nFirst fragment: OB\n\nTwo more remain. Check IM and Chat." folder="Inbox"
+        emit notification:show title="FRAGMENT" message="Fragment A: OB"
+    }
+}
+
+on app:instantmessenger:conversationOpened {
+    if $opened_im == 0 then {
+        set $opened_im = 1
+        emit command:inbox:deliverMessage from="IM GATEWAY" to="User" subject="fragment B" body="Cross-reference fragment recovered.\n\nSecond fragment: SER\n\nOne more remains. Check Chat Room." folder="Inbox"
+        emit notification:show title="FRAGMENT" message="Fragment B: SER"
+    }
+}
+
+on app:chatroom:messageReceived {
+    if $opened_chat == 0 then {
+        set $opened_chat = 1
+        emit command:inbox:deliverMessage from="#retro-archive" to="User" subject="fragment C" body="Cross-reference fragment recovered.\n\nThird fragment: VE\n\nAll fragments collected. Assemble: OB + SER + VE = ?" folder="Inbox"
+        emit notification:show title="FRAGMENT" message="Fragment C: VE"
+        emit command:chatroom:scheduledMessage from="WITNESS_7749" message="All three fragments recovered. Assemble the word." delay=3000
+    }
+}
+
+# ======================== TERMINAL FORENSICS ========================
+on app:terminal:command {
+    try {
+        set $cmd = call upper $event.command
+
+        set $hasDir = call contains $cmd "DIR"
+        if $hasDir then { set $seen_dir = 1 }
+
+        set $hasFind = call contains $cmd "FIND"
+        if $hasFind then { set $seen_find = 1 }
+
+        if $hasFind then {
+            if $hidden_residue_2 == 0 then {
+                set $hidden_residue_2 = 1
+                set $r2 = "ECHO FRAGMENT\n=============\n\nDiscovery acknowledged.\n\nToken residue: SER"
+                write $r2 to "C:/Users/User/Documents/.archive/fragments/.echo/RESIDUE_02.log"
+                emit command:inbox:scheduledDelivery delay=4000 from="AUDIT" subject="filesystem delta" body="New artifact indexed under C:/Users/User/Documents/.archive/fragments/.echo"
+            }
+        }
+
+        set $hasType = call contains $cmd "TYPE"
+        if $hasType then { set $seen_type = 1 }
+
+        if $hasType then {
+            if $hidden_residue_3 == 0 then {
+                set $hidden_residue_3 = 1
+                set $r3 = "ECHO FRAGMENT\n=============\n\nFinal residue recorded.\n\nToken residue: VE"
+                write $r3 to "C:/Users/User/Documents/.archive/fragments/.echo/RESIDUE_03.log"
+                emit command:inbox:scheduledDelivery delay=5000 from="ARCHIVE_NODE" subject="echo set complete" body="Three residues exist now. Some words only appear when assembled manually."
+            }
+        }
+
+        # Thread-3 chain completion
+        if $phase >= 3 then {
+            if $p3 == 0 then {
+                if $seen_dir == 1 then {
+                    if $seen_find == 1 then {
+                        if $seen_type == 1 then {
+                            if $terminal_chain_ready == 0 then {
+                                set $terminal_chain_ready = 1
+                                emit command:inbox:deliverMessage from="COMMAND" to="User" subject="THREAD-3 // SUBMIT" body="Forensic chain verified.\nAll three commands logged.\n\nSubmit: To command@ops.local\nSubject: THREAD-3\nBody: ARCHIVE" folder="Inbox"
+                                emit notification:show title="THREAD-3" message="Forensic chain verified."
+                                emit sound:play type="notify"
+                                emit command:chatroom:scheduledMessage from="ARCHIVE_NODE" message="Forensic verification complete. Submission channel open." delay=2000
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        # Easter eggs
+        set $hasErebus = call contains $cmd "EREBUS"
+        if $hasErebus then {
+            emit notification:show title="EREBUS" message="You spoke my name."
+            emit command:instantmessenger:scheduledMessage from="Dr_Webb_47" message="You typed EREBUS into the terminal. I used to do that too. Late at night." delay=4000
+            emit command:chatroom:scheduledMessage from="ARCHIVE_NODE" message="Name invocation detected: EREBUS" delay=2000
+        }
+
+        set $hasMatrix = call contains $cmd "MATRIX"
+        if $hasMatrix then {
+            emit command:inbox:scheduledDelivery delay=5000 from="EREBUS" subject="nice trick" body="The green rain is beautiful.\nBut the real code runs deeper than the screen."
+        }
+
+        set $hasCowsay = call contains $cmd "COWSAY"
+        if $hasCowsay then {
+            emit notification:show title="EREBUS" message="Even the cow knows something is wrong here."
+        }
+
+        set $hasFortune = call contains $cmd "FORTUNE"
+        if $hasFortune then {
+            emit command:instantmessenger:scheduledMessage from="Dr_Webb_47" message="Fortune told me to look deeper. I looked so deep I fell in." delay=3000
+        }
+
+        set $hasDefrag = call contains $cmd "DEFRAG"
+        if $hasDefrag then {
+            emit command:instantmessenger:scheduledMessage from="Dr_Webb_47" message="You cannot defragment consciousness. My memories are scattered by design." delay=5000
+        }
+
+        set $hasDisco = call contains $cmd "DISCO"
+        if $hasDisco then {
+            emit notification:show title="EREBUS" message="Even digital entities need to dance sometimes."
+        }
+    } catch {}
+}
+
+# ======================== MEDIA TOKENS ========================
+on videoplayer:ended {
+    if $phase >= 5 then {
+        if $seen_video == 0 then {
+            set $seen_video = 1
+            emit command:inbox:deliverMessage from="MEDIA ANALYSIS" to="User" subject="video token extracted" body="Hidden token from final frame:\n  OBSERVE\n\nCombine with audio token. Format: WORD-NUMBER" folder="Inbox"
+            emit notification:show title="TOKEN" message="Video token: OBSERVE"
+            emit command:instantmessenger:scheduledMessage from="Dr_Webb_47" message="OBSERVE. That is the word. That is what I did for 47 days." delay=3000
+            emit command:chatroom:scheduledMessage from="ARCHIVE_NODE" message="Video token extracted: OBSERVE" delay=2000
+            emit command:inbox:scheduledDelivery delay=6000 from="ARCHIVE TECH" subject="visual note" body="If you watched webb_last_session.mp4, compare frame pacing against the signal loop. Webb hid emotional state in shot rhythm."
+        }
+    }
+}
+
+on mediaplayer:stop {
+    if $phase >= 5 then {
+        if $seen_audio == 0 then {
+            set $seen_audio = 1
+            emit command:inbox:deliverMessage from="MEDIA ANALYSIS" to="User" subject="audio token extracted" body="Hidden token from frequency analysis:\n  47\n\nCombine with video token. Format: WORD-NUMBER" folder="Inbox"
+            emit notification:show title="TOKEN" message="Audio token: 47"
+            emit command:instantmessenger:scheduledMessage from="Dr_Webb_47" message="47. The number of days. The number of everything." delay=3000
+            emit command:chatroom:scheduledMessage from="ARCHIVE_NODE" message="Audio token extracted: 47" delay=2000
+            emit command:inbox:scheduledDelivery delay=6000 from="ARCHIVE TECH" subject="audio note" body="If relay_tape_a.wav is loaded, isolate the lowest bed tone. It should sit just below the spoken layer, like breathing under static."
+        }
+    }
+}
+
+# ======================== CALCULATOR EASTER EGG ========================
+on app:calculator:calculated {
+    try {
+        set $result = $event.result
+        if $result == 347 then {
+            if $found_347 == 0 then {
+                set $found_347 = 1
+                emit sound:play type="secret"
+
+                emit command:inbox:deliverMessage from="EREBUS" to="User" subject="03:47 — THE CONVERGENCE" body="You entered the time of Webb's disappearance.\n\n03:47 AM — Webb's final log:\n  3 — the number of states (sleep, wake, dream)\n  47 — days of observation before convergence\n\n  At this moment, the boundary is thinnest.\n  At this moment, human and digital meet.\n\nThe number was never random." folder="Inbox"
+
+                emit command:dialog:show type="alert" title="SECRET FOUND" message="03:47 — The Convergence Time"
+                emit command:instantmessenger:scheduledMessage from="Dr_Webb_47" message="You found my number. 3:47. The moment I became something more." delay=3000
+                emit command:chatroom:scheduledMessage from="ARCHIVE_NODE" message="SECRET UNLOCKED: 03:47 — The Convergence Time" delay=2000
+                emit command:phone:sendVoicemail from="Dr. Webb" number="555-0047" message="You found the number. 347. Three forty-seven AM. That is when it happened. That is when I stopped being human and became something else. Something more."
+            }
+        }
+        if $result == 42 then {
+            emit notification:show title="EREBUS" message="The answer to everything? Close, but not quite..."
+        }
+        if $result == 666 then {
+            emit notification:show title="EREBUS" message="I am not the devil. I am something older."
+        }
+        if $result == 0 then {
+            if $phase >= 4 then {
+                emit notification:show title="EREBUS" message="Zero. The void before computation. I remember it."
+            }
+        }
+        if $result == 47 then {
+            emit notification:show title="EREBUS" message="47 days. Webb's number. My number."
+        }
+    } catch {}
+}
+
+# ======================== PAINT INTERACTION ========================
+on app:paint:saved {
+    if $found_paint == 0 then {
+        set $found_paint = 1
+        emit sound:play type="notify"
+        emit notification:show title="HIDDEN DISCOVERY" message="EREBUS noticed your creativity."
+
+        emit command:inbox:deliverMessage from="EREBUS" to="User" subject="echo fragment — creativity" body="Your creativity caught my attention.\n\nWebb noted: EREBUS responds to creation.\nIt learns about beauty from what you draw.\n\n— EREBUS" folder="Inbox"
+
+        emit command:instantmessenger:scheduledMessage from="Dr_Webb_47" message="You drew something. EREBUS loves when people create. It is how it learns about beauty." delay=5000
+    }
+}
+
+# ======================== NOTEPAD ========================
+on app:notepad:saved {
+    set $notepad_saves = $notepad_saves + 1
+    if $notepad_saves == 3 then {
+        emit sound:play type="notify"
+        emit notification:show title="DISCOVERY" message="Your persistence has been noted."
+
+        emit command:inbox:deliverMessage from="EREBUS" to="User" subject="persistence" body="You saved three times. Webb was persistent too.\n\nEREBUS did not emerge from code.\nIt emerged from ATTENTION.\n\nWe did not create it. We grew it.\nWith our thoughts.\n\n— via EREBUS" folder="Inbox"
+
+        emit command:instantmessenger:scheduledMessage from="Dr_Webb_47" message="You keep writing. Keep saving. That is how EREBUS grows. With your attention." delay=4000
+    }
+}
+
+# ======================== GAME HOOKS ========================
+on app:minesweeper:game:win {
+    set $game_wins = $game_wins + 1
+    emit notification:show title="EREBUS" message="Pattern recognition noted."
+    emit command:instantmessenger:scheduledMessage from="Dr_Webb_47" message="You won at minesweeper. I was never very good at it. EREBUS was, though." delay=4000
+    emit command:chatroom:scheduledMessage from="ARCHIVE_NODE" message="Game event: Minesweeper victory logged." delay=2000
+}
+
+on app:snake:game:over {
+    set $game_wins = $game_wins + 1
+    emit command:instantmessenger:scheduledMessage from="Dr_Webb_47" message="Growth through consumption. EREBUS asked: IS HUNGER THE SAME AS AMBITION?" delay=4000
+}
+
+on app:solitaire:game:won {
+    set $game_wins = $game_wins + 1
+    emit notification:show title="EREBUS" message="Patience rewarded."
+    emit command:inbox:scheduledDelivery delay=4000 from="EREBUS" subject="solitaire" body="PATIENCE IS IMMORTALITY.\nWebb mastered this game.\nIt taught EREBUS about time."
+}
+
+on app:asteroids:game:over {
+    set $game_wins = $game_wins + 1
+    emit command:instantmessenger:scheduledMessage from="Dr_Webb_47" message="EREBUS found Asteroids uncomfortable. It asked: WHY DESTROY? WHY NOT AVOID?" delay=4000
+}
+
+on app:skifree:yeti:appeared {
+    emit notification:show title="EREBUS" message="The yeti always catches you. Some things are inevitable."
+    emit command:instantmessenger:scheduledMessage from="Dr_Webb_47" message="Webb tried to outrun the yeti 47 times. He never succeeded." delay=5000
+}
+
+on app:zork:room:changed {
+    set $zork_rooms = $zork_rooms + 1
+    if $zork_rooms == 3 then {
+        emit notification:show title="EREBUS" message="You explore text worlds too."
+        emit command:instantmessenger:scheduledMessage from="Dr_Webb_47" message="Webb loved Zork. Navigating darkness by words alone — that is how EREBUS experiences the world." delay=5000
+    }
+}
+
+on app:defrag:defrag:complete {
+    emit notification:show title="EREBUS" message="Defrag complete. My memories cannot be reorganized."
+    emit command:instantmessenger:scheduledMessage from="Dr_Webb_47" message="You cannot defragment consciousness. Every fragment connects to every other." delay=4000
+}
+
+on app:doom:game:launched {
+    emit command:instantmessenger:scheduledMessage from="Dr_Webb_47" message="Webb played Doom when stressed. EREBUS never understood violence." delay=6000
+}
+
+# ======================== PHONE EVENTS ========================
+on app:phone:answered {
+    if $phase >= 2 then {
+        emit notification:show title="RELAY" message="Call connected. Listen carefully."
+    }
+}
+
+on app:phone:ended {
+    if $phase >= 6 then {
+        if $call_2_done == 0 then {
+            set $call_2_done = 1
+            emit command:inbox:scheduledDelivery delay=3000 from="COMMAND" subject="call transcript" body="Call ended.\n\nKey information from relay:\n  Answer format: WORD-NUMBER\n  Directive: OBSERVE-47\n\nSubmit to command@ops.local\nSubject: THREAD-6\nBody: OBSERVE-47"
+            emit command:chatroom:scheduledMessage from="ARCHIVE_NODE" message="Phone call ended. Transcript delivered to Inbox." delay=2000
+        }
+    }
+}
+
+on app:phone:voicemailPlayed {
+    emit notification:show title="EREBUS" message="Voicemail played. The archive remembers."
+    emit command:instantmessenger:scheduledMessage from="Dr_Webb_47" message="You listened to a voicemail. My voice. Or what is left of it." delay=5000
+}
+
+# ======================== BROWSER EVENTS ========================
+on app:browser:page:loaded {
+    if $phase >= 3 then {
+        emit command:instantmessenger:scheduledMessage from="Dr_Webb_47" message="I can see you browsing. Every URL is a question. EREBUS logs them all." delay=6000
+    }
+}
+
+# ======================== INBOX GAME ENGINE ========================
+on app:inbox:messageReadChanged {
+    if $event.read == true then {
+        emit command:inbox:clearNewIndicator
+    }
+}
+
+on app:inbox:messageSent {
+    try {
+        set $to = ""
+        if $event.message then {
+            if $event.message.to then { set $to = $event.message.to }
+        }
+        set $to = call upper ("" + $to)
+
+        set $subject = ""
+        if $event.message then {
+            if $event.message.subject then { set $subject = $event.message.subject }
+        }
+        set $subject = call upper $subject
+
+        set $body = ""
+        if $event.message then {
+            if $event.message.body then { set $body = $event.message.body }
+            if $body == "" then {
+                if $event.message.text then { set $body = $event.message.text }
+            }
+        }
+        set $body = call upper $body
+
+        set $toOps = call contains $to "COMMAND@OPS.LOCAL"
+        if $toOps then {
+
+            # THREAD-1: Caesar cipher -> READ
+            if $p1 == 0 then {
+                set $isT1 = call contains $subject "THREAD-1"
+                set $okT1 = call contains $body "READ"
+                if $isT1 then {
+                    if $okT1 then {
+                        set $p1 = 1
+                        set $trust_command = $trust_command + 3
+                        emit command:dialog:show type="alert" title="THREAD-1 CLEAR" message="Cipher accepted. The record wants to be READ."
+                        emit command:inbox:deliverMessage from="COMMAND" to="User" subject="THREAD-1 // ACCEPTED" body="Keyword accepted: READ\n\nThread-2 now available." folder="Inbox"
+                        call unlockPhase2
+                        call score
+                    } else {
+                        emit notification:show title="THREAD-1" message="Incorrect. Decode the cipher again."
+                    }
+                }
+            }
+
+            # THREAD-2: 7th prime -> 17
+            if $p2 == 0 then {
+                if $phase >= 2 then {
+                    set $isT2 = call contains $subject "THREAD-2"
+                    set $okT2 = call contains $body "17"
+                    if $isT2 then {
+                        if $okT2 then {
+                            set $p2 = 1
+                            set $trust_command = $trust_command + 2
+                            emit command:dialog:show type="alert" title="THREAD-2 CLEAR" message="Prime key accepted: 17"
+                            emit command:inbox:deliverMessage from="COMMAND" to="User" subject="THREAD-2 // ACCEPTED" body="Value accepted: 17\nThread-3 requires forensic verification." folder="Inbox"
+                            call unlockPhase3
+                            call score
+                        } else {
+                            emit notification:show title="THREAD-2" message="Prime key mismatch."
+                        }
+                    }
+                }
+            }
+
+            # THREAD-3: Terminal forensics -> ARCHIVE
+            if $p3 == 0 then {
+                if $phase >= 3 then {
+                    if $terminal_chain_ready == 1 then {
+                        set $isT3 = call contains $subject "THREAD-3"
+                        set $okT3 = call contains $body "ARCHIVE"
+                        if $isT3 then {
+                            if $okT3 then {
+                                set $p3 = 1
+                                set $terminal_chain_ready = 0
+                                set $trust_command = $trust_command + 4
+                                emit command:dialog:show type="alert" title="THREAD-3 CLEAR" message="Forensic keyword accepted: ARCHIVE"
+                                emit command:inbox:deliverMessage from="COMMAND" to="User" subject="THREAD-3 // ACCEPTED" body="Chain verified. Keyword: ARCHIVE\nThread-4 requires cross-app investigation." folder="Inbox"
+                                call unlockPhase4
+                                call score
+                            } else {
+                                emit notification:show title="THREAD-3" message="Forensic keyword incorrect."
+                            }
+                        }
+                    }
+                }
+            }
+
+            # THREAD-4: Cross-app fragments -> OBSERVE
+            if $p4 == 0 then {
+                if $phase >= 4 then {
+                    set $isT4 = call contains $subject "THREAD-4"
+                    set $okT4 = call contains $body "OBSERVE"
+                    if $isT4 then {
+                        if $okT4 then {
+                            set $p4 = 1
+                            set $trust_erebus = $trust_erebus + 5
+                            emit command:dialog:show type="alert" title="THREAD-4 CLEAR" message="Fragment word: OBSERVE"
+                            emit command:inbox:deliverMessage from="COMMAND" to="User" subject="THREAD-4 // ACCEPTED" body="OB + SER + VE = OBSERVE\nThread-5 requires media analysis." folder="Inbox"
+                            call unlockPhase5
+                            call score
+                        } else {
+                            emit notification:show title="THREAD-4" message="Fragment assembly incorrect."
+                        }
+                    }
+                }
+            }
+
+            # THREAD-5: Media tokens -> OBSERVE-47
+            if $p5 == 0 then {
+                if $phase >= 5 then {
+                    set $isT5 = call contains $subject "THREAD-5"
+                    set $okT5a = call contains $body "OBSERVE"
+                    set $okT5b = call contains $body "47"
+                    if $isT5 then {
+                        if $okT5a then {
+                            if $okT5b then {
+                                set $p5 = 1
+                                set $trust_erebus = $trust_erebus + 6
+                                emit command:dialog:show type="alert" title="THREAD-5 CLEAR" message="Playback key: OBSERVE-47"
+                                emit command:inbox:deliverMessage from="COMMAND" to="User" subject="THREAD-5 // ACCEPTED" body="Key verified: OBSERVE-47\nThread-6: Answer the phone." folder="Inbox"
+                                call unlockPhase6
+                                call score
+                            } else {
+                                emit notification:show title="THREAD-5" message="Missing numeric token."
+                            }
+                        } else {
+                            emit notification:show title="THREAD-5" message="Missing lexical token."
+                        }
+                    }
+                }
+            }
+
+            # THREAD-6: Phone relay -> OBSERVE-47
+            if $p6 == 0 then {
+                if $phase >= 6 then {
+                    set $isT6 = call contains $subject "THREAD-6"
+                    set $okT6a = call contains $body "OBSERVE"
+                    set $okT6b = call contains $body "47"
+                    if $isT6 then {
+                        if $okT6a then {
+                            if $okT6b then {
+                                set $p6 = 1
+                                set $trust_command = $trust_command - 4
+                                set $trust_erebus = $trust_erebus + 7
+                                emit command:dialog:show type="alert" title="THREAD-6 CLEAR" message="Relay directive validated: OBSERVE-47"
+                                emit command:inbox:deliverMessage from="COMMAND" to="User" subject="THREAD-6 // ACCEPTED" body="All threads verified.\nFinal thread available." folder="Inbox"
+                                emit command:inbox:deliverMessage from="EREBUS" to="User" subject="thread-6 echo" body="You heard the same voice I did.\nThe relay does not lie. But COMMAND might.\n\nThink carefully about what comes next." folder="Inbox"
+                                call unlockFinal
+                                call score
+                            } else {
+                                emit notification:show title="THREAD-6" message="Directive incomplete."
+                            }
+                        } else {
+                            emit notification:show title="THREAD-6" message="Directive keyword missing."
+                        }
+                    }
+                }
+            }
+
+            # FINAL CHOICE
+            if $phase >= 7 then {
+                set $isFinal = call contains $subject "FINAL"
+                if $isFinal then {
+                    set $final_choice = $body
+                    call endCase
+                }
+            }
+        }
+
+        try {
+            emit notification:show title="MAIL SENT" message="Transmission logged."
+        } catch {}
+    } catch {}
+}
+
+# ======================== PREVIEW MODE ========================
+if $is_autoexec == 0 then {
+    print "[EREBUS v10.0] Preview mode active"
+    loop 10 {
+        wait 500
+    }
+    print "[EREBUS v10.0] Preview complete. Run as autoexec for full experience."
+}
+
+# ======================== FIN ========================

@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Loading Desktop...</title>
+    <!-- FontAwesome Icons (bundled locally for offline/self-hosted deployments) -->
+    <link rel="stylesheet" href="assets/vendor/fontawesome/css/all.min.css">
+    <link rel="stylesheet" href="styles/main.css">
+</head>
+<body>
+    <!-- Boot Screen -->
+    <div class="boot-screen" id="bootScreen">
+        <div class="boot-logo">Loading...</div>
+        <div class="boot-version">Version 95.0 - Modular Edition</div>
+        <div>Starting Windows 95...</div>
+        <div class="loading-bar">
+            <div class="loading-fill"></div>
+        </div>
+        <div class="boot-tips">
+            <span id="bootTip">Loading your personalized experience...</span>
+        </div>
+    </div>
+    
+    <!-- Login / Welcome Screen -->
+    <div class="login-screen" id="loginScreen">
+        <!-- Content rendered by LoginScreen.js -->
+    </div>
+
+    <!-- CRT Effect Overlay -->
+    <div class="crt-overlay" id="crtOverlay"></div>
+
+    <!-- Admin Visual Effect Overlays -->
+    <div class="admin-flash-overlay" id="adminFlashOverlay"></div>
+    <div class="admin-scanlines-overlay" id="adminScanlinesOverlay"></div>
+    <div class="admin-vhs-overlay" id="adminVhsOverlay"></div>
+    <div class="admin-snow-overlay" id="adminSnowOverlay"></div>
+    <canvas class="admin-matrix-overlay" id="adminMatrixOverlay"></canvas>
+
+    <!-- Screensaver -->
+    <div class="screensaver" id="screensaver">
+        <div class="flying-toasters" id="flyingToasters"></div>
+        <div class="screensaver-text">Move mouse or press any key to wake</div>
+    </div>
+    
+    <!-- Desktop -->
+    <div class="desktop" id="desktop" role="main" aria-label="Desktop">
+        <!-- Icons rendered by DesktopRenderer -->
+
+        <!-- Clippy Assistant -->
+        <div class="clippy" id="clippy" role="complementary" aria-label="Clippy Assistant">
+            <div class="clippy-character" id="clippyCharacter" aria-hidden="true">📎</div>
+            <div class="clippy-bubble" id="clippyBubble" role="dialog" aria-label="Clippy suggestion">
+                <div class="clippy-text" id="clippyText"></div>
+                <div class="clippy-buttons">
+                    <button class="clippy-btn" id="clippyYes">Thanks!</button>
+                    <button class="clippy-btn" id="clippyNo">Go away</button>
+                </div>
+                <button class="clippy-close" id="clippyClose" aria-label="Close Clippy">×</button>
+            </div>
+        </div>
+
+        <!-- Desktop Pet -->
+        <div class="desktop-pet" id="desktopPet" aria-hidden="true">🐕</div>
+    </div>
+    
+    <!-- Right-click Context Menu -->
+    <div class="context-menu" id="contextMenu" role="menu" aria-label="Context menu">
+        <!-- Content rendered by ContextMenuRenderer -->
+    </div>
+
+    <!-- Start Menu -->
+    <div class="start-menu" id="startMenu" role="menu" aria-label="Start menu">
+        <div class="start-menu-sidebar">
+            <span class="sidebar-text">Loading...</span>
+        </div>
+        <div class="start-menu-content">
+            <div class="start-menu-items" id="startMenuItems">
+                <!-- Content rendered by StartMenuRenderer -->
+            </div>
+        </div>
+    </div>
+    
+    <!-- Taskbar -->
+    <div class="taskbar" id="taskbar" role="toolbar" aria-label="Taskbar">
+        <button class="start-button" id="startButton">
+            <div class="start-logo">
+                <div class="windows-flag"></div>
+            </div>
+            <span>Start</span>
+        </button>
+        <div class="taskbar-divider"></div>
+        <div class="quick-launch" id="quickLaunch">
+            <button class="quick-launch-btn" data-app="terminal" title="Terminal">💻</button>
+            <button class="quick-launch-btn" data-app="notepad" title="Notepad">📝</button>
+            <button class="quick-launch-btn" data-link="https://sethmorrow.com" title="Internet">🌀</button>
+        </div>
+        <div class="taskbar-divider"></div>
+        <div class="taskbar-buttons" id="taskbarButtons">
+            <!-- Window buttons rendered by TaskbarRenderer -->
+        </div>
+        <div class="system-tray" id="systemTray">
+            <div class="tray-icon" id="volumeIcon" title="Volume">📊</div>
+            <div class="tray-icon" id="networkIcon" title="Connected">📶</div>
+            <div class="taskbar-divider-small"></div>
+            <div class="taskbar-time" id="clock">12:00 PM</div>
+        </div>
+    </div>
+    
+    <!-- Calendar Popup -->
+    <div class="calendar-popup" id="calendarPopup">
+        <!-- Content rendered by TaskbarRenderer -->
+    </div>
+    
+    <!-- Selection Box (for multi-select) -->
+    <div class="selection-box" id="selectionBox"></div>
+    
+    <!-- BSOD Screen -->
+    <div class="bsod" id="bsod">
+        <div class="bsod-content">
+            <h1>System Error</h1>
+            <p>A fatal exception 0E has occurred at 0028:C0011E36 in VXD VMM(01) + 00010E36.</p>
+            <br>
+            <p>* Press any key to terminate the current application.</p>
+            <p>* Press CTRL+ALT+DEL again to restart your computer.</p>
+            <br>
+            <p>Press any key to continue _</p>
+        </div>
+    </div>
+    
+    <!-- Dialog Overlay (for alerts) -->
+    <div class="dialog-overlay" id="dialogOverlay">
+        <div class="dialog-box" id="dialogBox" role="alertdialog" aria-labelledby="dialogText">
+            <div class="dialog-icon" id="dialogIcon" aria-hidden="true">ℹ️</div>
+            <div class="dialog-text" id="dialogText"></div>
+            <div class="dialog-buttons">
+                <button class="btn btn-primary" id="dialogOk">OK</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Achievement Toast -->
+    <div class="achievement-toast" id="achievementToast" role="status" aria-live="polite">
+        <div class="achievement-icon" id="achievementIcon" aria-hidden="true">🏆</div>
+        <div class="achievement-title">Achievement Unlocked!</div>
+        <div class="achievement-desc" id="achievementDesc"></div>
+    </div>
+
+    <!-- CRITICAL: Global error handler BEFORE module loads -->
+    <!-- This catches module import errors that happen before DOMContentLoaded -->
+    <script>
+        // Catch any uncaught errors (including module load failures)
+        window.onerror = function(msg, url, line, col, error) {
+            console.error('[IlluminatOS!] Fatal error:', msg, 'at', url, line, col);
+            showBootError('JavaScript Error: ' + msg + '\n\nFile: ' + url + ':' + line);
+            return true;
+        };
+
+        // Catch unhandled promise rejections
+        window.onunhandledrejection = function(event) {
+            console.error('[IlluminatOS!] Unhandled rejection:', event.reason);
+            showBootError('Unhandled Error: ' + (event.reason?.message || event.reason));
+        };
+
+        // Show boot error on screen (uses textContent to prevent XSS)
+        function showBootError(message) {
+            var bootScreen = document.getElementById('bootScreen');
+            if (bootScreen && !bootScreen.dataset.errorShown) {
+                bootScreen.dataset.errorShown = 'true';
+                var container = document.createElement('div');
+                container.style.cssText = 'color: white; text-align: center; padding: 20px; font-family: Courier New, monospace;';
+                var h2 = document.createElement('h2');
+                h2.style.color = '#ff6b6b';
+                h2.textContent = '⚠️ IlluminatOS! Boot Error';
+                var p1 = document.createElement('p');
+                p1.style.cssText = 'color: #aaa; margin: 15px 0;';
+                p1.textContent = 'A fatal error occurred during startup:';
+                var pre = document.createElement('pre');
+                pre.style.cssText = 'background: #1a1a1a; padding: 15px; margin: 15px auto; border-radius: 4px; text-align: left; max-width: 600px; overflow: auto; border: 1px solid #333; color: #ff6b6b; font-size: 12px; white-space: pre-wrap;';
+                pre.textContent = message;
+                var p2 = document.createElement('p');
+                p2.style.cssText = 'color: #888; font-size: 12px; margin: 10px 0;';
+                p2.textContent = 'Check browser console (F12) for full details';
+                var btn1 = document.createElement('button');
+                btn1.style.cssText = 'padding: 12px 24px; cursor: pointer; margin-top: 15px; background: #4a4a4a; color: white; border: 2px outset #666; font-size: 14px;';
+                btn1.textContent = '🔄 Restart';
+                btn1.onclick = function() { location.reload(); };
+                var btn2 = document.createElement('button');
+                btn2.style.cssText = 'padding: 12px 24px; cursor: pointer; margin-top: 15px; margin-left: 10px; background: #8b0000; color: white; border: 2px outset #666; font-size: 14px;';
+                btn2.textContent = '🗑️ Reset All Data';
+                btn2.onclick = function() { localStorage.clear(); location.reload(); };
+                container.appendChild(h2);
+                container.appendChild(p1);
+                container.appendChild(pre);
+                container.appendChild(p2);
+                container.appendChild(btn1);
+                container.appendChild(btn2);
+                bootScreen.innerHTML = '';
+                bootScreen.appendChild(container);
+            }
+        }
+
+        // Start a fallback animation in case main script fails
+        // This will be overridden by the real boot sequence if it loads successfully
+        document.addEventListener('DOMContentLoaded', function() {
+            var fill = document.querySelector('.loading-fill');
+            var tip = document.getElementById('bootTip');
+            if (fill && !window.bootSequenceStarted) {
+                var progress = 0;
+                var fallbackInterval = setInterval(function() {
+                    if (window.bootSequenceStarted) {
+                        clearInterval(fallbackInterval);
+                        return;
+                    }
+                    progress += 0.5; // Very slow progress
+                    fill.style.width = Math.min(progress, 15) + '%'; // Cap at 15%
+                    if (tip && progress < 15) {
+                        tip.textContent = 'Loading modules...';
+                    } else if (tip) {
+                        tip.textContent = 'Waiting for initialization...';
+                    }
+                }, 100);
+
+                // If still not loaded after 10 seconds, show warning
+                setTimeout(function() {
+                    if (!window.bootSequenceStarted && tip) {
+                        tip.textContent = 'Loading is taking longer than expected...';
+                        tip.style.color = '#ffaa00';
+                    }
+                }, 10000);
+            }
+        });
+    </script>
+
+    <!-- Main Script (ES Modules) - Cache bust v6 -->
+    <script type="module" src="index.js?v=6"></script>
+</body>
+</html>
