@@ -5,6 +5,50 @@
 
 import { STORAGE_KEYS } from './Constants.js';
 
+/**
+ * Keys that, if present anywhere in a JSON-parsed payload, would let a
+ * malicious value mutate Object.prototype (prototype pollution). Any
+ * incoming payload — whether written by app code, replayed from
+ * localStorage, or hydrated from a remote snapshot — is rejected if it
+ * contains one of these keys at any depth.
+ *
+ * `__proto__` is the obvious one. `constructor` and `prototype` matter
+ * because a chain like `{ constructor: { prototype: { polluted: true } } }`
+ * still ends up writing to `Object.prototype.polluted` if the object is
+ * later merged via `Object.assign` or used as a base for spread copy.
+ */
+const PROTO_POLLUTION_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+
+/**
+ * Walk a value (object, array, or scalar) and return true if any
+ * *object key* matches PROTO_POLLUTION_KEYS at any depth. Array
+ * indices aren't keys. Cycle detection uses a WeakSet so the check is
+ * safe on graphs of unknown shape.
+ *
+ * @param {*} value
+ * @returns {boolean}
+ */
+function _hasUnsafeKeys(value) {
+    const seen = new WeakSet();
+    function walk(v) {
+        if (v === null || typeof v !== 'object') return false;
+        if (seen.has(v)) return false;
+        seen.add(v);
+        if (Array.isArray(v)) {
+            for (const item of v) {
+                if (walk(item)) return true;
+            }
+            return false;
+        }
+        for (const key of Object.keys(v)) {
+            if (PROTO_POLLUTION_KEYS.has(key)) return true;
+            if (walk(v[key])) return true;
+        }
+        return false;
+    }
+    return walk(value);
+}
+
 class StorageManagerClass {
     constructor() {
         this.basePrefix = STORAGE_KEYS.PREFIX;
@@ -18,8 +62,22 @@ class StorageManagerClass {
             parseFailures: 0,
             quotaExceededCount: 0,
             lastParseFailure: null,
-            lastQuotaExceeded: null
+            lastQuotaExceeded: null,
+            // W3.5 — payloads rejected because they contained __proto__ /
+            // constructor / prototype keys.
+            unsafeKeyRejections: 0,
+            lastUnsafeKeyRejection: null,
+            // W3.1 — writes dropped because they arrived during a remote
+            // snapshot hydration.
+            hydrationDrops: 0,
+            lastHydrationDrop: null
         };
+
+        // W3.1 — hydration guard. UserStateSync.pullRemoteSnapshot wraps its
+        // restore loop in beginHydration() / endHydration(). While hydrating,
+        // direct UI writes via .set() are dropped (with a warning) so the
+        // incoming snapshot isn't immediately overwritten by stale UI state.
+        this._isHydrating = false;
 
         // Invalidate cache when another tab writes to localStorage
         this._boundStorageHandler = (e) => {
@@ -69,7 +127,12 @@ class StorageManagerClass {
             if (item === null) return defaultValue;
 
             try {
-                return JSON.parse(item);
+                const parsed = JSON.parse(item);
+                if (_hasUnsafeKeys(parsed)) {
+                    this._recordUnsafeKeyRejection(prefixedKey, 'read');
+                    return defaultValue;
+                }
+                return parsed;
             } catch (parseError) {
                 this._recordParseFailure(prefixedKey, parseError);
                 return defaultValue;
@@ -83,8 +146,12 @@ class StorageManagerClass {
      * Set a value in global (non-user-scoped) storage.
      */
     setGlobal(key, value) {
+        const prefixedKey = `${this.basePrefix}${key}`;
+        if (_hasUnsafeKeys(value)) {
+            this._recordUnsafeKeyRejection(prefixedKey, 'write');
+            return false;
+        }
         try {
-            const prefixedKey = `${this.basePrefix}${key}`;
             if (this.available) {
                 localStorage.setItem(prefixedKey, JSON.stringify(value));
             }
@@ -143,6 +210,14 @@ class StorageManagerClass {
 
                 try {
                     const parsed = JSON.parse(item);
+                    // W3.5 — defense-in-depth: a payload written by an older
+                    // or compromised version of the app could contain
+                    // prototype-polluting keys. Reject it on the way out
+                    // so consumers never see the unsafe shape.
+                    if (_hasUnsafeKeys(parsed)) {
+                        this._recordUnsafeKeyRejection(prefixedKey, 'read');
+                        return defaultValue;
+                    }
                     this._cache.set(prefixedKey, parsed);
                     return parsed;
                 } catch (parseError) {
@@ -168,6 +243,24 @@ class StorageManagerClass {
      */
     set(key, value) {
         const prefixedKey = this.getKey(key);
+
+        // W3.5 — reject payloads carrying prototype-polluting keys.
+        if (_hasUnsafeKeys(value)) {
+            this._recordUnsafeKeyRejection(prefixedKey, 'write');
+            return false;
+        }
+
+        // W3.1 — during a remote snapshot hydration, drop UI-driven writes
+        // so the incoming snapshot isn't overwritten before consumers
+        // finish reacting to it. UserStateSync brackets the restore loop
+        // with beginHydration/endHydration; everything else (including the
+        // snapshot writes themselves, which go through this.setDuringHydration)
+        // is the cause of the drop, not the victim.
+        if (this._isHydrating) {
+            this._recordHydrationDrop(prefixedKey);
+            return false;
+        }
+
         try {
             const serialized = JSON.stringify(value);
 
@@ -463,6 +556,84 @@ class StorageManagerClass {
         console.warn(`[StorageManager] Corrupted JSON for "${key}". Returning fallback value.`, error);
     }
 
+    _recordUnsafeKeyRejection(key, direction) {
+        this.telemetry.unsafeKeyRejections += 1;
+        this.telemetry.lastUnsafeKeyRejection = {
+            key,
+            direction,
+            timestamp: new Date().toISOString()
+        };
+        console.warn(`[StorageManager] Rejected ${direction} of "${key}" — payload contains prototype-pollution keys.`);
+    }
+
+    _recordHydrationDrop(key) {
+        this.telemetry.hydrationDrops += 1;
+        this.telemetry.lastHydrationDrop = {
+            key,
+            timestamp: new Date().toISOString()
+        };
+        console.warn(`[StorageManager] Dropped write to "${key}" during snapshot hydration.`);
+    }
+
+    /**
+     * Mark the start of a remote snapshot hydration. Any `set()` call during
+     * the hydration window is dropped (and tallied in telemetry.hydrationDrops).
+     * The hydrator itself should use `hydrationSet()` to write the incoming
+     * payload without tripping the guard.
+     *
+     * Idempotent — repeated calls without a matching `endHydration()` keep
+     * the flag on. `UserStateSync` is the only intended caller.
+     */
+    beginHydration() {
+        this._isHydrating = true;
+    }
+
+    /**
+     * Mark the end of a remote snapshot hydration. After this returns, normal
+     * `set()` calls resume.
+     */
+    endHydration() {
+        this._isHydrating = false;
+    }
+
+    /**
+     * Whether a remote snapshot is currently being applied.
+     * @returns {boolean}
+     */
+    isHydrating() {
+        return this._isHydrating;
+    }
+
+    /**
+     * Write a key during hydration, bypassing the `_isHydrating` drop guard.
+     * The prototype-pollution check still runs — an incoming snapshot can't
+     * be allowed to carry unsafe keys just because it's a snapshot.
+     *
+     * @param {string} key
+     * @param {*} value
+     * @returns {boolean}
+     */
+    hydrationSet(key, value) {
+        const prefixedKey = this.getKey(key);
+        if (_hasUnsafeKeys(value)) {
+            this._recordUnsafeKeyRejection(prefixedKey, 'hydration');
+            return false;
+        }
+        try {
+            const serialized = JSON.stringify(value);
+            if (this.available) {
+                localStorage.setItem(prefixedKey, serialized);
+                this._cache.set(prefixedKey, JSON.parse(serialized));
+            } else {
+                this.memoryFallback.set(prefixedKey, value);
+            }
+            return true;
+        } catch (e) {
+            console.error(`[StorageManager] hydrationSet failed for "${key}":`, e);
+            return false;
+        }
+    }
+
     getTelemetry() {
         return {
             ...this.telemetry
@@ -474,7 +645,11 @@ class StorageManagerClass {
             parseFailures: 0,
             quotaExceededCount: 0,
             lastParseFailure: null,
-            lastQuotaExceeded: null
+            lastQuotaExceeded: null,
+            unsafeKeyRejections: 0,
+            lastUnsafeKeyRejection: null,
+            hydrationDrops: 0,
+            lastHydrationDrop: null
         };
     }
 

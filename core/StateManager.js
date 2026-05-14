@@ -237,7 +237,7 @@ class StateManagerClass {
     setState(path, value, persist = false) {
         const keys = path.split('.');
         const lastKey = keys.pop();
-        
+
         // Navigate to parent object, creating intermediate objects as needed
         let obj = this.state;
         for (const key of keys) {
@@ -246,7 +246,7 @@ class StateManagerClass {
             }
             obj = obj[key];
         }
-        
+
         const oldValue = obj[lastKey];
         obj[lastKey] = value;
 
@@ -255,11 +255,62 @@ class StateManagerClass {
 
         // Notify subscribers for this path and parent paths
         this.notifySubscribers(path, value);
-        
+
         // Persist to storage if requested
         if (persist) {
             this.persistState(path, value);
         }
+    }
+
+    /**
+     * Atomic state + storage write (W3.4).
+     *
+     * `setState(path, value, true)` updates the in-memory state and *then*
+     * attempts to persist. When storage fails (quota exceeded, payload
+     * rejected by the prototype-pollution guard, hydration drop, etc.) the
+     * in-memory state is already ahead of storage — drift.
+     *
+     * `setStateAndPersist(path, value)` writes to storage first, and only
+     * commits the in-memory change if the write succeeded. On failure it
+     * leaves both stores untouched and returns `false`. Subscribers are
+     * not notified for failed writes.
+     *
+     * @param {string} path - Dot-notation path
+     * @param {*} value - New value
+     * @returns {boolean} `true` if both state and storage were updated.
+     */
+    setStateAndPersist(path, value) {
+        const storageMap = {
+            'icons': 'desktopIcons',
+            'filePositions': 'filePositions',
+            'menuItems': 'menuItems',
+            'recycledItems': 'recycledItems',
+            'achievements': 'achievements',
+            'settings.sound': 'soundEnabled',
+            'settings.crtEffect': 'crtEnabled',
+            'settings.pet.enabled': 'petEnabled',
+            'settings.pet.type': 'currentPet',
+            'user.hasVisited': 'hasVisited',
+            'user.userName': 'user.userName',
+            'user.loginMode': 'user.loginMode'
+        };
+
+        const storageKey = storageMap[path];
+        if (storageKey) {
+            // Try the storage write first. StorageManager.set returns false
+            // on QuotaExceededError, prototype-pollution rejection, or a
+            // hydration-window drop. Any of these mean "do not commit".
+            const ok = StorageManager.set(storageKey, value);
+            if (!ok) {
+                console.warn(`[StateManager] setStateAndPersist("${path}") rolled back — storage write failed.`);
+                return false;
+            }
+        }
+
+        // Storage succeeded (or this path has no storage mapping) — commit
+        // the in-memory change without re-persisting.
+        this.setState(path, value, false);
+        return true;
     }
 
     /**
@@ -407,6 +458,28 @@ class StateManagerClass {
     // ===== Icon State Helpers =====
 
     /**
+     * Coerce a desktop icon coordinate into the valid range (W3.6).
+     *
+     * Without bounds checking, `StateManager.addIcon({ x: NaN, y: 1e9 })`
+     * happily persists an off-screen icon — the user can't see it, can't
+     * recycle it, and it survives reloads. Clamps to a generous window so
+     * future viewport-relative re-layout has something to work with, and
+     * rejects non-finite values by snapping to 0.
+     *
+     * @param {number} value
+     * @returns {number} Finite integer in [0, 100000]
+     * @private
+     */
+    _clampCoord(value) {
+        const n = Number(value);
+        if (!Number.isFinite(n)) return 0;
+        // 100000px upper bound is far larger than any plausible viewport;
+        // tight enough to catch e.g. a thousand-pixel-per-frame drift bug
+        // before it makes storage unreadable.
+        return Math.max(0, Math.min(100000, Math.round(n)));
+    }
+
+    /**
      * Add an icon
      * @param {Object} iconData - Icon configuration
      */
@@ -414,9 +487,13 @@ class StateManagerClass {
         const occupied = getAllOccupiedPositions(k => this.getState(k));
         const hasCoordinates = Number.isFinite(iconData?.x) && Number.isFinite(iconData?.y);
 
-        // Even when coordinates are provided, verify the slot is free
+        // Even when coordinates are provided, verify the slot is free.
+        // Clamp incoming coordinates so a NaN / Infinity / 1e9 value
+        // from a buggy caller doesn't strand the icon off-screen.
+        const seedX = hasCoordinates ? this._clampCoord(iconData.x) : 0;
+        const seedY = hasCoordinates ? this._clampCoord(iconData.y) : 0;
         const position = hasCoordinates
-            ? findNearestFreeSlot(iconData.x, iconData.y, occupied)
+            ? findNearestFreeSlot(seedX, seedY, occupied)
             : getNextDesktopSlot(occupied);
 
         const positionedIcon = { ...iconData, ...position };
@@ -453,8 +530,10 @@ class StateManagerClass {
         const hasCoordinates = Number.isFinite(item?.x) && Number.isFinite(item?.y);
 
         // Even when coordinates exist, verify the slot is still free
+        const seedX = hasCoordinates ? this._clampCoord(item.x) : 0;
+        const seedY = hasCoordinates ? this._clampCoord(item.y) : 0;
         const position = hasCoordinates
-            ? findNearestFreeSlot(item.x, item.y, occupied)
+            ? findNearestFreeSlot(seedX, seedY, occupied)
             : getNextDesktopSlot(occupied);
 
         const restoredIcon = { ...item, ...position };
@@ -475,6 +554,12 @@ class StateManagerClass {
      * @param {number} y - New Y position
      */
     updateIconPosition(iconId, x, y) {
+        // W3.6 — clamp incoming coordinates. A buggy drag handler that
+        // pushes NaN/Infinity through this method otherwise corrupts the
+        // icon set on disk and the icon disappears for the user.
+        const seedX = this._clampCoord(x);
+        const seedY = this._clampCoord(y);
+
         // Collect occupied positions excluding the icon being moved
         const occupied = getAllOccupiedPositions(k => this.getState(k))
             .filter(pos => {
@@ -482,7 +567,7 @@ class StateManagerClass {
                 return !(movingIcon && pos.x === movingIcon.x && pos.y === movingIcon.y);
             });
 
-        const slot = findNearestFreeSlot(x, y, occupied);
+        const slot = findNearestFreeSlot(seedX, seedY, occupied);
         const icons = this.state.icons.map(icon =>
             icon.id === iconId ? { ...icon, x: slot.x, y: slot.y } : icon
         );

@@ -1769,6 +1769,14 @@ class FileSystemManager {
 
       // Save filesystem so changes persist even if the caller forgets
       this.saveFileSystem();
+
+      // W3.3 — emit a directory-changed event so apps subscribed to FS
+      // changes (Explorer-style views, file pickers, etc.) re-render when
+      // shortcut files are added or removed by the sync. Without this, the
+      // Desktop folder mutates silently and its open viewers stay stale.
+      const desktopPathStr = desktopPath.join('/');
+      EventBus.emit(Events.FILESYSTEM_DIRECTORY_CHANGED, { path: desktopPathStr });
+      EventBus.emit(Events.FILESYSTEM_CHANGED, { path: desktopPathStr, source: 'syncDesktopIcons' });
     } finally {
       this.godMode = prevGodMode;
     }
@@ -1860,6 +1868,12 @@ class FileSystemManager {
 
       // Save filesystem so changes persist even if the caller forgets
       this.saveFileSystem();
+
+      // W3.3 — emit a directory-changed event so subscribers see the new
+      // Program Files contents instead of staring at a stale listing.
+      const programFilesPathStr = programFilesPath.join('/');
+      EventBus.emit(Events.FILESYSTEM_DIRECTORY_CHANGED, { path: programFilesPathStr });
+      EventBus.emit(Events.FILESYSTEM_CHANGED, { path: programFilesPathStr, source: 'syncInstalledApps' });
     } finally {
       this.godMode = prevGodMode;
     }

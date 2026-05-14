@@ -93,7 +93,8 @@ bash scripts/lint-innerhtml.sh        # Detect unsafe innerHTML usage
 ### Frontend
 
 - **Event-driven**: Central `EventBus` (pub/sub) with `SemanticEventBus` for schema-validated events. `SemanticEventBus` also owns the unified command registry — call `EventBus.registerCommand(name, handler)` and `EventBus.executeCommand(name, payload)`. `CommandBus.js` is a deprecated facade slated for Wave 4 removal.
-- **State management**: `StateManager` with reactive subscriptions and `resetVolatile()` for clean user-switch
+- **State management**: `StateManager` with reactive subscriptions and `resetVolatile()` for clean user-switch. For persisted paths (`icons`, `settings.sound`, etc.) use `setStateAndPersist(path, value)` to avoid state↔storage drift — it writes storage first and only commits the in-memory change if the write succeeds.
+- **Storage hardening**: `StorageManager.set/get/setGlobal/getGlobal` reject any payload containing `__proto__` / `constructor` / `prototype` keys at any depth (rejections tallied in `telemetry.unsafeKeyRejections`). During a remote snapshot hydration, UI-driven `.set()` calls are dropped (tallied in `telemetry.hydrationDrops`); the hydrator uses `beginHydration()` / `hydrationSet(key, value)` / `endHydration()` to write the incoming payload without tripping the guard.
 - **Singletons**: Core systems exported as `export default new ClassName()`
 - **Subscription ownership**: `SubscriptionManager` (`core/SubscriptionManager.js`) tracks every `EventBus.on()` and `StateManager.subscribe()` return against the active owner. Set the owner via `SubscriptionManager.runAs(ownerId, fn)` — `AppBase` does this around `onOpen`/`onMount` (owner = windowId), `FeatureBase` around `initialize()` (owner = featureId), `PluginLoader` around `onLoad()` (owner = pluginId). On close/disable/unload/logout, `SubscriptionManager.unsubscribeAll(ownerId)` releases everything. The existing `this.subscribe()` / `this.onEvent()` helpers in AppBase/FeatureBase still work — SubscriptionManager is an additional safety net for raw `.on()` calls inside lifecycle code.
 - **AppBase**: All apps extend `AppBase` with lifecycle methods (`onOpen`, `onClose`, `onFocus`, `onBlur`, `onMount`). Multi-instance apps **must** use `setInstanceState()` / `getInstanceState()` — apps that still hold per-window data on `this` must declare `singleton: true` until migrated.
@@ -170,7 +171,8 @@ Never tear down `MultiplayerClient`, `RealtimeClient`, or `PresenceManager` dire
 - **Never** set `.innerHTML` with unescaped user data — use `escapeHtml()`
 - **Never** commit `backend/env.php`, `config/admin-credentials.php`, or `config/overrides.json`
 - **Never** put session tokens in URLs (query strings, fragments). For WebSocket auth, pass the token via `Sec-WebSocket-Protocol: token.<hex>`.
-- **Always** route script-initiated file ops through `validateScriptPath()` (or `ScriptEngine.validateScriptPath()`). Don't inline a new allowlist.
+- **Always** route script-initiated and command-bus-initiated file ops through `validateScriptPath()` (or `ScriptEngine.validateScriptPath()`). The script engine, the SSE remote-FS handler in `index.js`, and the `command:fs:*` handlers in `CommandBus.js` all share this single allowlist.
+- **Never** store user-controlled JSON in `localStorage` (or hand it to `StorageManager`) without going through `StorageManager.set` — its prototype-pollution guard rejects payloads with `__proto__` / `constructor` / `prototype` keys.
 - Config section validation strips HTML, blocks `url()`, `javascript:`, `expression()` in CSS
 - WebSocket messages are rate-limited (30/sec) and size-limited (64 KB)
 - API rate limiting is per-user/IP with configurable windows
@@ -198,6 +200,8 @@ Never tear down `MultiplayerClient`, `RealtimeClient`, or `PresenceManager` dire
 1. Create `plugins/features/my-plugin/index.js` with manifest
 2. Export `{ id, name, version, features: [], apps: [], onLoad, onUnload }`
 3. Add feature/app classes in the plugin directory
+
+> ⚠️ The plugin manifest is validated before registration (`PluginLoader._validatePluginManifest`). `id` must match `/^[a-zA-Z0-9._-]+$/` and be ≤64 chars. Duplicate feature/app IDs within the manifest, declared `feature.dependencies` that don't resolve, and non-function `onLoad`/`onUnload` are all rejected up front. The loader is transactional: `loaded: true` is set only after `onLoad()` plus every feature/app registration succeed — a failed load rolls back precisely what it registered and runs `onUnload()` for symmetry.
 
 ### New API Endpoint
 1. Add controller method in `backend/controllers/`

@@ -50,10 +50,12 @@ The final API surface lives in `CLAUDE.md` § Architecture Patterns and is refle
 |---|---|---|
 | Wave 1 | Foundation: lifecycle, session, modal race, partial path/auth hardening | ✅ Landed in PR #1 |
 | Wave 2 | Source-of-truth consolidation: `SubscriptionManager`, `EventTopology`, `CommandBus` facade, `fetchWithAuth` | ✅ Landed in PR #2 |
-| Wave 3 | Hardening: storage hydration guard, desktop-icon reconciliation, FS sync event emission, prototype-pollution guards, builtin error type uniformity | ⏳ Planned |
-| Wave 4 | Legacy retirement: drop `LEGACY_EVENT_MAPPING`, remove `CommandBus` facade, remove WS query-string auth, Terminal per-window state migration, remove `core/EventBus.js` re-export | ⏳ Planned |
+| Wave 3 | Hardening: storage hydration guard, prototype-pollution guards, atomic state+storage write, FS sync emit, icon coord clamp, CommandBus fs path validation, plugin manifest validation + transactional load, script context validation, builtin error uniformity | ✅ Landed in PR #2 |
+| Wave 4 | Legacy retirement: drop `LEGACY_EVENT_MAPPING`, remove `CommandBus` facade, remove WS query-string auth, Terminal per-window state migration, remove `core/EventBus.js` re-export, desktop-icon reconciliation (FS-as-truth) | ⏳ Planned |
 
-Total time estimate from PR #1 to "final unified product": Wave 3 (3–4 PRs), Wave 4 (3 PRs, depends on Wave 3 completion).
+Total time estimate from PR #1 to "final unified product": Wave 4 (3 PRs).
+
+> Wave 3 landed in two halves: this PR (#2) bundled it with Wave 2 because the items overlapped — `fetchWithAuth` shares the hardening surface, and the plugin/script/storage guards are small enough that a separate PR would have been mostly diff noise. W3.2 (desktop-icon reconciliation) is deferred to Wave 4 because it touches boot order and warrants its own focused PR.
 
 ---
 
@@ -132,52 +134,49 @@ The reauth UI (a modal that prompts for credentials when `auth:expired` fires) i
 
 ---
 
-## Wave 3 — Hardening & drift cleanup
+## Wave 3 — Hardening & drift cleanup (done, except W3.2)
 
-After Wave 2 lands, every cross-cutting concern has a single owner. Wave 3 cleans up the surviving drift and adds the small security guards the audit flagged.
+Landed in PR #2 alongside Wave 2. The one exception is W3.2 (desktop-icon reconciliation), which touches boot order and warrants its own PR — moved to Wave 4.
 
-### W3.1 — Storage hydration guard
+### W3.1 — Storage hydration guard ✅
 
-`UserStateSync.isApplyingRemoteSnapshot` blocks remote sync but UI writes can still overwrite the incoming snapshot. Add `StorageManager.isHydrating()` flag and check it inside `StorageManager.set` — queue or drop writes during hydration.
+`StorageManager.beginHydration()` / `endHydration()` / `isHydrating()` plus a `hydrationSet(key, value)` backdoor for the hydrator itself. `StorageManager.set()` drops writes (with a `telemetry.hydrationDrops` increment + warning) during a hydration window. `UserStateSync.pullRemoteSnapshot` now brackets its restore loop in `beginHydration` / `endHydration` and uses `hydrationSet` for the snapshot writes themselves. The existing `isApplyingRemoteSnapshot` flag stays in place (it's read by `scheduleSync` to avoid pushing back during a pull) — the new flag closes the complementary hole.
 
-### W3.2 — Desktop-icon reconciliation
+### W3.2 — Desktop-icon reconciliation ⏳ Wave 4
 
-Two sources of truth for desktop icons: `StateManager.icons` (loaded from `StorageManager.get('desktopIcons')`) and `Desktop/*.lnk` files in the VFS. Pick FS as the truth (matches the Win95 mental model). Boot hydrates `StateManager.icons` from `FileSystemManager.getDesktopShortcuts()`. `StateManager.icons` becomes a derived cache, refreshed via the existing FS events.
+`StateManager.icons` and `Desktop/*.lnk` are still two sources of truth. Picking FS as the truth touches boot order (`StateManager.initialize` would hydrate icons from `FileSystemManager.getDesktopShortcuts()` instead of `StorageManager.get('desktopIcons')`) and changes runtime sync direction — deferred to a separate PR.
 
-### W3.3 — FS-sync event emission
+### W3.3 — FS-sync event emission ✅
 
-`syncDesktopIcons` and `syncInstalledApps` mutate the tree without emitting `FILESYSTEM_*` events. Apps subscribing to FS changes miss these mutations. Add emits or refactor to use `writeFile`/`createDirectory` paths that already emit.
+`syncDesktopIcons` and `syncInstalledApps` now emit `filesystem:directory:changed` and a `filesystem:changed { source }` event when they're done mutating the tree. Apps subscribed to FS changes (Explorer-style views, file pickers) no longer miss the sync's writes.
 
-### W3.4 — `StateManager.setStateAndPersist`
+### W3.4 — `StateManager.setStateAndPersist` ✅
 
-A single call that updates `StateManager.state` and `StorageManager.set` atomically, rolling back state if storage fails (quota / unavailable). Eliminates the "state changed but storage didn't" drift class.
+`StateManager.setStateAndPersist(path, value)` writes storage first (via `StorageManager.set`, which now returns `false` on quota / hydration drop / prototype-pollution rejection) and only commits the in-memory state on success. Subscribers see the change exactly when both stores agree.
 
-### W3.5 — Storage payload guards
+### W3.5 — Storage payload guards ✅
 
-`StorageManager.set/get` use `JSON.parse` without prototype-pollution checks. Add a simple post-parse pass that rejects `__proto__` / `constructor.prototype` keys at the top level (and recursively, configurable).
+`StorageManager.set` / `get` / `setGlobal` / `getGlobal` / `hydrationSet` now run an `_hasUnsafeKeys()` recursive scan that rejects payloads containing `__proto__`, `constructor`, or `prototype` keys at any depth. Rejections are tallied in `telemetry.unsafeKeyRejections` so admins can spot exploit attempts in the boot health report.
 
-### W3.6 — Icon coordinate bounds
+### W3.6 — Icon coordinate bounds ✅
 
-`StateManager.addIcon` / `updateIconPosition` accept arbitrary numbers. Clamp to viewport / desktop bounds and reject NaN.
+`StateManager._clampCoord(value)` snaps non-finite numbers to 0 and clamps anything outside [0, 100000] into the viewport. Called by `addIcon`, `updateIconPosition`, and `restoreIcon`. Stops a NaN drag handler from stranding an icon off-screen and corrupting `desktopIcons` storage.
 
-### W3.7 — Plugin manifest validation & transactional load
+### W3.7 — Plugin manifest validation & transactional load ✅
 
-`PluginLoader` sets `loaded: true` before `onLoad()` runs. A plugin whose features fail to initialize is marked loaded anyway. Fix:
-- Validate the manifest shape (required fields, ID uniqueness, declared dependencies exist) before any registration.
-- Defer `loaded: true` until after `onLoad()` and all plugin features' `initialize()` succeed.
-- On failure, unregister features and call `onUnload()`.
+`PluginLoader._validatePluginManifest()` runs before any registration: rejects missing/empty `id`, non-array `features`/`apps`, duplicate feature/app IDs within the plugin, declared `feature.dependencies` that don't resolve in the current registry, non-function `onLoad`/`onUnload`. `loaded: true` is now set *after* `onLoad` and all feature/app registrations succeed — a partially-loaded plugin no longer reports as healthy. On failure, the loader rolls back only the registrations it tracked during this load (precise, not "everything tagged with this pluginId") and runs `onUnload` symmetrically so plugins can clean up non-subscription resources.
 
-### W3.8 — Builtin error type uniformity
+### W3.8 — Builtin error type uniformity ✅
 
-Some RetroScript builtins still throw bare `new Error(...)`; the rest throw `RuntimeError` with line/column info. Wrap bare throws at the visitor layer or fix each builtin.
+Replaced bare `throw new Error(...)` in `TelemetryBuiltins` (6 sites) and `DebugBuiltins` (3 sites) with `throw new RuntimeError(...)`. `RuntimeError` carries the line/column/hint structure the interpreter pipeline expects, so scripts now get consistent error envelopes regardless of which builtin failed.
 
-### W3.9 — ScriptEngine context contract
+### W3.9 — ScriptEngine context contract ✅
 
-Add `ScriptEngine.validateContext()` at engine init that fails fast if required services are missing, instead of 50+ inline `if (!context.X)` checks scattered through builtins.
+`ScriptEngine.validateContext(context)` returns `{ ok, missingRequired, missingOptional }`. Required: `FileSystemManager`, `EventBus`. Optional: `StateManager`, `WindowManager`, `StorageManager`, `AppRegistry`, `FeatureRegistry`, `TelemetryCollector`, `ReplayEngine`, `NarrativeStateManager`, `MediaAssetManager`. `ScriptEngine.initialize()` calls this and logs an error when required services are missing — engine still initializes (cosmetic builtins keep working) but the boot-health diagnosis is now obvious.
 
-### W3.10 — CommandBus fs commands path validation
+### W3.10 — CommandBus fs commands path validation ✅
 
-`command:fs:write` / `command:fs:read` / `command:fs:mkdir` (in `core/CommandBus.js`) bypass the script-engine path validator. Add the same allowlist check at the CommandBus layer so script `emit "command:fs:write" { path: "C:/..." }` and write-statement `write $x to "C:/..."` apply identical guards.
+`command:fs:read|write|delete|mkdir|copy|move` now run their payload through `validateScriptPath()` (the same allowlist the script engine and SSE handler use) before reaching `FileSystemManager`. `copy` / `move` validate *both* endpoints so an attacker can't smuggle a write by validating one path and operating on another. Closes the escape hatch where a script could bypass the engine-level check by emitting `command:fs:write` directly.
 
 ---
 

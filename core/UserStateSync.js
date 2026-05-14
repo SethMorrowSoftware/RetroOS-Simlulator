@@ -117,16 +117,27 @@ class UserStateSync {
             return;
         }
 
+        // W3.1 — flip both the legacy isApplyingRemoteSnapshot flag (read by
+        // scheduleSync to skip pushing back while we're pulling) and the
+        // StorageManager.isHydrating flag (which drops UI-driven .set()
+        // calls so concurrent writes don't clobber the incoming snapshot).
         this.isApplyingRemoteSnapshot = true;
+        StorageManager.beginHydration();
         try {
             StorageManager.clear();
             for (const [key, value] of Object.entries(storageData)) {
-                StorageManager.set(key, value);
+                // hydrationSet bypasses the drop guard for snapshot writes
+                // themselves; the prototype-pollution check still runs.
+                StorageManager.hydrationSet(key, value);
             }
-            this.saveMeta({ updated_at: data.updated_at || new Date().toISOString() });
         } finally {
+            StorageManager.endHydration();
             this.isApplyingRemoteSnapshot = false;
         }
+
+        // saveMeta uses the regular .set() path, which is now active again
+        // after endHydration above.
+        this.saveMeta({ updated_at: data.updated_at || new Date().toISOString() });
     }
 
     loadMeta() {

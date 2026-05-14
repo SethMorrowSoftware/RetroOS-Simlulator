@@ -33,6 +33,34 @@ import EventBus from './EventBus.js';
 import StateManager from './StateManager.js';
 import WindowManager from './WindowManager.js';
 import FileSystemManager from './FileSystemManager.js';
+import { validateScriptPath } from './script/utils/PathValidation.js';
+
+/**
+ * Validate a path passed to a `command:fs:*` handler against the same
+ * allowlist that script-driven file ops use (W3.10).
+ *
+ * Before this guard, a script could escape the script-engine path check by
+ * emitting `command:fs:write { path: "C:/anything" }` instead of using the
+ * `write` statement — the CommandBus handler reached straight into
+ * `FileSystemManager` with no validation. This wrapper closes that hole:
+ * the script and command surfaces now share one boundary.
+ *
+ * The underlying validator throws a RuntimeError; we rethrow as a plain
+ * Error here so the CommandBus error envelope ({ success: false, error })
+ * carries a clean message instead of a ScriptError with line:0 column:0.
+ *
+ * @param {string} path
+ * @param {string} commandName - e.g. 'fs:write', for the error message
+ * @returns {string} normalized path
+ */
+function validateCommandFsPath(path, commandName) {
+    try {
+        return validateScriptPath(path);
+    } catch (err) {
+        const msg = err && err.message ? err.message : `Invalid path for ${commandName}`;
+        throw new Error(`[${commandName}] ${msg}`);
+    }
+}
 
 class CommandBusClass {
     constructor() {
@@ -216,20 +244,20 @@ class CommandBusClass {
     // ==========================================
     _registerFsCommands() {
         this.register('fs:read', async (payload) => {
-            const { path } = payload;
+            const path = validateCommandFsPath(payload.path, 'fs:read');
             const content = FileSystemManager.readFile(path);
             return { path, content };
         });
 
         this.register('fs:write', async (payload) => {
-            const { path, content } = payload;
-            FileSystemManager.writeFile(path, content);
+            const path = validateCommandFsPath(payload.path, 'fs:write');
+            FileSystemManager.writeFile(path, payload.content);
             // Note: FileSystemManager already emits FS_FILE_WRITE — no duplicate emit here
             return { path, written: true };
         });
 
         this.register('fs:delete', async (payload) => {
-            const { path } = payload;
+            const path = validateCommandFsPath(payload.path, 'fs:delete');
             const node = FileSystemManager.getNode(path);
             if (!node) {
                 throw new Error(`Path not found: ${path}`);
@@ -245,20 +273,24 @@ class CommandBusClass {
         });
 
         this.register('fs:mkdir', async (payload) => {
-            const { path } = payload;
+            const path = validateCommandFsPath(payload.path, 'fs:mkdir');
             FileSystemManager.createDirectory(path);
             // Note: FileSystemManager already emits FS_DIR_CREATE — no duplicate emit here
             return { path, created: true };
         });
 
         this.register('fs:copy', async (payload) => {
-            const { source, destination } = payload;
+            // Validate both endpoints so an attacker can't smuggle a write
+            // by validating one path and operating on another.
+            const source = validateCommandFsPath(payload.source, 'fs:copy(source)');
+            const destination = validateCommandFsPath(payload.destination, 'fs:copy(destination)');
             FileSystemManager.copyItem(source, destination);
             return { source, destination, copied: true };
         });
 
         this.register('fs:move', async (payload) => {
-            const { source, destination } = payload;
+            const source = validateCommandFsPath(payload.source, 'fs:move(source)');
+            const destination = validateCommandFsPath(payload.destination, 'fs:move(destination)');
             FileSystemManager.moveItem(source, destination);
             return { source, destination, moved: true };
         });

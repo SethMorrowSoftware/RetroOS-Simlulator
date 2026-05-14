@@ -2,6 +2,8 @@
  * DebugBuiltins - Debugging and inspection functions for RetroScript
  */
 
+import { RuntimeError } from '../errors/ScriptError.js';
+
 export function registerDebugBuiltins(interpreter) {
     // Debug output
     interpreter.registerBuiltin('debug', (...args) => {
@@ -37,7 +39,7 @@ export function registerDebugBuiltins(interpreter) {
     // Assertion
     interpreter.registerBuiltin('assert', (condition, message = 'Assertion failed') => {
         if (!condition) {
-            throw new Error(String(message));
+            throw new RuntimeError(String(message));
         }
         return true;
     });
@@ -50,7 +52,7 @@ export function registerDebugBuiltins(interpreter) {
         if (actualStr !== expectedStr) {
             const msg = message ||
                 `Assertion failed: expected ${expectedStr}, got ${actualStr}`;
-            throw new Error(msg);
+            throw new RuntimeError(msg);
         }
         return true;
     });
@@ -64,7 +66,7 @@ export function registerDebugBuiltins(interpreter) {
         if (actualType !== expectedType) {
             const msg = message ||
                 `Type assertion failed: expected ${expectedType}, got ${actualType}`;
-            throw new Error(msg);
+            throw new RuntimeError(msg);
         }
         return true;
     });
