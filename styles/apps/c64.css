@@ -139,7 +139,8 @@
    EmulatorJS measure its canvas parent as 0x0 and never grow back. */
 .c64-splash,
 .c64-stage,
-.c64-loading {
+.c64-loading,
+.c64-error {
     position: absolute;
     top: 0;
     left: 0;
@@ -303,6 +304,72 @@
     color: #c8c8ff;
     font-size: 14px;
     font-family: 'VT323', 'Courier New', monospace;
+}
+
+/* ── Error Overlay ───────────────────────── */
+
+.c64-error {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: #3535a2;       /* C64 border navy — matches the splash */
+    color: #fff;
+    text-align: center;
+    gap: 14px;
+    padding: 32px 28px;
+    z-index: 12;
+}
+
+.c64-error-icon {
+    font-size: 48px;
+    margin-bottom: 4px;
+}
+
+.c64-error-title {
+    font-size: 18px;
+    font-weight: bold;
+    color: #ffff66;            /* C64 yellow */
+    font-family: 'VT323', 'Courier New', monospace;
+    letter-spacing: 0.5px;
+    max-width: 520px;
+}
+
+.c64-error-body {
+    color: #c8c8ff;            /* C64 light blue */
+    font-size: 13px;
+    line-height: 1.55;
+    max-width: 540px;
+}
+
+.c64-error-line {
+    margin: 4px 0;
+}
+
+.c64-error-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 12px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.c64-error-link {
+    display: inline-block;
+    padding: 4px 12px;
+    background: #7878d8;
+    color: #fff;
+    text-decoration: none;
+    border-top: 2px solid #a8a8e8;
+    border-left: 2px solid #a8a8e8;
+    border-right: 2px solid #1c1c5e;
+    border-bottom: 2px solid #1c1c5e;
+    font-size: 12px;
+    font-family: inherit;
+}
+
+.c64-error-link:hover {
+    background: #8888e8;
 }
 
 /* ── Status Bar ──────────────────────────── */
