@@ -700,6 +700,26 @@ This happens automatically for all string literals during expression evaluation.
 
 All paths use the IlluminatOS virtual file system (VFS). Paths look like `C:/folder/file.txt`.
 
+### Allowed paths
+
+`write`, `read`, `delete`, and `mkdir` go through an allowlist before reaching the filesystem. Paths must start with one of these prefixes:
+
+| Prefix | What it's for |
+|---|---|
+| `C:/Users/User/Desktop/` | User desktop |
+| `C:/Users/User/Documents/` | User documents |
+| `C:/Users/User/Pictures/` | User images |
+| `C:/Users/User/Music/` | User audio |
+| `C:/Users/User/Videos/` | User video |
+| `C:/Users/User/Projects/` | User project folders |
+| `C:/Users/User/Secret/` | Hidden user folder |
+| `C:/Windows/` and `C:/Windows/System32/` | System data |
+| `C:/server/`, `C:/shared/`, `C:/public/` | Server-shared content |
+
+Paths with `..` segments, control characters, or roots outside this list are rejected with a `RuntimeError`. The same allowlist is enforced for SSE-driven remote filesystem ops, so script behavior matches server-pushed behavior.
+
+If you need a new root, add it once in `core/script/utils/PathValidation.js` — there's only one place to edit.
+
 ### write
 
 ```retro
@@ -718,7 +738,7 @@ print $content
 The `into` clause names the variable. If omitted, defaults to `$result`:
 
 ```retro
-read "C:/config.txt"
+read "C:/Users/User/Documents/config.txt"
 print $result
 ```
 
@@ -732,23 +752,25 @@ mkdir "C:/Users/User/Documents/MyProject"
 
 ```retro
 delete "C:/Users/User/Documents/old.txt"
-rm "C:/Users/User/temp"
+rm "C:/Users/User/Documents/temp"
 ```
 
 Tries file deletion first, falls back to recursive directory deletion.
 
 ### Best Practices
 
-Always wrap file reads in `try/catch` since files may not exist:
+Always wrap file reads in `try/catch` since files may not exist (or the path may be rejected):
 
 ```retro
 try {
-  read "C:/data.txt" into $data
+  read "C:/Users/User/Documents/data.txt" into $data
   print "Data: " + $data
 } catch $err {
   print "Could not read file: " + $err
 }
 ```
+
+Path-validation errors raise the same `RuntimeError` as a missing-file or permissions error and can be caught the same way.
 
 ---
 

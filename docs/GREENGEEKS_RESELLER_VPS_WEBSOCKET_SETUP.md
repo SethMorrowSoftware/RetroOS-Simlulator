@@ -293,8 +293,12 @@ curl -sS https://yourdomain.com/ws-health
 
 ### B. Browser WebSocket handshake
 Open browser devtools on your app and verify:
-- WebSocket connection to `wss://yourdomain.com/ws?token=...`
+- WebSocket connection to `wss://yourdomain.com/ws` (note: **no `?token=` query string** — the token travels as a subprotocol)
+- Request header includes `Sec-WebSocket-Protocol: token.<hex>, illuminatos`
+- Response header echoes `Sec-WebSocket-Protocol: illuminatos`
 - Status 101 Switching Protocols
+
+> Tokens in URLs leak into proxy access logs and browser history. Current IlluminatOS clients pass the session token via `Sec-WebSocket-Protocol` instead. The server (`websocket/server.php`) still accepts `?token=<hex>` and `Authorization: Bearer <hex>` for backwards compatibility, but prefer subprotocol auth in any new client and tighten your access-log retention accordingly.
 
 ### C. Multiplayer behavior tests
 Open two authenticated sessions (different users):
@@ -303,6 +307,7 @@ Open two authenticated sessions (different users):
 3. Start/join a game session and exchange `game` events
 4. Kill sidecar (`systemctl stop ...`) and confirm client reconnect/degrade behavior
 5. Restart sidecar and verify reconnect works
+6. Log off in browser A (Start → Shut Down → Log Off). Confirm sidecar logs show A's connection closed and presence dropped before B sees B alone. The unified `SessionManager` cascade should disconnect WS, close SSE, and destroy presence before resolving the new login.
 
 ---
 
@@ -340,6 +345,7 @@ Open two authenticated sessions (different users):
 - Keep heartbeat and rate-limit defaults unless load testing proves changes needed
 - Monitor process restarts and memory usage
 - Remove development-only endpoints/tools from production deployment
+- **Audit your reverse-proxy access logs.** With the current client, the session token rides in `Sec-WebSocket-Protocol`, not the URL, so access logs that record only request lines no longer capture tokens. If your log format includes `%{Sec-WebSocket-Protocol}i`, strip or rotate it aggressively.
 
 ---
 

@@ -2,6 +2,8 @@
 
 This guide documents the **current** development workflow for extending IlluminatOS with apps, features, plugins, and RetroScript-driven experiences.
 
+For the longer-term plan to unify legacy APIs (CommandBus → SemanticEventBus, owner-scoped subscriptions, EventTopology, 401-aware fetch), see [`docs/UNIFIED_ROADMAP.md`](docs/UNIFIED_ROADMAP.md). This guide documents what's true today; the roadmap documents where the codebase is heading.
+
 ## Table of contents
 1. Development model
 2. Local setup and validation
@@ -9,11 +11,12 @@ This guide documents the **current** development workflow for extending Illumina
 4. Adding a new app
 5. Adding a new feature
 6. Adding a plugin
-7. Building RetroScript “apps” and scripted experiences
+7. Building RetroScript "apps" and scripted experiences
 8. Filesystem and persistence contracts
 9. Event and command integration
-10. Admin/backend integration points
-11. Documentation and cleanup standards
+10. Session lifecycle (logout / user-switch)
+11. Admin/backend integration points
+12. Documentation and cleanup standards
 
 ---
 
@@ -93,17 +96,20 @@ Each phase is tracked by the boot health diagnostics system, recording status, d
 
 ### Key subsystems
 - `apps/AppRegistry.js`: app registration + launch
-- `core/WindowManager.js`: window lifecycle
+- `core/WindowManager.js`: window lifecycle, modal stack with deterministic cleanup
 - `core/FileSystemManager.js`: virtual filesystem (with server-backed file sync)
-- `core/FeatureRegistry.js`: feature lifecycle and toggles
+- `core/FeatureRegistry.js`: feature lifecycle, toggles, isolated-failure dependent disable
+- `core/FeatureBase.js`: feature base class with serialized enable/disable queue
 - `core/PluginLoader.js`: plugin manifest loading
 - `core/script/ScriptEngine.js`: RetroScript runtime
-- `core/CommandBus.js`: script/system command adapters
-- `core/ConfigLoader.js`: configuration loading with backend/default fallback
+- `core/script/utils/PathValidation.js`: single allowlist for script-driven file ops (also used by SSE remote FS handler in `index.js`)
+- `core/CommandBus.js`: script/system command adapters (parallel to `SemanticEventBus` for historical reasons; see roadmap)
+- `core/ConfigLoader.js`: configuration loading with backend/default fallback; session token API
 - `core/RealtimeClient.js`: SSE real-time event bridge (v2 API)
-- `core/SemanticEventBus.js`: higher-level typed semantic events with middleware, request/response, channels
+- `core/SemanticEventBus.js`: the canonical event bus — schema-validated semantic events with middleware, request/response, channels. `core/EventBus.js` is just a re-export.
+- `core/SessionManager.js`: owns the logout / user-switch cascade. Single source of teardown sequence.
 - `core/NarrativeStateManager.js`: campaign/scene/objective/flag/clue state with multiplayer sync
-- `core/MultiplayerClient.js`: WebSocket client for real-time multiplayer
+- `core/MultiplayerClient.js`: WebSocket client for real-time multiplayer; token via `Sec-WebSocket-Protocol`
 - `core/PresenceManager.js`: online user tracking and status
 - `core/GameSession.js`: multiplayer game lifecycle mixin
 - `core/TelemetryCollector.js`: event capture and analytics
@@ -164,20 +170,65 @@ In `apps/AppRegistry.js`:
 
 ### 4.4 App quality checklist
 - Uses `addHandler()` (not raw `addEventListener`) for cleanup safety
-- Uses `instance state` for per-window state
+- Uses `setInstanceState()` / `getInstanceState()` for per-window state. **Do not** store window-scoped data on `this` directly — multi-instance apps will bleed state across windows. If you can't migrate today, mark the app `singleton: true` in the super() call.
 - Handles keyboard shortcuts only when active window has focus
 - Cleans timers/RAF loops in `onClose`
 - Registers commands/queries in `onMount()` (not the constructor) so `_currentWindowId` is available for proper cleanup tracking
 - Uses `this.escapeHtml()` (from `AppBase`) when inserting user-supplied text into `innerHTML`
 - Guards against division by zero and null references in rendering/state calculations
+- If your app subscribes to events that are scoped to the logged-in user (multiplayer rooms, presence, server-side state), subscribe inside `onMount` and unsubscribe on `onClose` — or hook `user:logout` / `user:switch` to drop session caches.
+
+### 4.5 Multi-instance vs singleton
+
+```js
+super({
+  id: 'myapp',
+  // singleton: true makes launch() always focus the existing window.
+  // Default (omitted / false) creates a new window per launch.
+  singleton: false
+});
+```
+
+Multi-instance apps **must** use per-window state APIs:
+
+```js
+// Inside onOpen / onMount / onClose:
+this.setInstanceState('counter', 0);
+const n = this.getInstanceState('counter', 0);
+this.updateInstanceState({ counter: n + 1, lastClick: Date.now() });
+```
+
+State stored on `this` is shared across every window the app has open, which is virtually always a bug. `Terminal` is currently forced singleton for exactly this reason and is on the roadmap to migrate.
 
 ---
 
 ## 5) Adding a new feature
 
-Features run in background and are toggled through `FeatureRegistry`.
+Features run in the background and are toggled through `FeatureRegistry`. Lifecycle is unified through `FeatureBase`.
 
-### 5.1 Create feature class
+### 5.1 Lifecycle contract (read this first)
+
+`FeatureBase` provides three lifecycle hooks you may override:
+
+| Hook | When | What to do |
+|---|---|---|
+| `initialize()` | Once, the first time the feature is enabled. **Never re-runs.** | Subscribe to events via `this.subscribe(...)`; bind DOM handlers via `this.addHandler(...)`; allocate any long-lived resources. |
+| `enable()` | Every time the feature becomes active (boot, settings toggle on). Inherited; usually you do not override. | Activate the feature's behavior. The base class also calls `initialize()` the first time. |
+| `disable()` | Every time the feature becomes inactive. Inherited; usually you do not override. | Release event/DOM resources via `cleanup()`. The base class queues your call so a rapid toggle can't double-run. |
+| `cleanup()` | Called by `disable()`. | Override to free anything not tracked by `this.subscribe()` / `this.addHandler()`. The defaults already unwire subscriptions and DOM handlers. |
+
+> ⚠️ `disable()` does **not** reset `this.initialized`. A subsequent `enable()` will not re-run `initialize()`. If your feature genuinely needs a re-init on toggle, override `disable()`:
+>
+> ```js
+> async disable() {
+>   await super.disable();
+>   this.initialized = false; // force re-init next enable()
+> }
+> ```
+
+Concurrent `enable()` / `disable()` calls are serialized internally — you never have to worry about two clicks racing.
+
+### 5.2 Create feature class
 
 ```js
 import FeatureBase from '../core/FeatureBase.js';
@@ -189,6 +240,7 @@ class MyFeature extends FeatureBase {
       name: 'My Feature',
       category: 'enhancement',
       config: { enabledThing: true, speed: 3 },
+      dependencies: [], // other feature IDs this depends on
       settings: [
         { key: 'enabledThing', label: 'Enable Thing', type: 'checkbox' },
         { key: 'speed', label: 'Speed', type: 'number', min: 1, max: 10 }
@@ -197,6 +249,8 @@ class MyFeature extends FeatureBase {
   }
 
   async initialize() {
+    // Subscriptions registered through this.subscribe are auto-cleaned
+    // in cleanup() — no need to track them yourself.
     this.subscribe('window:open', (payload) => this.log('window opened', payload));
   }
 }
@@ -204,16 +258,17 @@ class MyFeature extends FeatureBase {
 export default new MyFeature();
 ```
 
-### 5.2 Register feature
+### 5.3 Register feature
 - Core feature: register during feature phase in `index.js`
 - Plugin feature: export from plugin manifest and let `PluginLoader` handle registration
 
-### 5.3 Feature checklist
-- Uses `subscribe()` and `addHandler()` helpers for automatic cleanup
+### 5.4 Feature checklist
+- Uses `this.subscribe()` and `this.addHandler()` helpers for automatic cleanup
 - Keeps config defaults stable and consistent between `config.json` and code defaults
-- Has explicit `enable/disable` behavior if runtime toggling changes stateful behavior
+- Override `disable()` only if you need to force re-init on next enable (see §5.1)
 - Guards against division by zero in progress/statistics calculations
 - Resolves any pending callbacks/promises before replacing them (avoids hanging callers)
+- If the feature depends on other features (e.g. `AchievementSystem` depends on `SoundSystem`), declare it in `dependencies` — `FeatureRegistry` walks dependents on disable and isolates per-feature failures.
 
 ---
 
@@ -314,7 +369,62 @@ If you add app-specific script control, register commands from the app and docum
 
 ---
 
-## 10) Admin/backend integration points
+## 10) Session lifecycle (logout / user-switch)
+
+The user-session lifecycle is unified through `core/SessionManager.js`. Don't tear down realtime/presence/state from a UI handler — go through `SessionManager`.
+
+### 10.1 Canonical events
+
+| Event | When | What's already done by the time it fires |
+|---|---|---|
+| `user:login` | Initial boot login completed or post-logoff login completed | Token set, storage rescoped, `StateManager.initialize()` finished |
+| `user:logout` | User logged off | Realtime closed, presence destroyed, multiplayer disconnected, token cleared, `StateManager.resetVolatile()` ran |
+| `user:switch` | Active user changed | Same teardown as logout, then storage rescoped to the new user |
+| `auth:expired` | Server returned 401 | Token has been cleared. Show a reauth UI. |
+
+### 10.2 Hooks for your feature/app
+
+```js
+// In a feature's initialize():
+this.subscribe('user:login', ({ username, mode }) => {
+  // Fetch the new user's data from the server
+});
+
+this.subscribe('user:logout', () => {
+  // Drop any user-scoped in-memory cache
+});
+
+this.subscribe('user:switch', ({ previous, next }) => {
+  // Equivalent to logout+login for caching purposes
+});
+```
+
+### 10.3 Triggering logout / user-switch
+
+```js
+import SessionManager from '../core/SessionManager.js';
+
+// End the session (e.g. Start → Log Off)
+await SessionManager.logout({ reason: 'user_requested' });
+
+// Switch directly to another user (no logout overlay)
+await SessionManager.switchUser('alice');
+```
+
+The cascade is sequenced so subscribers never see a half-torn-down session:
+
+1. `MultiplayerClient.disconnect()` — stop receiving WS events for the outgoing user
+2. `closeRealtime()` — close the SSE stream
+3. `PresenceManager.destroy()` — drop presence + typing state
+4. `setSessionToken(null)` — fail any in-flight fetches fast
+5. `StateManager.resetVolatile()` — clear in-memory user-scoped state (icons, windows, UI flags)
+6. emit `user:logout` or `user:switch` for subscribers
+
+Storage is untouched on `logout()` (it's user-scoped already) and rescoped on `switchUser(newUser)`.
+
+---
+
+## 11) Admin/backend integration points
 
 ### Backend v1 (file-based, no database required)
 - `api/config.php`: merged runtime config
@@ -342,14 +452,15 @@ When backend is unavailable, the frontend continues with inline defaults and log
 
 ---
 
-## 11) Documentation and cleanup standards
+## 12) Documentation and cleanup standards
 
 When you add/modify capabilities:
 1. Update README overview if user-facing behavior changed
 2. Update this guide for extension workflow changes
 3. Update `SCRIPTING_GUIDE.md` for script-visible changes
 4. Update `docs/RETROSCRIPT_SCRIPTABLE_EVENTS.md` for event/command/query changes
-5. Remove superseded planning/debug docs rather than leaving stale guidance
+5. Update `docs/UNIFIED_ROADMAP.md` if you completed (or reshaped) a roadmap item
+6. Remove superseded planning/debug docs rather than leaving stale guidance
 
 Use this rule: if a document is no longer actionable for contributors, archive it outside repo or delete it.
 
@@ -364,7 +475,8 @@ When modifying backend v2:
 - Backend color validation must accept only 3-digit or 6-digit hex (not arbitrary lengths)
 - Rate limiting keys should use parsed URL paths (not raw URI with query strings)
 - Route registration order matters: specific routes (e.g., `/config/user/:section`) must come before wildcard routes (e.g., `/config/:section`)
-- SSE filesystem commands are restricted to allowed path prefixes (`/C/server/`, `/C/shared/`, `/C/public/`). Do not add new prefixes without reviewing blast radius.
+- **Path allowlist** for script-driven and SSE-driven file operations lives in `core/script/utils/PathValidation.js`. Both call sites use it. Adding a new safe root requires only one edit. Do not duplicate the prefix list inline.
+- **WebSocket auth**: pass the session token via `Sec-WebSocket-Protocol: token.<hex>` only. The legacy `?token=` query string is accepted server-side for compatibility but must not be used by new client code (tokens in URLs leak into proxy logs and browser history).
 - Multiplayer remote state handlers must set `_isProcessingRemoteUpdate = true` before emitting local events to prevent infinite broadcast loops
 - The `SemanticEventBus.request()` method uses a `settled` flag to prevent double-resolution races between timeout and response handlers
 - Validate `appId` against `AppRegistry.getAll()` before launching apps from SSE events
