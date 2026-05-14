@@ -2,7 +2,7 @@
 
 This guide documents the **current** development workflow for extending IlluminatOS with apps, features, plugins, and RetroScript-driven experiences.
 
-For the longer-term plan to unify legacy APIs (CommandBus → SemanticEventBus, owner-scoped subscriptions, EventTopology, 401-aware fetch), see [`docs/UNIFIED_ROADMAP.md`](docs/UNIFIED_ROADMAP.md). This guide documents what's true today; the roadmap documents where the codebase is heading.
+The platform-level unification (owner-scoped subscriptions, unified command registry, single realtime topology, `fetchWithAuth` 401 trap, shared file-op path validation, transactional plugin load) has all landed and is reflected below. Deferred follow-ups are listed in [`docs/MIGRATION_ROADMAP.md`](docs/MIGRATION_ROADMAP.md).
 
 ## Table of contents
 1. Development model
@@ -63,6 +63,13 @@ php -S localhost:8000
 ### Backend v2 test suite
 ```bash
 php test-backend.php        # smoke tests for all API endpoints
+php test-security.php       # authorization / security tests
+```
+
+### Aggregated CI gate
+```bash
+bash scripts/ci-gate.sh     # JS syntax, PHP lint, innerHTML safety,
+                            # RetroScript harness, event-schema coverage
 ```
 
 ### Recommended validation loop
@@ -71,7 +78,10 @@ php test-backend.php        # smoke tests for all API endpoints
 3. Test launch from Start menu and terminal
 4. Verify no uncaught errors in browser console
 5. Test persistence by reload
-6. Check `window.__OS_BOOT_HEALTH` in console for per-component diagnostics
+6. Check `window.__OS_BOOT_HEALTH` for the boot phase report
+7. Check `window.__OS_HEALTH` for the live runtime snapshot (subscription
+   accounting, storage telemetry, event-bus stats + schema coverage, feature
+   posture, realtime state, recent faults)
 
 ---
 
@@ -103,7 +113,8 @@ Each phase is tracked by the boot health diagnostics system, recording status, d
 - `core/PluginLoader.js`: plugin manifest loading
 - `core/script/ScriptEngine.js`: RetroScript runtime
 - `core/script/utils/PathValidation.js`: single allowlist for script-driven file ops (also used by SSE remote FS handler in `index.js`)
-- `core/CommandBus.js`: ⚠️ deprecated facade — delegates to `SemanticEventBus.commandHandlers`. Use `EventBus.registerCommand()` / `EventBus.executeCommand()` directly for new code.
+- `core/CommandBus.js`: ⚠️ deprecated facade — delegates to `SemanticEventBus.commandHandlers`. Both APIs share the same registry. Use `EventBus.registerCommand()` / `EventBus.executeCommand()` directly for new code. The script engine no longer imports `CommandBus`.
+- `core/HealthMonitor.js`: live runtime health snapshot at `window.__OS_HEALTH`.
 - `core/SubscriptionManager.js`: owner-scoped subscription tracker. `runAs(ownerId, fn)` sets the active owner; `unsubscribeAll(ownerId)` releases.
 - `core/EventTopology.js`: single source-of-truth list of cross-process events (`{ backend, frontend?, transports }`). Consumed by `RealtimeClient` and (later) `MultiplayerClient`.
 - `core/ConfigLoader.js`: configuration loading with backend/default fallback; session token API
@@ -200,7 +211,7 @@ const n = this.getInstanceState('counter', 0);
 this.updateInstanceState({ counter: n + 1, lastClick: Date.now() });
 ```
 
-State stored on `this` is shared across every window the app has open, which is virtually always a bug. `Terminal` is currently forced singleton for exactly this reason and is on the roadmap to migrate.
+State stored on `this` is shared across every window the app has open, which is virtually always a bug. `Terminal` and `Paint` use property accessors on the prototype that proxy to `setInstanceState` / `getInstanceState` so the existing `this.commandHistory` / `this.ctx` references throughout the file work unchanged but route to per-window storage.
 
 ---
 
@@ -374,7 +385,7 @@ EventBus.registerCommand('myapp:doThing', async (payload) => {
 await EventBus.executeCommand('myapp:doThing', { foo: 1 });
 ```
 
-`CommandBus.register()` / `CommandBus.execute()` still work — they're a thin facade that delegates to the unified API — but `CommandBus.js` is `@deprecated`. The script engine no longer takes `CommandBus` in its context (every visitor and builtin now goes through `context.EventBus.executeCommand`), and `apps/ScriptRunner.js` no longer imports the file. Boot still calls `CommandBus.initialize()` because that's where the `command:fs:*` / `command:window:*` / `command:terminal:*` handler set is registered — full file removal is tracked as P2.1 in `docs/MIGRATION_ROADMAP.md`. Use the bus directly for new code.
+`CommandBus.register()` / `CommandBus.execute()` still work — they're a thin facade that delegates to the unified API — but `CommandBus.js` is `@deprecated`. The script engine no longer takes `CommandBus` in its context (every visitor and builtin goes through `context.EventBus.executeCommand`), and `apps/ScriptRunner.js` no longer imports the file. Boot still calls `CommandBus.initialize()` because that's where the `command:fs:*` / `command:window:*` / `command:terminal:*` handler set is registered — full file removal is the F1 follow-up in `docs/MIGRATION_ROADMAP.md`. Use the bus directly for new code.
 
 Common command surfaces: app lifecycle actions, window actions, filesystem actions, dialog/notification/sound/system settings actions. If you add app-specific script control, register commands from the app and document them.
 
@@ -492,10 +503,11 @@ When you add/modify capabilities:
 2. Update this guide for extension workflow changes
 3. Update `SCRIPTING_GUIDE.md` for script-visible changes
 4. Update `docs/RETROSCRIPT_SCRIPTABLE_EVENTS.md` for event/command/query changes
-5. Update `docs/UNIFIED_ROADMAP.md` if you completed (or reshaped) a roadmap item
-6. Remove superseded planning/debug docs rather than leaving stale guidance
+5. Update `CLAUDE.md` if you change an architectural pattern or a key file's role
+6. If you close one of the items in `docs/MIGRATION_ROADMAP.md`, remove the entry rather than just marking it done
+7. Remove superseded planning/debug docs rather than leaving stale guidance
 
-Use this rule: if a document is no longer actionable for contributors, archive it outside repo or delete it.
+Use this rule: if a document is no longer actionable for contributors, delete it.
 
 ### Backend v2 documentation
 When modifying backend v2:

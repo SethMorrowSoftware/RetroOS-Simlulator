@@ -78,7 +78,6 @@
 40. [Command Bus Commands](#command-bus-commands)
 41. [Query Bus Queries](#query-bus-queries)
 42. [Built-in Functions](#built-in-functions)
-43. [Legacy Event Mapping](#legacy-event-mapping)
 
 ---
 
@@ -1549,11 +1548,11 @@ These functions are available in RetroScript via `call functionName(args)`.
 
 ---
 
-## Legacy Event Mapping (deprecated)
+## Legacy Event Names (removed)
 
-> ⚠️ **Do not use these names in new scripts.** They are auto-rewritten to the semantic names below for backwards compatibility, but the mapping table is on the roadmap for removal (see `docs/UNIFIED_ROADMAP.md`). Grepping for the new names will not find usages that use the legacy form.
+> The auto-rewrite table that used to translate old event names is gone. The names below are **no longer recognised** — using them will silently fail to wire up. Use the semantic name on the right in every script:
 
-| Legacy Name (avoid) | Use Instead |
+| Old Name (gone) | Use Instead |
 |-------------|---------|
 | `startmenu:toggle` | `ui:menu:start:toggle` |
 | `contextmenu:show` | `ui:menu:context:show` |
@@ -1598,24 +1597,29 @@ Events follow the pattern: `namespace:action` or `namespace:category:action`
 
 ## Complete App Registry
 
-All 37 scriptable applications:
+All 42 scriptable applications (registered by `apps/AppRegistry.js`):
 
 | App ID | Name | Category |
 |--------|------|----------|
 | `adminpanel` | Admin Panel | system |
+| `analyticsdashboard` | Analytics Dashboard | system |
 | `asteroids` | Asteroids | games |
+| `bonzibuddy` | BonziBuddy | companions |
 | `browser` | Browser | internet |
 | `calculator` | Calculator | accessories |
 | `calendar` | Calendar | accessories |
+| `campaignstudio` | Campaign Studio | narrative |
 | `chatroom` | ChatRoom | internet |
 | `clock` | Clock | accessories |
 | `controlpanel` | Control Panel | system |
 | `defrag` | Defrag | system |
 | `displayproperties` | Display Properties | settings |
 | `doom` | Doom | games |
+| `dosbox` | DOSBox | games |
 | `featuressettings` | Features Settings | settings |
 | `findfiles` | Find Files | system |
 | `freecell` | FreeCell | games |
+| `gamelobby` | Game Lobby | multiplayer |
 | `helpsystem` | Help | system |
 | `hypercard` | HyperCard | accessories |
 | `inbox` | Inbox | internet |
@@ -1629,29 +1633,38 @@ All 37 scriptable applications:
 | `recyclebin` | Recycle Bin | system |
 | `rundialog` | Run | system |
 | `scriptrunner` | Script Runner | system |
+| `showrunnerconsole` | Showrunner Console | narrative |
 | `skifree` | SkiFree | games |
 | `snake` | Snake | games |
 | `solitaire` | Solitaire | games |
 | `soundsettings` | Sound Settings | settings |
 | `taskmanager` | Task Manager | system |
 | `terminal` | Terminal | system |
+| `tetris` | Tetris | games |
+| `timelineeditor` | Timeline Editor | narrative |
 | `zork` | Zork | games |
 
 ---
 
 ## System Features
 
-All 7 system features:
+The 13 built-in features (extending `FeatureBase`):
 
 | Feature ID | Name | Description |
 |------------|------|-------------|
+| `soundsystem` | Sound System | Centralized audio with MP3 support and synthesized fallbacks |
 | `achievements` | Achievement System | Tracks and unlocks achievements |
-| `clippy` | Clippy Assistant | Interactive desktop assistant |
-| `desktop-pet` | Desktop Pet | Interactive desktop pet |
-| `easter-eggs` | Easter Eggs | Hidden features and secrets |
-| `screensaver` | Screensaver | Screen saver system |
-| `sound-system` | Sound System | System audio and sound effects |
-| `system-dialogs` | System Dialogs | Native-style dialog windows |
+| `systemdialogs` | System Dialogs | Native-style alert / confirm / prompt / file dialogs |
+| `screensaver` | Screensaver | Idle screensaver (toasters, starfield, marquee) |
+| `clippy` | Clippy Assistant | Context-aware paperclip assistant |
+| `desktoppet` | Desktop Pet | Animated companion with physics |
+| `eastereggs` | Easter Eggs | Konami code, cheat codes, hidden features |
+| `campaign-manager` | Campaign Manager | ARG campaign lifecycle and packaging |
+| `mood-orchestrator` | Mood Orchestrator | Atmosphere presets and adaptive scoring |
+| `content-template-manager` | Content Template Manager | Reusable narrative templates |
+| `online-users` | Online Users | System-tray presence indicator for multiplayer |
+| `notifications` | Notifications | Toast notifications, sound alerts, taskbar flash |
+| `reauthgate` | Reauth Gate | Surfaces a reauth prompt when `auth:expired` fires |
 
 ---
 
