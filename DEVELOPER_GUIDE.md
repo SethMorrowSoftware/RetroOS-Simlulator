@@ -2,7 +2,7 @@
 
 This guide documents the **current** development workflow for extending IlluminatOS with apps, features, plugins, and RetroScript-driven experiences.
 
-The platform-level unification (owner-scoped subscriptions, unified command registry, single realtime topology, `fetchWithAuth` 401 trap, shared file-op path validation, transactional plugin load) has all landed and is reflected below. Deferred follow-ups are listed in [`docs/MIGRATION_ROADMAP.md`](docs/MIGRATION_ROADMAP.md).
+The platform-level unification (owner-scoped subscriptions, unified command registry, single realtime topology, `fetchWithAuth` 401 trap, shared file-op path validation, transactional plugin load) has all landed and is reflected below.
 
 ## Table of contents
 1. Development model
@@ -504,8 +504,7 @@ When you add/modify capabilities:
 3. Update `SCRIPTING_GUIDE.md` for script-visible changes
 4. Update `docs/RETROSCRIPT_SCRIPTABLE_EVENTS.md` for event/command/query changes
 5. Update `CLAUDE.md` if you change an architectural pattern or a key file's role
-6. If you close one of the items in `docs/MIGRATION_ROADMAP.md`, remove the entry rather than just marking it done
-7. Remove superseded planning/debug docs rather than leaving stale guidance
+6. Remove superseded planning/debug docs rather than leaving stale guidance
 
 Use this rule: if a document is no longer actionable for contributors, delete it.
 

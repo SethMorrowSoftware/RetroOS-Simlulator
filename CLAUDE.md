@@ -265,7 +265,7 @@ Never tear down `MultiplayerClient`, `RealtimeClient`, or `PresenceManager` dire
 
 ## Event System
 
-Events use namespaced format: `window:open`, `app:close`, `ui:menu:start:toggle`, etc. Schemas live in `core/schema/` with validation. `SemanticEventBus` provides middleware, logging, request/response, channels, and the unified command registry. There is no separate `EventBus` implementation — `core/EventBus.js` is a one-line re-export so old imports keep working (the re-export is kept indefinitely — see `docs/MIGRATION_ROADMAP.md` for the rationale).
+Events use namespaced format: `window:open`, `app:close`, `ui:menu:start:toggle`, etc. Schemas live in `core/schema/` with validation. `SemanticEventBus` provides middleware, logging, request/response, channels, and the unified command registry. There is no separate `EventBus` implementation — `core/EventBus.js` is a one-line re-export kept indefinitely so the ~75 existing `from './EventBus.js'` imports don't need to churn.
 
 The canonical user-session events are `user:login`, `user:logout`, `user:switch`, `auth:expired` (see `core/schema/system.js`).
 
@@ -287,7 +287,6 @@ Script file ops (`write` / `read` / `delete` / `mkdir`) validate paths against t
 - `docs/retroscript/README.md` — RetroScript documentation hub (learning-oriented guide, alphabetical dictionary, 10 tutorials)
 - `docs/RETROSCRIPT_SCRIPTABLE_EVENTS.md` — Exhaustive event/command/query reference for scripts
 - `docs/TERMINAL_SCRIPTING.md` — Terminal-specific RetroScript built-ins and workflows
-- `docs/MIGRATION_ROADMAP.md` — Deliberate non-decisions kept as-is (the previously deferred F1/F2/F3 follow-ups are closed)
 - `docs/GREENGEEKS_RESELLER_VPS_WEBSOCKET_SETUP.md` — Production WebSocket sidecar deployment guide
 - `docs/walkthrough.md`, `docs/required_media.md` — In-world content for the EREBUS campaign in `autoexec.retro`
 

@@ -169,7 +169,6 @@ curl 'http://localhost:8000/api/queue.php?action=status'
 - `SCRIPTING_GUIDE.md` — RetroScript language, runtime, events, and patterns
 - `docs/RETROSCRIPT_SCRIPTABLE_EVENTS.md` — complete event, command, and query reference for scripting
 - `docs/TERMINAL_SCRIPTING.md` — terminal-specific scripting built-ins and workflows
-- `docs/MIGRATION_ROADMAP.md` — short list of deferred follow-ups and deliberate non-decisions
 - `docs/GREENGEEKS_RESELLER_VPS_WEBSOCKET_SETUP.md` — GreenGeeks reseller VPS deployment guide for the WebSocket sidecar
 - `docs/walkthrough.md`, `docs/required_media.md` — in-world content for the EREBUS campaign in `autoexec.retro`
 - `plugins/features/dvd-bouncer/README.md` — concrete plugin example
@@ -254,5 +253,3 @@ curl 'http://localhost:8000/api/queue.php?action=status'
 - **Storage hardening**: `StorageManager.set/get/setGlobal/getGlobal/hydrationSet` reject payloads with `__proto__` / `constructor` / `prototype` keys at any depth; UI writes are dropped during snapshot hydration; pre-login `.set()` writes are queued and replayed under the user scope on login with set-if-missing semantics (so a returning user's data isn't clobbered by boot-time defaults); icon coordinates are clamped to a sane range.
 - **Desktop-icon sync is bidirectional**: state → FS via `FileSystemManager.syncDesktopIcons` and FS → state via `StateManager.installDesktopIconReconciler` (subscribes to `filesystem:directory:changed` and skips events with `source: 'syncDesktopIcons'` to avoid feedback loops).
 - Multiplayer state sync uses a re-broadcast guard plus a version-vector conflict surface (`mp:state:conflict`, `story:state:conflict`) so concurrent edits no longer silently clobber.
-
-`docs/MIGRATION_ROADMAP.md` tracks deliberate non-decisions (e.g., the `core/EventBus.js` re-export); the previously-deferred F1 (CommandBus deletion), F2 (bidirectional icon sync), and F3 (pre-login storage drift) follow-ups are closed.
