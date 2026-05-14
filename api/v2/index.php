@@ -91,6 +91,29 @@ $router->get('/themes/:id',        [ThemeController::class, 'get']);
 $router->put('/themes/:id',        [ThemeController::class, 'update']);
 $router->delete('/themes/:id',     [ThemeController::class, 'delete']);
 
+// ─── Campaign Routes (Admin) ────────────────────────────────
+// Note: /campaigns/active must come BEFORE /campaigns/:id so the literal
+// path isn't captured by the :id wildcard.
+$router->get('/campaigns/active',           [CampaignController::class, 'active']);
+$router->get('/campaigns',                  [CampaignController::class, 'list']);
+$router->post('/campaigns',                 [CampaignController::class, 'create']);
+$router->get('/campaigns/:id',              [CampaignController::class, 'get']);
+$router->put('/campaigns/:id',              [CampaignController::class, 'update']);
+$router->delete('/campaigns/:id',           [CampaignController::class, 'delete']);
+$router->post('/campaigns/:id/activate',    [CampaignController::class, 'activate']);
+$router->post('/campaigns/:id/deactivate',  [CampaignController::class, 'deactivate']);
+$router->post('/campaigns/:id/publish',     [CampaignController::class, 'publish']);
+
+// ─── Timeline Routes (Admin) ────────────────────────────────
+// Same ordering rule: literal sub-paths before :id.
+$router->post('/timeline/run-due',          [TimelineController::class, 'runDue']);
+$router->get('/timeline',                   [TimelineController::class, 'list']);
+$router->post('/timeline',                  [TimelineController::class, 'create']);
+$router->get('/timeline/:id',               [TimelineController::class, 'get']);
+$router->put('/timeline/:id',               [TimelineController::class, 'update']);
+$router->delete('/timeline/:id',            [TimelineController::class, 'delete']);
+$router->post('/timeline/:id/fire',         [TimelineController::class, 'fire']);
+
 // ─── Event / SSE Routes ────────────────────────────────────
 $router->get('/events/stream',      [EventController::class, 'stream']);
 $router->post('/events',            [EventController::class, 'dispatch']);

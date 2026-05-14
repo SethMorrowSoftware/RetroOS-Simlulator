@@ -593,6 +593,26 @@ small.text-muted {
 }
 .bc-status-ok  { color: var(--success); }
 .bc-status-error { color: var(--danger); }
+
+/* Monospaced textarea used by Campaigns / Timeline editors for JSON/code. */
+.code-input {
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 12px;
+    line-height: 1.4;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 8px;
+    color: var(--text);
+    white-space: pre;
+    tab-size: 2;
+}
+.code-input:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px rgba(74, 144, 217, 0.2);
+}
+
 .bc-collapsible-header {
     display: flex;
     align-items: center;
