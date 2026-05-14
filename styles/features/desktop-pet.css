@@ -14,6 +14,7 @@
     -moz-user-select: none;
     -ms-user-select: none;
     background: transparent;
+    overflow: visible;
 }
 
 .desktop-pet canvas {
@@ -21,4 +22,215 @@
     image-rendering: -moz-crisp-edges;
     image-rendering: crisp-edges;
     background: transparent;
+    display: block;
+}
+
+/* ---- Name tag (shown on hover) ---- */
+.pet-name-tag {
+    position: absolute;
+    left: 50%;
+    bottom: -16px;
+    transform: translateX(-50%);
+    background: rgba(20, 20, 28, 0.86);
+    color: #ffffff;
+    font-family: 'MS Sans Serif', 'Tahoma', sans-serif;
+    font-size: 10px;
+    padding: 2px 6px;
+    border: 1px solid #555;
+    border-radius: 3px;
+    pointer-events: none;
+    white-space: nowrap;
+    z-index: 1;
+    box-shadow: 1px 1px 0 rgba(0, 0, 0, 0.5);
+}
+
+/* ---- Speech bubble (lives on document.body, positioned per-frame) ---- */
+.pet-speech-bubble {
+    position: fixed;
+    z-index: 9000;
+    background: #ffffff;
+    color: #000;
+    border: 2px solid #000;
+    border-radius: 10px;
+    padding: 6px 10px;
+    font-family: 'MS Sans Serif', 'Tahoma', sans-serif;
+    font-size: 11px;
+    max-width: 200px;
+    pointer-events: none;
+    box-shadow: 2px 2px 0 rgba(0, 0, 0, 0.4);
+    animation: pet-bubble-pop 200ms ease-out;
+}
+
+.pet-speech-bubble::after {
+    content: "";
+    position: absolute;
+    left: 50%;
+    bottom: -8px;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 8px solid transparent;
+    border-right: 8px solid transparent;
+    border-top: 8px solid #000;
+}
+
+.pet-speech-bubble::before {
+    content: "";
+    position: absolute;
+    left: 50%;
+    bottom: -5px;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-top: 6px solid #fff;
+    z-index: 1;
+}
+
+@keyframes pet-bubble-pop {
+    0% { transform: scale(0.6); opacity: 0; }
+    60% { transform: scale(1.08); opacity: 1; }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+/* ---- Particle effects (hearts/sparkles/Zzz/etc.) ---- */
+.pet-particle {
+    position: fixed;
+    z-index: 9001;
+    font-family: 'MS Sans Serif', 'Tahoma', sans-serif;
+    font-size: 16px;
+    pointer-events: none;
+    user-select: none;
+    text-shadow: 0 0 4px rgba(0, 0, 0, 0.4);
+    animation: pet-particle-float 1.2s ease-out forwards;
+}
+
+.pet-particle-heart {
+    animation: pet-particle-heart 1.2s ease-out forwards;
+}
+.pet-particle-sparkle {
+    animation: pet-particle-sparkle 1s ease-out forwards;
+    font-size: 14px;
+}
+.pet-particle-zzz {
+    animation: pet-particle-zzz 1.5s ease-in-out forwards;
+    font-weight: bold;
+    font-size: 14px;
+}
+.pet-particle-question,
+.pet-particle-exclaim {
+    animation: pet-particle-bounce 0.9s ease-out forwards;
+    font-weight: bold;
+}
+.pet-particle-food {
+    animation: pet-particle-float 1.4s ease-out forwards;
+}
+.pet-particle-note {
+    animation: pet-particle-music 1.1s ease-out forwards;
+}
+
+@keyframes pet-particle-float {
+    0%   { transform: translate(-50%, 0)    scale(0.5); opacity: 0; }
+    20%  { transform: translate(-50%, -8px) scale(1.1); opacity: 1; }
+    100% { transform: translate(-50%, -40px) scale(0.6); opacity: 0; }
+}
+@keyframes pet-particle-heart {
+    0%   { transform: translate(-50%, 0)    scale(0.4); opacity: 0; }
+    20%  { transform: translate(-50%, -10px) scale(1.3); opacity: 1; }
+    100% { transform: translate(-50%, -50px) scale(0.6); opacity: 0; }
+}
+@keyframes pet-particle-sparkle {
+    0%   { transform: translate(-50%, 0) rotate(0)    scale(0.4); opacity: 0; }
+    20%  { transform: translate(-50%, -6px) rotate(180deg) scale(1.2); opacity: 1; }
+    100% { transform: translate(-50%, -32px) rotate(360deg) scale(0.4); opacity: 0; }
+}
+@keyframes pet-particle-zzz {
+    0%   { transform: translate(-50%, 0) scale(0.6); opacity: 0; }
+    30%  { transform: translate(-30%, -10px) scale(1.0); opacity: 0.9; }
+    70%  { transform: translate(20%, -28px) scale(1.2); opacity: 0.8; }
+    100% { transform: translate(60%, -52px) scale(0.6); opacity: 0; }
+}
+@keyframes pet-particle-bounce {
+    0%   { transform: translate(-50%, 0)    scale(0.3); opacity: 0; }
+    30%  { transform: translate(-50%, -10px) scale(1.4); opacity: 1; }
+    60%  { transform: translate(-50%, -8px) scale(0.9); opacity: 1; }
+    100% { transform: translate(-50%, -28px) scale(0.6); opacity: 0; }
+}
+@keyframes pet-particle-music {
+    0%   { transform: translate(-50%, 0) rotate(-15deg) scale(0.5); opacity: 0; }
+    20%  { transform: translate(-30%, -10px) rotate(0)   scale(1.1); opacity: 1; }
+    100% { transform: translate(40%, -40px) rotate(20deg) scale(0.6); opacity: 0; }
+}
+
+/* ---- Right-click context menu ---- */
+.pet-context-menu {
+    position: fixed;
+    z-index: 9100;
+    background: #ECE9D8;
+    border: 1px solid #888;
+    border-top-color: #fff;
+    border-left-color: #fff;
+    box-shadow: 2px 2px 6px rgba(0, 0, 0, 0.4);
+    font-family: 'MS Sans Serif', 'Tahoma', sans-serif;
+    font-size: 11px;
+    min-width: 160px;
+    padding: 2px;
+    user-select: none;
+}
+
+.pet-context-menu-item {
+    position: relative;
+    padding: 4px 10px 4px 22px;
+    cursor: pointer;
+    white-space: nowrap;
+    color: #000;
+}
+
+.pet-context-menu-item:hover {
+    background: #316AC5;
+    color: #fff;
+}
+
+.pet-context-menu-item.has-submenu {
+    padding-right: 20px;
+}
+
+.pet-context-menu-sep {
+    height: 1px;
+    margin: 3px 4px;
+    background: #aaa;
+    border-bottom: 1px solid #fff;
+}
+
+.pet-context-submenu {
+    display: none;
+    position: absolute;
+    left: 100%;
+    top: -3px;
+    background: #ECE9D8;
+    border: 1px solid #888;
+    border-top-color: #fff;
+    border-left-color: #fff;
+    box-shadow: 2px 2px 6px rgba(0, 0, 0, 0.4);
+    padding: 2px;
+    min-width: 140px;
+}
+
+.pet-context-menu-item.has-submenu:hover > .pet-context-submenu {
+    display: block;
+}
+
+.pet-context-submenu .pet-context-menu-item {
+    padding-left: 10px;
+}
+
+/* ---- Rename dialog input override ---- */
+.pet-rename-input {
+    font-family: 'MS Sans Serif', 'Tahoma', sans-serif;
+    font-size: 12px;
+    border: 1px solid #888;
+    border-top-color: #555;
+    border-left-color: #555;
+    background: #fff;
 }

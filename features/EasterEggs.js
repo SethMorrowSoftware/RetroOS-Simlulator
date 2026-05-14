@@ -120,6 +120,33 @@ class EasterEggs extends FeatureBase {
                 this.typedChars = [];
             }
 
+            // Pet-related cheats — quick fun without their own UI
+            if (this.typedChars.slice(-7).join('') === 'petfeed') {
+                EventBus.emit('easteregg:triggered', { code: 'petfeed' });
+                EventBus.emit(Events.PET_TOGGLE, { enabled: true });
+                this.typedChars = [];
+            }
+            if (this.typedChars.slice(-4).join('') === 'purr') {
+                EventBus.emit('easteregg:triggered', { code: 'purr' });
+                EventBus.emit(Events.PET_CHANGE, { type: 'neko' });
+                this.typedChars = [];
+            }
+            if (this.typedChars.slice(-3).join('') === 'woof') {
+                EventBus.emit('easteregg:triggered', { code: 'woof' });
+                EventBus.emit(Events.PET_CHANGE, { type: 'dog' });
+                this.typedChars = [];
+            }
+            if (this.typedChars.slice(-3).join('') === 'hop') {
+                EventBus.emit('easteregg:triggered', { code: 'hop' });
+                EventBus.emit(Events.PET_CHANGE, { type: 'bunny' });
+                this.typedChars = [];
+            }
+            if (this.typedChars.slice(-3).join('') === 'yip') {
+                EventBus.emit('easteregg:triggered', { code: 'yip' });
+                EventBus.emit(Events.PET_CHANGE, { type: 'fox' });
+                this.typedChars = [];
+            }
+
             // Custom registered cheats
             if (this._customCheats) {
                 const typed = this.typedChars.join('');
@@ -157,6 +184,7 @@ class EasterEggs extends FeatureBase {
 
         StateManager.unlockAchievement('konami_master');
         EventBus.emit(Events.SOUND_PLAY, { type: 'startup' });
+        EventBus.emit('easteregg:triggered', { code: 'konami' });
 
         // Enable pet
         EventBus.emit(Events.PET_TOGGLE, { enabled: true });
@@ -223,6 +251,7 @@ class EasterEggs extends FeatureBase {
         };
 
         EventBus.emit(Events.SOUND_PLAY, { type: 'startup' });
+        EventBus.emit('easteregg:triggered', { code: 'rosebud' });
 
         // Trigger hook
         this.triggerHook('easter-egg:rosebud', {});
@@ -253,6 +282,7 @@ class EasterEggs extends FeatureBase {
         document.body.classList.add('disco-mode');
         StateManager.unlockAchievement('disco_fever');
         EventBus.emit(Events.SOUND_PLAY, { type: 'secret' });
+        EventBus.emit('easteregg:triggered', { code: 'disco' });
 
         setTimeout(() => {
             document.body.classList.remove('disco-mode');
@@ -270,6 +300,7 @@ class EasterEggs extends FeatureBase {
 
         StateManager.unlockAchievement('matrix_mode');
         EventBus.emit(Events.SOUND_PLAY, { type: 'secret' });
+        EventBus.emit('easteregg:triggered', { code: 'matrix' });
         EventBus.emit('terminal:matrix', {});
 
         // Trigger hook
@@ -299,7 +330,8 @@ class EasterEggs extends FeatureBase {
             { name: 'Rosebud', hint: 'Type "rosebud"', type: 'cheat' },
             { name: 'Matrix', hint: 'Type "matrix"', type: 'cheat' },
             { name: 'Disco', hint: 'Type "disco"', type: 'cheat' },
-            { name: 'Clock Click', hint: 'Click clock 10 times', type: 'click' }
+            { name: 'Clock Click', hint: 'Click clock 10 times', type: 'click' },
+            { name: 'Pet Cheats', hint: 'Type "purr", "woof", "hop", "yip", or "petfeed"', type: 'cheat' }
         ];
     }
 }
