@@ -29,6 +29,7 @@ import EventBus, { Events } from '../core/EventBus.js';
 import StateManager from '../core/StateManager.js';
 import WindowManager from '../core/WindowManager.js';
 import { escapeHtml, escAttr } from '../core/Sanitize.js';
+import SubscriptionManager from '../core/SubscriptionManager.js';
 
 class AppBase {
     /**
@@ -291,7 +292,10 @@ class AppBase {
 
         let content;
         try {
-            content = this.onOpen(params);
+            // SubscriptionManager.runAs binds any EventBus.on() / StateManager.subscribe()
+            // calls inside onOpen() to this window's ID, so they auto-clean on close
+            // even if the app didn't use this.onEvent() / this.subscribe() helpers.
+            content = SubscriptionManager.runAs(windowId, () => this.onOpen(params));
         } catch (error) {
             EventBus.emit(Events.APP_ERROR, {
                 appId: this.id,
@@ -333,8 +337,13 @@ class AppBase {
             const prevWindowId = this._currentWindowId;
             this._currentWindowId = windowId;
             try {
-                this.registerCoreScriptApi();
-                this.onMount();
+                // Bind subscriptions created in onMount to this window's ID
+                // so they get cleaned up automatically on close, even if
+                // the app bypasses the AppBase helper methods.
+                SubscriptionManager.runAs(windowId, () => {
+                    this.registerCoreScriptApi();
+                    this.onMount();
+                });
                 // Emit app ready event after mount completes
                 EventBus.emit(Events.APP_READY, {
                     appId: this.id,
@@ -433,6 +442,11 @@ class AppBase {
         // event is dispatched in that path.
         this._focusedWindowIds.delete(windowId);
 
+        // Release any subscriptions that were tracked against this window
+        // by SubscriptionManager (i.e. raw EventBus.on() / StateManager.subscribe()
+        // calls made inside onOpen/onMount that bypassed the AppBase helpers).
+        SubscriptionManager.unsubscribeAll(windowId);
+
         // Update legacy properties
         if (this.openWindows.size === 0) {
             this.isOpen = false;
@@ -442,6 +456,10 @@ class AppBase {
             // Clean up global event subscriptions registered outside any window context
             this._globalEventUnsubscribers.forEach(unsub => unsub());
             this._globalEventUnsubscribers = [];
+
+            // Release any subscriptions tracked against the app ID itself
+            // (e.g. constructor-time registrations).
+            SubscriptionManager.unsubscribeAll(this.id);
         } else {
             // Set windowId to another open window
             this.windowId = this.openWindows.keys().next().value;

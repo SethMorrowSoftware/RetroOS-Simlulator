@@ -13,7 +13,7 @@
 import StorageManager from './StorageManager.js';
 import EventBus, { Events } from './EventBus.js';
 import { PATHS } from './Constants.js';
-import { getConfig, getAuthHeaders, getApiBasePath, isBackendAvailable } from './ConfigLoader.js';
+import { getConfig, getApiBasePath, isBackendAvailable, fetchWithAuth } from './ConfigLoader.js';
 
 /**
  * Protected system paths that require godMode to modify
@@ -1202,9 +1202,8 @@ class FileSystemManager {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000);
     try {
-      const response = await fetch(`${apiBase}/files/${serverId}`, {
+      const response = await fetchWithAuth(`${apiBase}/files/${serverId}`, {
         method: 'DELETE',
-        headers: getAuthHeaders(),
         signal: controller.signal,
       });
       if (!response.ok) {
@@ -1934,9 +1933,8 @@ class FileSystemManager {
     formData.append('file', file);
     formData.append('virtual_path', virtualPath);
 
-    const response = await fetch(`${apiBase}/files/upload`, {
+    const response = await fetchWithAuth(`${apiBase}/files/upload`, {
       method: 'POST',
-      headers: getAuthHeaders(),
       body: formData,
     });
 
@@ -1996,9 +1994,7 @@ class FileSystemManager {
     }
 
     const apiBase = getApiBasePath() + 'api/v2';
-    const response = await fetch(`${apiBase}/files/${node.serverId}/download`, {
-      headers: getAuthHeaders(),
-    });
+    const response = await fetchWithAuth(`${apiBase}/files/${node.serverId}/download`);
 
     if (!response.ok) {
       throw new Error('Download failed');
@@ -2027,9 +2023,8 @@ class FileSystemManager {
     if (!node || !node.serverId) return false;
 
     const apiBase = getApiBasePath() + 'api/v2';
-    const response = await fetch(`${apiBase}/files/${node.serverId}`, {
+    const response = await fetchWithAuth(`${apiBase}/files/${node.serverId}`, {
       method: 'DELETE',
-      headers: getAuthHeaders(),
     });
 
     if (!response.ok) {
@@ -2058,11 +2053,8 @@ class FileSystemManager {
 
     let response;
     try {
-      response = await fetch(`${apiBase}/files`, {
-        headers: {
-          ...getAuthHeaders(),
-          'Accept': 'application/json',
-        },
+      response = await fetchWithAuth(`${apiBase}/files`, {
+        headers: { 'Accept': 'application/json' },
         signal: controller.signal,
       });
     } catch (error) {
@@ -2158,11 +2150,8 @@ class FileSystemManager {
 
     const apiBase = getApiBasePath() + 'api/v2';
     try {
-      const response = await fetch(`${apiBase}/files/quota`, {
-        headers: {
-          ...getAuthHeaders(),
-          'Accept': 'application/json',
-        },
+      const response = await fetchWithAuth(`${apiBase}/files/quota`, {
+        headers: { 'Accept': 'application/json' },
       });
       if (!response.ok) return null;
       const data = await response.json();

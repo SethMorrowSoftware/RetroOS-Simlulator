@@ -49,11 +49,11 @@ The final API surface lives in `CLAUDE.md` § Architecture Patterns and is refle
 | Wave | Theme | Status |
 |---|---|---|
 | Wave 1 | Foundation: lifecycle, session, modal race, partial path/auth hardening | ✅ Landed in PR #1 |
-| Wave 2 | Source-of-truth consolidation: `SubscriptionManager`, `EventTopology`, `CommandBus` facade, `fetchWithAuth` | ⏳ Planned |
+| Wave 2 | Source-of-truth consolidation: `SubscriptionManager`, `EventTopology`, `CommandBus` facade, `fetchWithAuth` | ✅ Landed in PR #2 |
 | Wave 3 | Hardening: storage hydration guard, desktop-icon reconciliation, FS sync event emission, prototype-pollution guards, builtin error type uniformity | ⏳ Planned |
 | Wave 4 | Legacy retirement: drop `LEGACY_EVENT_MAPPING`, remove `CommandBus` facade, remove WS query-string auth, Terminal per-window state migration, remove `core/EventBus.js` re-export | ⏳ Planned |
 
-Total time estimate from PR #1 to "final unified product": Wave 2 (3–4 PRs), Wave 3 (3–4 PRs), Wave 4 (3 PRs, depends on Wave 2/3 completion).
+Total time estimate from PR #1 to "final unified product": Wave 3 (3–4 PRs), Wave 4 (3 PRs, depends on Wave 3 completion).
 
 ---
 
@@ -73,70 +73,62 @@ Landed in PR #1. See `docs/ARCHITECTURE_AUDIT.md` for status annotations.
 
 ---
 
-## Wave 2 — Source-of-truth consolidation
+## Wave 2 — Source-of-truth consolidation (done)
 
-The largest single win. Once Wave 2 lands, "where is this owned?" has a single answer for every cross-cutting concern.
+Landed in PR #2. Once Wave 2 lands, "where is this owned?" has a single answer for every cross-cutting concern.
 
-### W2.1 — `SubscriptionManager`
+### W2.1 — `SubscriptionManager` ✅
 
 **Problem.** Subscribers accumulate. `EventBus.on(...)` returns an unsubscribe function that virtually nobody stores. Apps closing, features disabling, plugins unloading, and the logout cascade all leak.
 
-**Solution.** A `SubscriptionManager` that:
-- Wraps `SemanticEventBus.on`, `StateManager.subscribe`, `CommandBus.register`.
-- Stores each subscription keyed by `ownerId` (`appId` / `featureId` / `pluginId` / `'session'`).
-- Exposes `unsubscribeAll(ownerId)`.
+**Resolution.** `core/SubscriptionManager.js` (new). Wraps every `SemanticEventBus.on` and `StateManager.subscribe` return automatically: when one of these is called inside a `SubscriptionManager.runAs(ownerId, fn)` scope, the unsubscribe function is recorded against that owner. A single `unsubscribeAll(ownerId)` call releases the lot.
 
-**Integration.**
-- `AppBase.handleClose` calls `unsubscribeAll(this.windowId)` then `unsubscribeAll(this.id)` once last window closes.
-- `FeatureBase.disable` calls `unsubscribeAll(this.id)` (replaces the manual `eventUnsubscribers` array).
-- `PluginLoader.unloadPlugin` calls `unsubscribeAll(pluginId)`.
-- `SessionManager._teardown` adds `unsubscribeAll('session')` between `setSessionToken(null)` and `resetVolatile()`.
+Owner IDs:
+- App window ID (`notepad-1`, `notepad-2`, …) — owned by the open window.
+- App ID (`notepad`) — for constructor-time registrations that survive a single window's lifetime.
+- Feature ID (`soundsystem`) — for raw subscriptions inside `initialize()` that bypass `this.subscribe()`.
+- Plugin ID — for raw subscriptions inside `onLoad()` that bypass feature lifecycle.
+- `'session'` — reserved for future migrations of boot-time wiring that should drop on logout.
 
-**Compatibility.** Existing `.on()` calls still work — the manager records them with the current `_currentOwnerId` (set by `AppBase`/`FeatureBase`/`PluginLoader` when invoking lifecycle). Apps/features that opt into `this.subscribe(...)` get auto-cleanup; raw `EventBus.on(...)` users keep the old (no-cleanup) semantics until migrated.
+Integration:
+- `AppBase.launch()` wraps `onOpen` and `onMount` in `SubscriptionManager.runAs(windowId, …)`.
+- `AppBase.handleClose()` calls `SubscriptionManager.unsubscribeAll(windowId)` and, when the last window closes, `unsubscribeAll(this.id)`.
+- `FeatureBase.enable()` wraps `initialize()` in `runAs(this.id, …)`. `cleanup()` calls `unsubscribeAll(this.id)`.
+- `PluginLoader.loadPlugin()` wraps `onLoad()` in `runAs(plugin.id, …)`. `unloadPlugin()` calls `unsubscribeAll(pluginId)`.
+- `SessionManager._teardown` calls `unsubscribeAll('session')`.
 
-**Estimated PRs.** 1 — small, additive.
+Compatibility: anonymous subscriptions (no owner active) pass through unchanged — existing `EventBus.on(...)` calls outside any lifecycle keep the old "caller manages cleanup" semantics. AppBase's `onEvent()` and FeatureBase's `subscribe()` helpers remain in place and continue tracking unsubscribes in their per-owner arrays; SubscriptionManager is an additional safety net for raw `.on()` calls inside lifecycle code.
 
-### W2.2 — `EventTopology`
+### W2.2 — `EventTopology` ✅
 
 **Problem.** Realtime event mapping is sprawled across three files: `RealtimeClient.bridgedEvents`, `index.js:694-799` SSE handlers, and the `MultiplayerClient` WS bridge. Drift is already present (`narrative.mood.shift` / `system.notification` wired in `index.js` but not `bridgedEvents`).
 
-**Solution.** A single `core/EventTopology.js` listing every cross-process event:
+**Resolution.** `core/EventTopology.js` (new). Single array of `{ backend, frontend?, transports, description? }` entries covering every cross-process event. `RealtimeClient.bridgedEvents` is now derived from `getBackendEventsForTransport('sse')` — adding a new SSE event means adding one topology entry, no second list to keep in sync.
 
-```js
-export const EventTopology = [
-  {
-    backendName: 'system.notification',
-    frontendName: 'notification:show',
-    transports: ['sse', 'ws'],
-    handler: (payload) => { /* normalize */ }
-  },
-  // ...
-];
-```
+When `frontend` is set on a topology entry, `RealtimeClient` emits *both* the legacy `sse:<backend>` alias (existing handlers in `index.js` keep working) *and* the semantic `frontend` name (new handlers can subscribe directly). When `frontend` is omitted (because the existing handler in `index.js` does payload transformation that the topology can't do), only the legacy alias fires.
 
-`RealtimeClient`, the SSE handler in `index.js`, and `MultiplayerClient` all iterate this list.
+Wave 4 will retire the `sse:<backend>` aliases once all handlers have moved to the semantic names defined in the topology.
 
-**Estimated PRs.** 1.
-
-### W2.3 — `CommandBus` facade
+### W2.3 — `CommandBus` facade ✅
 
 **Problem.** Two parallel registration mechanisms (`EventBus.on('command:*')` and `CommandBus.register`). Developers must choose. The bus already routes commands as events.
 
-**Solution.** Add `registerCommand` / `executeCommand` to `SemanticEventBus`. Mark `CommandBus.js` `@deprecated`. `CommandBus.register` becomes a thin pass-through. No call-site changes required.
+**Resolution.** `SemanticEventBus` now owns the command registry (`commandHandlers` Map, `registerCommand()`, `executeCommand()`, `hasCommand()`, `getCommands()`). `CommandBus.js` is a thin facade: its `handlers` field is a *reference* to `SemanticEventBus.commandHandlers`, and `CommandBus.register()` / `.execute()` delegate to the unified API. The file is marked `@deprecated` and will be removed in Wave 4. No call-site changes required for existing code.
 
-**Estimated PRs.** 1.
+New code should `import EventBus from './EventBus.js'` and call `EventBus.registerCommand(...)` / `EventBus.executeCommand(...)` directly.
 
-### W2.4 — `fetchWithAuth` + 401 trap
+### W2.4 — `fetchWithAuth` + 401 trap ✅
 
 **Problem.** Backend expires tokens; frontend never notices and loops with a stale token. No reauth UI.
 
-**Solution.** Add `fetchWithAuth(url, options)` to `ConfigLoader.js`:
-- Adds `Authorization: Bearer <token>` and `X-Requested-With` automatically.
-- On 401: clears the token, calls `SessionManager.logout({ reason: 'auth_expired' })`, emits `auth:expired` (schema already exists), shows reauth dialog.
+**Resolution.** `fetchWithAuth(input, init)` exported from `ConfigLoader.js`:
+- Adds `Authorization: Bearer <token>` (unless `skipAuth: true` is passed in `init`).
+- Adds `X-Requested-With: XMLHttpRequest` as the CSRF sentinel.
+- On a 401 response, invokes `SessionManager.logout({ reason: 'auth_expired' })` and emits `auth:expired` (schema already exists). A re-entrancy guard prevents recursive logouts when multiple in-flight requests resolve to 401 simultaneously.
 
-Migrate the ~10 existing `fetch()` callers. Mechanical.
+Migrated callers in this PR: `UserStateSync` (3 fetches), `FileSystemManager` (6 fetches), `RealtimeClient` (the SSE stream connection). `LoginScreen`'s login/register fetches intentionally stay on raw `fetch()` — a 401 there means "wrong password" or "anonymous session expired", not "active session token died", and we don't want those to trigger the logout cascade.
 
-**Estimated PRs.** 1.
+The reauth UI (a modal that prompts for credentials when `auth:expired` fires) is not yet wired — emitting the event from the trap is enough to break the reconnect loop, and a feature can subscribe to render the UI in a follow-up PR.
 
 ---
 

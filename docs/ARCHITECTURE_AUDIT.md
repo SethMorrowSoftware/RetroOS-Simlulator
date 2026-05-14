@@ -54,12 +54,12 @@ The single largest class of bugs. Subsystems acquire resources (event listeners,
 
 | Symptom | Location | Status |
 |---|---|---|
-| `EventBus`/`StateManager`/`CommandBus` listeners accumulate forever; no per-owner unsubscribe | `SemanticEventBus.js:137`, `StateManager.js:241`, `CommandBus.js:845` | ⏳ open — Wave 2 in roadmap (SubscriptionManager) |
+| `EventBus`/`StateManager`/`CommandBus` listeners accumulate forever; no per-owner unsubscribe | `SemanticEventBus.js:137`, `StateManager.js:241`, `CommandBus.js:845` | ✅ fixed in PR #2 — `core/SubscriptionManager.js` tracks `EventBus.on` / `StateManager.subscribe` returns; AppBase, FeatureBase, PluginLoader, SessionManager release per owner |
 | `FeatureBase.disable()` resets `initialized=false`, so `enable()` re-runs init and re-subscribes | `FeatureBase.js:137` (verified) | ✅ fixed in PR #1 — no longer resets; concurrent enable/disable queued |
 | `WindowManager.createModal()` cleans up via a one-shot event listener — races on rapid close | `WindowManager.js:1199-1207` (verified) | ✅ fixed in PR #1 — cleanup runs synchronously in `close()` via `_modalCleanups` |
 | No `user:logout` cascade. `MultiplayerClient.disconnect()`, `RealtimeClient.closeRealtime()`, `PresenceManager.destroy()` exist but are never called from logout | `MultiplayerClient.js:162`, `PresenceManager.js:204`, no caller | ✅ fixed in PR #1 — `core/SessionManager.js` owns the cascade, wired into `performLogoff` |
-| `AppBase.setContent()` replaces innerHTML without unregistering prior DOM listeners | `AppBase.js:558` | ⏳ open — Wave 2 (paired with SubscriptionManager) |
-| `StorageManager.destroy()` removes its storage event listener, but is never called | `StorageManager.js:484` | ⏳ open — will be called from SessionManager teardown in Wave 2 |
+| `AppBase.setContent()` replaces innerHTML without unregistering prior DOM listeners | `AppBase.js:558` | ⏳ open — Wave 3 (paired with desktop-icon reconciliation cleanup) |
+| `StorageManager.destroy()` removes its storage event listener, but is never called | `StorageManager.js:484` | ⏳ open — Wave 3 |
 
 ### CC-2: Multiple Sources of Truth
 
@@ -69,7 +69,7 @@ Several pieces of state live in two or more places that drift independently.
 |---|---|---|
 | `StateManager.state.icons` vs `Desktop/*.lnk` files in the virtual FS | `StateManager.js:138`, `FileSystemManager.js:1710,2040` | ⏳ open — Wave 3 |
 | `StateManager` cache vs `StorageManager` cache vs module-level caches (e.g. `AchievementSystem._achievementsCache`) | `StateManager.js`, `StorageManager.js`, `AchievementSystem.js:62` | ⏳ open — Wave 3 |
-| Realtime event mapping in `RealtimeClient.bridgedEvents`, `index.js` SSE handlers, `MultiplayerClient` WS bridge | `RealtimeClient.js:29-65`, `index.js:694-799`, `MultiplayerClient.js:544-554` | ⏳ open — Wave 2 (EventTopology) |
+| Realtime event mapping in `RealtimeClient.bridgedEvents`, `index.js` SSE handlers, `MultiplayerClient` WS bridge | `RealtimeClient.js:29-65`, `index.js:694-799`, `MultiplayerClient.js:544-554` | ✅ fixed in PR #2 — `core/EventTopology.js` is the single source; `RealtimeClient` derives `bridgedEvents` from it. `index.js` `sse:*` handlers stay subscribed for back-compat until Wave 4 retires the alias. |
 | Active window: `StateManager.ui.activeWindow` vs DOM `.active` class | `WindowManager.js:357,1131` | ⏳ open — Wave 3 |
 | Path-allowlist for filesystem ops duplicated client-side and server-side | `index.js:700-718`, `FileController.php:43+` | 🟡 partial — script + SSE allowlists unified in `core/script/utils/PathValidation.js` (PR #1). Server-side (`FileController.php`) still independent. |
 
@@ -101,7 +101,7 @@ These are concrete, actionable gaps — not dual-use concerns.
 | Gap | Location | Status |
 |---|---|---|
 | WebSocket session token in URL query param — leaks to proxy logs, browser history, server access logs | `MultiplayerClient.js:101` (verified) | ✅ fixed in PR #1 — client now passes token via `Sec-WebSocket-Protocol: token.<hex>`. Server still accepts legacy URL/Authorization for compat. |
-| No 401 trap anywhere in frontend; backend expires tokens, frontend never notices and loops with stale token | `UserStateSync.js:95-105`, `RealtimeClient.js:191-194` | ⏳ open — `auth:expired` event reserved (schema added); `fetchWithAuth` wrapper is Wave 2 in roadmap |
+| No 401 trap anywhere in frontend; backend expires tokens, frontend never notices and loops with stale token | `UserStateSync.js:95-105`, `RealtimeClient.js:191-194` | ✅ fixed in PR #2 — `fetchWithAuth(input, init)` in `ConfigLoader.js` traps 401 → runs `SessionManager.logout({ reason: 'auth_expired' })` → emits `auth:expired`. `UserStateSync`, `FileSystemManager`, and `RealtimeClient` migrated. |
 | RetroScript file ops pass paths to `FileSystemManager` with zero validation; `index.js` allowlist is client-side only | `Interpreter.js:578,588,606` (verified) | ✅ fixed in PR #1 — all script visitors call `validateScriptPath()`; same allowlist used by SSE handler |
 | `StorageManager.set/get` use `JSON.parse` on payloads without prototype-pollution checks | `StorageManager.js:145,177` | ⏳ open — Wave 3 |
 | No bounds checking on icon coordinates accepted by `StateManager.addIcon`/`updateIconPosition` | `StateManager.js:380,444` | ⏳ open — Wave 3 |
@@ -221,11 +221,11 @@ Status as of PR #1. See [`UNIFIED_ROADMAP.md`](UNIFIED_ROADMAP.md) for the activ
 
 ### Wave 1 — Lifecycle & Cleanup (highest leverage)
 
-**P1. Owner-scoped subscription tracker.** ⏳ Open — Wave 2 of roadmap
-A new `SubscriptionManager` that wraps `EventBus.on`, `StateManager.subscribe`, `CommandBus.register`, and stores each subscription keyed by `ownerId` (appId, featureId, pluginId, sessionId). Adds `unsubscribeAll(ownerId)`. `AppBase.handleClose`, `FeatureBase.disable`, `PluginLoader.unloadPlugin`, and a new logout cascade call this. Backwards-compat: existing `.on()` calls still work; ownership is opt-in via a new `.scope(ownerId).on(...)` overload.
+**P1. Owner-scoped subscription tracker.** ✅ Landed in PR #2
+`core/SubscriptionManager.js`. Tracks unsubscribe functions returned by `SemanticEventBus.on()` and `StateManager.subscribe()` against the active owner (set via `SubscriptionManager.runAs(ownerId, fn)`). `unsubscribeAll(ownerId)` releases the lot. Integrated into `AppBase.launch/handleClose`, `FeatureBase.enable/cleanup`, `PluginLoader.loadPlugin/unloadPlugin`, and `SessionManager._teardown`. Existing AppBase/FeatureBase per-owner cleanup arrays remain in place — SubscriptionManager is an additional safety net for raw `.on()` calls inside lifecycle code.
 
-**P2. Unified logout / user-switch cascade.** ✅ Landed in PR #1
-`core/SessionManager.js` owns the cascade. Order: `MultiplayerClient.disconnect()` → `closeRealtime()` → `PresenceManager.destroy()` → `setSessionToken(null)` → `StateManager.resetVolatile()` → emit `user:logout`/`user:switch`. Wired into `SystemDialogs.performLogoff`. The `SubscriptionManager.unsubscribeAll('session')` step from the original plan remains pending (depends on P1).
+**P2. Unified logout / user-switch cascade.** ✅ Landed in PR #1 (+ #2)
+`core/SessionManager.js` owns the cascade. Order: `MultiplayerClient.disconnect()` → `closeRealtime()` → `PresenceManager.destroy()` → `setSessionToken(null)` → `SubscriptionManager.unsubscribeAll('session')` → `StateManager.resetVolatile()` → emit `user:logout`/`user:switch`. The `'session'` owner is now wired through SubscriptionManager (PR #2); future migrations of boot-time wiring (e.g. `index.js` SSE handlers) into the `'session'` scope can opt in incrementally.
 
 **P3. Fix `FeatureBase` lifecycle semantics.** ✅ Landed in PR #1
 `this.initialized = false` removed from `disable()`. `_runLifecycle` promise queue serializes concurrent enable/disable. `FeatureRegistry.disable()` wraps dependent disables in try/catch with `feature:disable:error` emit. Documented escape hatch: subclasses can override `disable()` to force re-init.
@@ -235,11 +235,11 @@ A new `SubscriptionManager` that wraps `EventBus.on`, `StateManager.subscribe`, 
 
 ### Wave 2 — Source of Truth & Schema
 
-**P5. Collapse `CommandBus` into `SemanticEventBus`.** ⏳ Open — Wave 2 of roadmap
-Conservative path: keep `CommandBus.js` as a thin facade that delegates to a new `SemanticEventBus.registerCommand/executeCommand` API. Mark the file `@deprecated`. New code uses the unified API.
+**P5. Collapse `CommandBus` into `SemanticEventBus`.** ✅ Landed in PR #2
+`SemanticEventBus.commandHandlers` is the canonical registry. `registerCommand()`, `executeCommand()`, `hasCommand()`, `getCommands()` live on the bus. `CommandBus.js` is now a thin facade — its `handlers` field is a reference to `SemanticEventBus.commandHandlers`, and `register/execute` delegate to the unified API. Marked `@deprecated`; full removal in Wave 4.
 
-**P6. Centralize realtime event topology.** ⏳ Open — Wave 2 of roadmap
-New `core/EventTopology.js` lists every backend event, its frontend internal name, and its SSE/WS bridge handler. `RealtimeClient.bridgedEvents`, `index.js:694-799` SSE handlers, and the `MultiplayerClient` WS bridge all consult it. Eliminates drift.
+**P6. Centralize realtime event topology.** ✅ Landed in PR #2
+`core/EventTopology.js` is a single array of `{ backend, frontend?, transports, description? }` entries. `RealtimeClient.bridgedEvents` is now derived from `getBackendEventsForTransport('sse')` (a Set for O(1) lookups). When a topology entry sets `frontend`, `RealtimeClient` emits both the legacy `sse:<backend>` alias and the semantic event name, so new handlers can subscribe to the semantic name while existing `index.js` `sse:*` handlers keep working. Wave 4 will retire the alias.
 
 **P7. Reconcile desktop icons + atomic state↔storage writes.** ⏳ Open — Wave 3 of roadmap
 - Pick FS as truth for desktop icons (the Win95 mental model). On boot, `StateManager.icons` is hydrated from `getDesktopShortcuts()` rather than `StorageManager.get('desktopIcons')`.
@@ -255,10 +255,11 @@ New `core/EventTopology.js` lists every backend event, its frontend internal nam
 - ⏳ Standardize all builtins on `RuntimeError` (some still throw bare `Error`) — Wave 2.
 - ⏳ `ScriptEngine.validateContext()` that fails fast if required services missing — Wave 2.
 
-**P9. Auth hardening.** 🟡 Partial — landed in PR #1
-- ✅ WebSocket auth via subprotocol: `new WebSocket(url, ['token.<hex>', 'illuminatos'])`. Server reads from `Sec-WebSocket-Protocol`, echoes `illuminatos` for handshake compat. Legacy URL/Authorization paths still accepted.
-- ⏳ `fetchWithAuth()` wrapper that traps 401, clears token, emits `auth:expired`, shows reauth dialog — Wave 2.
-- ⏳ Migrate all `fetch()` callers to `fetchWithAuth` — Wave 2.
+**P9. Auth hardening.** 🟡 Mostly landed — PR #1 + PR #2
+- ✅ WebSocket auth via subprotocol: `new WebSocket(url, ['token.<hex>', 'illuminatos'])`. Server reads from `Sec-WebSocket-Protocol`, echoes `illuminatos` for handshake compat. Legacy URL/Authorization paths still accepted (Wave 4 removes them).
+- ✅ `fetchWithAuth()` wrapper in `ConfigLoader.js` traps 401, runs `SessionManager.logout({ reason: 'auth_expired' })`, emits `auth:expired` (PR #2). Re-entrancy guard prevents recursive logouts.
+- ✅ Migrated the high-traffic callers: `UserStateSync`, `FileSystemManager` (6 fetches), `RealtimeClient`. `LoginScreen` intentionally stays on raw `fetch()` — 401 on /auth/login means "wrong password", not "session expired".
+- ⏳ Reauth-UI subscriber for `auth:expired` (currently the event fires but no UI listens) — slated for a follow-up PR.
 
 **P10. Plugin manifest validation + transactional load.** ⏳ Open — Wave 3 of roadmap
 - Validate manifest schema before any registration.

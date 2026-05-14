@@ -1,23 +1,32 @@
 /**
  * CommandBus - Command execution layer for scripting support
  *
- * Provides a unified interface to execute actions via semantic events.
- * All command:* events are handled here and routed to appropriate handlers.
+ * @deprecated Use `SemanticEventBus.registerCommand()` and
+ *             `SemanticEventBus.executeCommand()` directly. This file is now
+ *             a thin facade that delegates to `SemanticEventBus.commandHandlers`
+ *             and exists so existing imports keep working. It will be removed
+ *             in Wave 4 of the unification roadmap.
  *
- * For scripting:
+ * The `handlers` Map is intentionally a *reference* to
+ * `SemanticEventBus.commandHandlers` — both objects see the same registrations,
+ * so `CommandBus.execute('foo')` and `SemanticEventBus.executeCommand('foo')`
+ * are equivalent. Timer/macro state remains here (those are CommandBus
+ * features, not part of the unified bus surface).
+ *
+ * Original responsibility (now shared with SemanticEventBus):
  *   - Commands trigger actions (command:app:launch, command:fs:write, etc.)
  *   - Queries retrieve state (query:windows, query:fs:list, etc.)
  *   - All commands support requestId for async response tracking
  *
- * Usage:
+ * Usage (legacy — still works):
  *   import CommandBus from './CommandBus.js';
  *   CommandBus.initialize();
- *
- *   // Execute command directly
  *   CommandBus.execute('app:launch', { appId: 'notepad' });
  *
- *   // Or via events
- *   EventBus.emit('command:app:launch', { appId: 'notepad', requestId: 'cmd-1' });
+ * Usage (preferred for new code):
+ *   import EventBus from './EventBus.js';
+ *   EventBus.registerCommand('app:launch', async (payload) => { ... });
+ *   await EventBus.executeCommand('app:launch', { appId: 'notepad' });
  */
 
 import EventBus from './EventBus.js';
@@ -27,7 +36,10 @@ import FileSystemManager from './FileSystemManager.js';
 
 class CommandBusClass {
     constructor() {
-        this.handlers = new Map();
+        // Share the command registry with SemanticEventBus so the two surfaces
+        // see the same handler set. Any registration via CommandBus.register
+        // is visible to SemanticEventBus.executeCommand and vice versa.
+        this.handlers = EventBus.commandHandlers;
         this.timers = new Map();
         this.macros = new Map();
         this.isRecording = false;
@@ -70,45 +82,28 @@ class CommandBusClass {
     }
 
     /**
-     * Register a command handler
+     * Register a command handler.
+     * @deprecated Use `EventBus.registerCommand(command, handler)` directly.
+     *             Both surfaces share the same registry, so existing callers
+     *             continue to work — this facade returns the unregister
+     *             function from the unified API.
      * @param {string} command - Command name (without 'command:' prefix)
      * @param {Function} handler - Handler function (payload, requestId) => result
+     * @returns {Function} Unregister function
      */
     register(command, handler) {
-        this.handlers.set(command, handler);
+        return EventBus.registerCommand(command, handler);
     }
 
     /**
-     * Execute a command
+     * Execute a command.
+     * @deprecated Use `EventBus.executeCommand(command, payload)` directly.
      * @param {string} command - Command name
      * @param {object} payload - Command payload
      * @returns {Promise} Result of the command
      */
     async execute(command, payload = {}) {
-        const { requestId } = payload;
-        const handler = this.handlers.get(command);
-
-        if (!handler) {
-            console.warn(`[CommandBus] Unknown command: ${command}`);
-            if (requestId) {
-                this._sendResult(requestId, false, null, `Unknown command: ${command}`);
-            }
-            return { success: false, error: `Unknown command: ${command}` };
-        }
-
-        try {
-            const result = await handler(payload);
-            if (requestId) {
-                this._sendResult(requestId, true, result);
-            }
-            return { success: true, data: result };
-        } catch (error) {
-            console.error(`[CommandBus] Error executing ${command}:`, error);
-            if (requestId) {
-                this._sendResult(requestId, false, null, error.message);
-            }
-            return { success: false, error: error.message };
-        }
+        return EventBus.executeCommand(command, payload);
     }
 
     /**

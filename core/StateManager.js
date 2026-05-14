@@ -12,6 +12,7 @@ import EventBus, { Events } from './EventBus.js';
 import StorageManager from './StorageManager.js';
 import { getConfig } from './ConfigLoader.js';
 import { getNextDesktopSlot, findNearestFreeSlot, getAllOccupiedPositions } from './DesktopLayout.js';
+import SubscriptionManager from './SubscriptionManager.js';
 
 // Default desktop icons (used when localStorage is empty)
 // Positions are placeholders; they get auto-arranged on first load
@@ -273,12 +274,15 @@ class StateManagerClass {
         }
         this.subscribers.get(path).push(callback);
 
-        // Return unsubscribe function
-        return () => {
+        // Return unsubscribe function, tracked against the active owner
+        // (set by SubscriptionManager.runAs). Anonymous when no owner is set.
+        const unsub = () => {
             const callbacks = this.subscribers.get(path);
+            if (!callbacks) return;
             const index = callbacks.indexOf(callback);
             if (index > -1) callbacks.splice(index, 1);
         };
+        return SubscriptionManager.track(unsub);
     }
 
     /**

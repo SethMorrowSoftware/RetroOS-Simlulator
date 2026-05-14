@@ -1,5 +1,5 @@
 import StorageManager from './StorageManager.js';
-import { getApiVersion, getApiBasePath, getAuthHeaders } from './ConfigLoader.js';
+import { getApiVersion, getApiBasePath, fetchWithAuth } from './ConfigLoader.js';
 
 const SNAPSHOT_META_KEY = '__dbSnapshotMeta';
 
@@ -72,12 +72,9 @@ class UserStateSync {
         if (!this.enabled || this.isApplyingRemoteSnapshot) return;
 
         const snapshot = this.exportSnapshot();
-        const response = await fetch(this.apiUrl('user-state'), {
+        const response = await fetchWithAuth(this.apiUrl('user-state'), {
             method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-                ...getAuthHeaders(),
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ snapshot }),
         });
 
@@ -92,11 +89,8 @@ class UserStateSync {
     }
 
     async pullRemoteSnapshot() {
-        const response = await fetch(this.apiUrl('user-state'), {
-            headers: {
-                'Accept': 'application/json',
-                ...getAuthHeaders(),
-            },
+        const response = await fetchWithAuth(this.apiUrl('user-state'), {
+            headers: { 'Accept': 'application/json' },
         });
 
         if (!response.ok) {
@@ -163,11 +157,8 @@ class UserStateSync {
 
     async fetchCurrentUser() {
         try {
-            const response = await fetch(this.apiUrl('auth/me'), {
-                headers: {
-                    'Accept': 'application/json',
-                    ...getAuthHeaders(),
-                },
+            const response = await fetchWithAuth(this.apiUrl('auth/me'), {
+                headers: { 'Accept': 'application/json' },
             });
 
             if (!response.ok) return null;

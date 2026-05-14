@@ -24,6 +24,7 @@
 import FeatureRegistry from './FeatureRegistry.js';
 import EventBus from './EventBus.js';
 import StorageManager from './StorageManager.js';
+import SubscriptionManager from './SubscriptionManager.js';
 
 class PluginLoaderClass {
     constructor() {
@@ -158,10 +159,13 @@ class PluginLoaderClass {
                 }
             }
 
-            // Call plugin's onLoad hook if provided
+            // Call plugin's onLoad hook if provided.
+            // Wrap in SubscriptionManager.runAs so any raw EventBus.on() /
+            // StateManager.subscribe() calls inside onLoad are tracked
+            // against this plugin's ID and cleaned up on unload.
             if (typeof plugin.onLoad === 'function') {
                 try {
-                    await plugin.onLoad();
+                    await SubscriptionManager.runAs(plugin.id, () => plugin.onLoad());
                 } catch (error) {
                     console.error(`[PluginLoader] Error in plugin ${plugin.id} onLoad - rolling back:`, error);
 
@@ -314,6 +318,11 @@ class PluginLoaderClass {
                     console.error(`[PluginLoader] Error in plugin ${pluginId} onUnload:`, error);
                 }
             }
+
+            // Release any subscriptions still tracked against this plugin
+            // (raw EventBus.on() / StateManager.subscribe() calls inside
+            // onLoad that bypassed feature-level cleanup).
+            SubscriptionManager.unsubscribeAll(pluginId);
 
             this.plugins.delete(pluginId);
 

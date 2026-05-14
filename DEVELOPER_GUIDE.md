@@ -103,7 +103,9 @@ Each phase is tracked by the boot health diagnostics system, recording status, d
 - `core/PluginLoader.js`: plugin manifest loading
 - `core/script/ScriptEngine.js`: RetroScript runtime
 - `core/script/utils/PathValidation.js`: single allowlist for script-driven file ops (also used by SSE remote FS handler in `index.js`)
-- `core/CommandBus.js`: script/system command adapters (parallel to `SemanticEventBus` for historical reasons; see roadmap)
+- `core/CommandBus.js`: ⚠️ deprecated facade — delegates to `SemanticEventBus.commandHandlers`. Use `EventBus.registerCommand()` / `EventBus.executeCommand()` directly for new code.
+- `core/SubscriptionManager.js`: owner-scoped subscription tracker. `runAs(ownerId, fn)` sets the active owner; `unsubscribeAll(ownerId)` releases.
+- `core/EventTopology.js`: single source-of-truth list of cross-process events (`{ backend, frontend?, transports }`). Consumed by `RealtimeClient` and (later) `MultiplayerClient`.
 - `core/ConfigLoader.js`: configuration loading with backend/default fallback; session token API
 - `core/RealtimeClient.js`: SSE real-time event bridge (v2 API)
 - `core/SemanticEventBus.js`: the canonical event bus — schema-validated semantic events with middleware, request/response, channels. `core/EventBus.js` is just a re-export.
@@ -357,15 +359,46 @@ During boot, desktop icons and installed apps are synced into filesystem structu
 - Subscribe via `EventBus`/`FeatureBase.subscribe`/`AppBase.onEvent`
 - Prefer semantic event names (`namespace:action`)
 - Keep payloads structured and explicit
+- Raw `EventBus.on(...)` calls inside `onOpen`/`onMount`/`initialize()`/plugin `onLoad()` are auto-tracked by `SubscriptionManager` against the current owner (windowId/featureId/pluginId) and released on close/disable/unload. You still get the `this.subscribe(...)` / `this.onEvent(...)` helpers for the common case — `SubscriptionManager` is the safety net.
 
 ### Commands
-Use `CommandBus` for scriptable cross-system actions:
-- app lifecycle actions
-- window actions
-- filesystem actions
-- dialog/notification/sound/system settings actions
+The command registry lives on `SemanticEventBus`. Preferred call style:
 
-If you add app-specific script control, register commands from the app and document them.
+```js
+import EventBus from '../core/EventBus.js';
+
+EventBus.registerCommand('myapp:doThing', async (payload) => {
+  return { ok: true };
+});
+
+await EventBus.executeCommand('myapp:doThing', { foo: 1 });
+```
+
+`CommandBus.register()` / `CommandBus.execute()` still work — they're a thin facade that delegates to the unified API — but `CommandBus.js` is `@deprecated` and slated for Wave 4 removal. Use the bus directly for new code.
+
+Common command surfaces: app lifecycle actions, window actions, filesystem actions, dialog/notification/sound/system settings actions. If you add app-specific script control, register commands from the app and document them.
+
+### Authenticated HTTP
+
+For any v2 API call, use `fetchWithAuth` from `ConfigLoader`:
+
+```js
+import { fetchWithAuth } from '../core/ConfigLoader.js';
+
+const resp = await fetchWithAuth('/api/v2/foo', { method: 'POST', body: JSON.stringify(...) });
+```
+
+It adds `Authorization: Bearer <token>` and `X-Requested-With: XMLHttpRequest` automatically, and on 401 triggers `SessionManager.logout({ reason: 'auth_expired' })` plus emits `auth:expired`. Pass `skipAuth: true` for endpoints that intentionally don't carry a session.
+
+### Cross-process events (SSE / WS)
+
+Adding a new server-emitted event? Add one entry to `core/EventTopology.js`:
+
+```js
+{ backend: 'my.feature.event', frontend: 'myfeature:event', transports: ['sse'], description: '…' }
+```
+
+`RealtimeClient` derives its bridge allowlist from this list. When `frontend` is set, both `sse:<backend>` (legacy alias) and the semantic frontend name are emitted, so new subscribers can use the clean name while existing handlers in `index.js` keep working.
 
 ---
 
@@ -380,7 +413,7 @@ The user-session lifecycle is unified through `core/SessionManager.js`. Don't te
 | `user:login` | Initial boot login completed or post-logoff login completed | Token set, storage rescoped, `StateManager.initialize()` finished |
 | `user:logout` | User logged off | Realtime closed, presence destroyed, multiplayer disconnected, token cleared, `StateManager.resetVolatile()` ran |
 | `user:switch` | Active user changed | Same teardown as logout, then storage rescoped to the new user |
-| `auth:expired` | Server returned 401 | Token has been cleared. Show a reauth UI. |
+| `auth:expired` | `fetchWithAuth` saw a 401 | Logout cascade has already run (token cleared, realtime/presence torn down). Show a reauth UI. |
 
 ### 10.2 Hooks for your feature/app
 
