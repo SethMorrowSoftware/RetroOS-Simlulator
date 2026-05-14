@@ -266,7 +266,7 @@ Event-schema coverage is enforced in CI: `node scripts/check-event-schema-covera
 
 ## RetroScript
 
-Custom scripting language (`.retro` files) for automation. See `SCRIPTING_GUIDE.md` for full documentation. Engine lives in `core/script/` with lexer, parser, and interpreter.
+Custom scripting language (`.retro` files) for automation. See `SCRIPTING_GUIDE.md` for the dense top-level reference, and `docs/retroscript/` for a learning-oriented guide, an alphabetical dictionary, and ten progressive tutorials ending in a full mini-ARG campaign. Engine lives in `core/script/` with lexer, parser, and interpreter.
 
 Script file ops (`write` / `read` / `delete` / `mkdir`) validate paths against the shared allowlist in `core/script/utils/PathValidation.js`. The allowlist also covers the SSE-driven remote FS ops in `index.js`. Don't inline new prefix arrays — add to `PathValidation` and have both call-sites use it.
 
@@ -274,7 +274,8 @@ Script file ops (`write` / `read` / `delete` / `mkdir`) validate paths against t
 
 - `README.md` — Project overview, run instructions, app/feature catalog
 - `DEVELOPER_GUIDE.md` — Extension development guide (apps, features, plugins, RetroScript)
-- `SCRIPTING_GUIDE.md` — Complete RetroScript language reference
+- `SCRIPTING_GUIDE.md` — Complete RetroScript language reference (dense, table-heavy)
+- `docs/retroscript/README.md` — RetroScript documentation hub (learning-oriented guide, alphabetical dictionary, 10 tutorials)
 - `docs/RETROSCRIPT_SCRIPTABLE_EVENTS.md` — Exhaustive event/command/query reference for scripts
 - `docs/TERMINAL_SCRIPTING.md` — Terminal-specific RetroScript built-ins and workflows
 - `docs/MIGRATION_ROADMAP.md` — Short list of deferred follow-ups (CommandBus deletion, icon sync, pre-login storage) and deliberate non-decisions
