@@ -786,7 +786,6 @@ on system:ready {
 | `ui:menu:context:hide` | Context menu hidden | *(none)* |
 | `ui:menu:action` | Menu action triggered | `action`, `data?` |
 | `ui:taskbar:update` | Taskbar update needed | *(none)* |
-| `taskbar:update` | Taskbar refresh | *(none)* |
 
 ---
 
@@ -995,8 +994,6 @@ emit notification:show title="Alert" message="Something happened!" type="warning
 | `features:initialized` | All features initialized | `count?`, `features?` |
 | `feature:pet:toggle` | Desktop pet toggled | *(none)* |
 | `feature:pet:change` | Desktop pet changed | `petType` |
-| `pet:toggle` | Pet visibility toggled | `visible?` |
-| `pet:change` | Pet type changed | `petType?` |
 
 ### Plugin Lifecycle
 
@@ -1308,6 +1305,11 @@ emit bsod:show error="CRITICAL_PROCESS_DIED" code="0x0000007E"
 
 Commands execute system actions. Use via `emit command:<name>` or the `exec()` built-in.
 
+> "Command Bus" is the historical name for the `command:*` channel; today it
+> lives inside the unified `SemanticEventBus` and dispatch happens through
+> `EventBus.executeCommand()`. The channel name and the section heading kept
+> the original label so external links to `#command-bus-commands` still work.
+
 ### App Commands
 | Command | Description | Payload |
 |---------|-------------|---------|
@@ -1392,7 +1394,15 @@ Commands execute system actions. Use via `emit command:<name>` or the `exec()` b
 
 ## Query Bus Queries
 
-Queries retrieve system state. Emit the query event and listen for the `:response`.
+Queries retrieve system state. The `query:*` handlers are registered in
+`core/CommandRegistry.js`; they emit `query:<name>:response` with the
+original `requestId` so callers can correlate the answer. The script engine
+exposes them via the `query <name> ...` statement form.
+
+> "Query Bus" is the historical name for the `query:*` channel; today it
+> lives inside the unified `SemanticEventBus`, but the request/response
+> wire shape and the section heading kept their original names so external
+> links to `#query-bus-queries` still work.
 
 | Query | Response | Description | Payload |
 |-------|----------|-------------|---------|
@@ -1602,25 +1612,25 @@ All 42 scriptable applications (registered by `apps/AppRegistry.js`):
 | App ID | Name | Category |
 |--------|------|----------|
 | `adminpanel` | Admin Panel | system |
-| `analyticsdashboard` | Analytics Dashboard | system |
+| `analytics-dashboard` | Analytics Dashboard | system |
 | `asteroids` | Asteroids | games |
 | `bonzibuddy` | BonziBuddy | companions |
 | `browser` | Browser | internet |
 | `calculator` | Calculator | accessories |
 | `calendar` | Calendar | accessories |
-| `campaignstudio` | Campaign Studio | narrative |
+| `campaign-studio` | Campaign Studio | narrative |
 | `chatroom` | ChatRoom | internet |
 | `clock` | Clock | accessories |
 | `controlpanel` | Control Panel | system |
 | `defrag` | Defrag | system |
-| `displayproperties` | Display Properties | settings |
+| `display` | Display Properties | settings |
 | `doom` | Doom | games |
 | `dosbox` | DOSBox | games |
-| `featuressettings` | Features Settings | settings |
-| `findfiles` | Find Files | system |
+| `features-settings` | Features Settings | settings |
+| `find` | Find Files | system |
 | `freecell` | FreeCell | games |
 | `gamelobby` | Game Lobby | multiplayer |
-| `helpsystem` | Help | system |
+| `help` | Help | system |
 | `hypercard` | HyperCard | accessories |
 | `inbox` | Inbox | internet |
 | `instantmessenger` | Instant Messenger | internet |
@@ -1631,17 +1641,17 @@ All 42 scriptable applications (registered by `apps/AppRegistry.js`):
 | `paint` | Paint | accessories |
 | `phone` | Phone | internet |
 | `recyclebin` | Recycle Bin | system |
-| `rundialog` | Run | system |
+| `run` | Run | system |
 | `scriptrunner` | Script Runner | system |
-| `showrunnerconsole` | Showrunner Console | narrative |
+| `showrunner-console` | Showrunner Console | narrative |
 | `skifree` | SkiFree | games |
 | `snake` | Snake | games |
 | `solitaire` | Solitaire | games |
-| `soundsettings` | Sound Settings | settings |
-| `taskmanager` | Task Manager | system |
+| `sounds` | Sound Settings | settings |
+| `taskmgr` | Task Manager | system |
 | `terminal` | Terminal | system |
 | `tetris` | Tetris | games |
-| `timelineeditor` | Timeline Editor | narrative |
+| `timeline-editor` | Timeline Editor | narrative |
 | `zork` | Zork | games |
 
 ---
@@ -1733,4 +1743,8 @@ Media cue events for ARG multimedia orchestration. Emitted by `MultimediaBuiltin
 
 ---
 
-*This document is auto-generated from the RetroOS source code. Every event listed here is defined in `core/EventSchema.js` and emitted by the corresponding application, feature, or system component.*
+*This document is maintained alongside the source. Event schemas live in
+`core/schema/` (per-domain files), aggregated by `core/EventSchema.js` and
+enforced by `scripts/check-event-schema-coverage.mjs` in CI. Schema coverage
+is currently 100% (207/207). If you change an event in the schema, update
+this catalog and verify the schema-coverage gate stays green.*

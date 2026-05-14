@@ -3340,43 +3340,54 @@ notify "System ready. Check your inbox."
 
 ### Complete App ID Reference
 
-Use these IDs in commands, queries, and events:
+Use these IDs in commands, queries, and events. IDs are the canonical
+`super({id: ...})` values from each app class — verified against
+`apps/AppRegistry.js`. 42 apps total.
 
 | App ID | App Name |
 |--------|----------|
-| `inbox` | Inbox (Email) |
-| `phone` | Phone |
-| `instantmessenger` | Instant Messenger |
-| `chatroom` | Chat Room |
+| `adminpanel` | Admin Panel |
+| `analytics-dashboard` | Analytics Dashboard |
+| `asteroids` | Asteroids |
+| `bonzibuddy` | BonziBuddy |
 | `browser` | Browser |
 | `calculator` | Calculator |
+| `calendar` | Calendar |
+| `campaign-studio` | Campaign Studio |
+| `chatroom` | Chat Room |
+| `clock` | Clock |
+| `controlpanel` | Control Panel |
+| `defrag` | Defrag |
+| `display` | Display Properties |
+| `doom` | Doom |
+| `dosbox` | DOSBox |
+| `features-settings` | Features Settings |
+| `find` | Find Files |
+| `freecell` | FreeCell |
+| `gamelobby` | Game Lobby |
+| `help` | Help System |
+| `hypercard` | HyperCard |
+| `inbox` | Inbox (Email) |
+| `instantmessenger` | Instant Messenger |
+| `mediaplayer` | Media Player (audio + video) |
+| `minesweeper` | Minesweeper |
+| `mycomputer` | My Computer |
 | `notepad` | Notepad |
 | `paint` | Paint |
-| `terminal` | Terminal |
-| `mediaplayer` | Media Player (audio + video) |
-| `mycomputer` | My Computer |
-| `minesweeper` | Minesweeper |
+| `phone` | Phone |
+| `recyclebin` | Recycle Bin |
+| `run` | Run Dialog |
+| `scriptrunner` | Script Runner |
+| `showrunner-console` | Showrunner Console |
+| `skifree` | SkiFree |
 | `snake` | Snake |
 | `solitaire` | Solitaire |
-| `freecell` | FreeCell |
-| `asteroids` | Asteroids |
-| `skifree` | SkiFree |
+| `sounds` | Sound Settings |
+| `taskmgr` | Task Manager |
+| `terminal` | Terminal |
+| `tetris` | Tetris |
+| `timeline-editor` | Timeline Editor |
 | `zork` | Zork |
-| `doom` | Doom |
-| `calendar` | Calendar |
-| `clock` | Clock |
-| `defrag` | Defrag |
-| `findfiles` | Find Files |
-| `help` | Help System |
-| `recyclebin` | Recycle Bin |
-| `taskmanager` | Task Manager |
-| `controlpanel` | Control Panel |
-| `displayproperties` | Display Properties |
-| `soundsettings` | Sound Settings |
-| `featuressettings` | Features Settings |
-| `adminpanel` | Admin Panel |
-| `run` | Run Dialog |
-| `hypercard` | HyperCard |
 
 ## 31) Multimedia Cue System (Phase 2)
 

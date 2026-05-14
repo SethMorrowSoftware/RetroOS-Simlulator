@@ -5,7 +5,7 @@ Welcome to the **RetroScript** documentation hub.
 RetroScript is the scripting language built into IlluminatOS. It is used for
 desktop automation, interactive content, autoexec boot routines, ARG/narrative
 campaigns, terminal scripting, multimedia cue choreography, and reactive
-event-driven scripts that bridge any of the 40+ apps, 13 features, and the
+event-driven scripts that bridge any of the 42 apps, 13 features, and the
 plugin system.
 
 This directory holds **fresh, learning-oriented documentation** that

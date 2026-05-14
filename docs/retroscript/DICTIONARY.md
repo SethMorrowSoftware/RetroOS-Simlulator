@@ -372,8 +372,8 @@ All builtins are listed below, grouped by source module.
 | `getApps()` | Array of `{id, name, category}` for registered apps. |
 | `getEnv()` | `{platform, version, language, timestamp}`. |
 | `emitEvent(name, payload?)` | `EventBus.emit(name, payload)`. |
-| `query(type, ...args)` | Routed to `QueryHandler` (see [Query Bus Channels](#query-bus-channels)). |
 | `exec(command, payload?)` | `EventBus.executeCommand(command, payload)`. Returns the command's return value or `null`. |
+| The `query` statement form (`query <name> ...`) routes through `EventBus.executeCommand` to the `query:*` handlers registered in `core/CommandRegistry.js`. See [Query Bus Channels](#query-bus-channels). |
 | `copyToClipboard(text)` | `navigator.clipboard.writeText`; returns boolean. |
 | `getStorage(key)` `setStorage(key, value)` | StorageManager passthrough. |
 
@@ -930,20 +930,21 @@ ScriptError                       common: {message, line, column, source, hint}
 
 ## App IDs
 
-Full list of `<appId>` values for `launch <appId>` and `command:<appId>:*`:
+Canonical `<appId>` values for `launch <appId>` and `command:<appId>:*`.
+Pulled from each app's `super({id: ...})` declaration; 42 apps total.
 
 ```
 calculator, notepad, paint, calendar, clock, hypercard,
-terminal, defrag, taskmanager, scriptrunner, campaignstudio,
-timelineeditor, showrunnerconsole, analyticsdashboard,
+terminal, defrag, taskmgr, scriptrunner, campaign-studio,
+timeline-editor, showrunner-console, analytics-dashboard,
 minesweeper, snake, asteroids, doom, solitaire, freecell,
 skifree, zork, tetris, dosbox,
 mediaplayer,
 browser, chatroom, phone, instantmessenger, inbox, gamelobby,
 bonzibuddy,
 mycomputer, recyclebin, adminpanel,
-controlpanel, displayproperties, soundsettings, featuressettings,
-findfiles, helpsystem, rundialog, shutdown
+controlpanel, display, sounds, features-settings,
+find, help, run
 ```
 
 ---

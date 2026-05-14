@@ -55,9 +55,9 @@ With MySQL backend v2 (multi-user, real-time events, webhooks):
 ```bash
 cp backend/env.example.php backend/env.php
 # Edit backend/env.php with your MySQL credentials
-php backend/migrate.php
-php backend/seed.php        # optional: seed default admin
+php backend/migrate.php     # CLI runner; web equivalent: api/v2/migrate.php
 php -S localhost:8000
+# Then visit http://localhost:8000/setup.php to create the default admin
 ```
 
 ### Backend v2 test suite
@@ -116,7 +116,7 @@ Each phase is tracked by the boot health diagnostics system, recording status, d
 - `core/CommandRegistry.js`: wires every platform-level command handler (`command:fs:*`, `command:window:*`, `command:terminal:*`, `command:dialog:*`, `command:app:*`, `command:setting:*`, `command:sound:play`, etc.), the `query:*` listeners, and the `timer:*` / `macro:*` lifecycle state. New code calls `EventBus.registerCommand()` / `EventBus.executeCommand()` directly — `CommandRegistry` is the wiring layer, not a separate API.
 - `core/HealthMonitor.js`: live runtime health snapshot at `window.__OS_HEALTH`.
 - `core/SubscriptionManager.js`: owner-scoped subscription tracker. `runAs(ownerId, fn)` sets the active owner; `unsubscribeAll(ownerId)` releases.
-- `core/EventTopology.js`: single source-of-truth list of cross-process events (`{ backend, frontend?, transports }`). Consumed by `RealtimeClient` and (later) `MultiplayerClient`.
+- `core/EventTopology.js`: single source-of-truth list of cross-process events (`{ backend, frontend?, transports }`). Consumed by `RealtimeClient` to build its SSE allowlist; `MultiplayerClient` currently bridges any `event` message verbatim with the `mp:` prefix (topology entries with `transports: ['ws']` document the wire surface).
 - `core/ConfigLoader.js`: configuration loading with backend/default fallback; session token API
 - `core/RealtimeClient.js`: SSE real-time event bridge (v2 API)
 - `core/SemanticEventBus.js`: the canonical event bus — schema-validated semantic events with middleware, request/response, channels. `core/EventBus.js` is just a re-export.
@@ -480,14 +480,14 @@ Storage is untouched on `logout()` (it's user-scoped already) and rescoped on `s
 ### Backend v2 (MySQL-backed, multi-user)
 When a MySQL database is configured (`backend/env.php`), the v2 API provides:
 
-- **REST API** (`api/v2/index.php`): router + middleware (auth, CORS, rate limiting)
-- **Controllers** (15): Auth, Config, User, System, Theme, Event, Webhook, Audit, File, Game, Multiplayer, Presence, Social, Message, UserState
-- **Models** (16): User, Session, Config, Theme, Event, Webhook, AuditLog, UserFile, UserStateSnapshot, Room, GameSession, GamePlayer, Leaderboard, Friendship, ChatMessage, DirectMessage
-- **Services** (4): EventService (event lifecycle), SSEBroadcaster (real-time push), WebhookDispatcher (external integrations), FileStorageService (server-side file storage)
-- **Migrations**: 19 SQL migrations (`backend/migrations/`) — run via `php backend/migrate.php`
-- **Seeding**: `php backend/seed.php` for default admin user
-- **Admin panel components** (`admin/assets/components/`): Dashboard, UserManager, ThemeCreator, WebhookManager, AuditLogViewer, AnnouncementManager
-- **Real-time client** (`core/RealtimeClient.js`): SSE connection with auto-reconnect, bridging server events into the frontend EventBus
+- **REST API** (`api/v2/index.php`): router + middleware (auth, CORS, rate limiting). Admin route blocks attach `auth + requireRole + rateLimit` via `$router->group(...)`; controllers don't repeat per-method middleware.
+- **Controllers** (17): Auth, Config, User, System, Theme, Event, Webhook, Audit, File, Game, Multiplayer, Presence, Social, Message, UserState, Campaign, Timeline
+- **Models** (18): User, Session, Config, Theme, Event, Webhook, AuditLog, UserFile, UserState, Room, GameSession, GamePlayer, Leaderboard, Friendship, ChatMessage, DirectMessage, Campaign, TimelineEntry
+- **Services** (4): EventService (event lifecycle + `sanitizeForExternal` strip of sensitive payload fields before SSE/webhook delivery), SSEBroadcaster (real-time push), WebhookDispatcher (external integrations; `resolveSafe` rejects private/loopback IPs + pins via `CURLOPT_RESOLVE`), FileStorageService (server-side file storage)
+- **Migrations**: 16 SQL migrations (`backend/migrations/001..016`) — run via `php backend/migrate.php` (CLI) or `api/v2/migrate.php` (web wizard)
+- **Seeding**: first-run admin setup via `setup.php`
+- **Admin panel components** (`admin/assets/components/`): Dashboard, AnalyticsDashboard, AnnouncementManager, AuditLogViewer, AutoexecEditor, BackendControlManager, CampaignManager, CommandCenter, EmojiPicker, LiveUsers, ThemeCreator, TimelineManager, TroubleshootingPanel, UserManager, WebhookManager
+- **Real-time client** (`core/RealtimeClient.js`): SSE connection with auto-reconnect; allowlist derived from `core/EventTopology.js`
 - **WebSocket sidecar** (`websocket/`): PHP WebSocket server for multiplayer transport, authenticating against the PHP API
 - **Setup wizard** (`setup.php`): first-run health check, PHP version/extension validation, credential setup. Locked after first run with no bypass.
 
@@ -512,7 +512,7 @@ Use this rule: if a document is no longer actionable for contributors, delete it
 ### Backend v2 documentation
 When modifying backend v2:
 - Update `backend/env.example.php` if new config keys are added
-- Add new SQL migrations in `backend/migrations/` (numbered sequentially, currently 001-019)
+- Add new SQL migrations in `backend/migrations/` (numbered sequentially, currently 001-016)
 - Update `test-backend.php` with smoke tests for new endpoints
 
 ### Security considerations
