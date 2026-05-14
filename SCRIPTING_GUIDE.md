@@ -2,6 +2,14 @@
 
 RetroScript is IlluminatOS's built-in scripting language for automation, interactive experiences, and ARG content delivery. Scripts are `.retro` files executed through a pipeline of Lexer, Parser, and Interpreter.
 
+> **Looking for something else?** This file is the dense top-level
+> reference. For a learning-oriented tour of the language, the
+> alphabetical dictionary, and ten step-by-step tutorials, see
+> [`docs/retroscript/`](docs/retroscript/README.md):
+> - [`docs/retroscript/GUIDE.md`](docs/retroscript/GUIDE.md) — concept-first comprehensive guide
+> - [`docs/retroscript/DICTIONARY.md`](docs/retroscript/DICTIONARY.md) — alphabetical lookup of every name in the language
+> - [`docs/retroscript/tutorials/`](docs/retroscript/tutorials/README.md) — ten progressive tutorials, ending in a full mini-ARG campaign
+
 > **Verifying this guide.** The syntax forms shown here are exercised by the `scripts/test-retroscript.sh` harness, which parses and executes a representative sample of every documented feature against the real lexer/parser/interpreter. Run it after any engine change:
 > ```bash
 > bash scripts/test-retroscript.sh
