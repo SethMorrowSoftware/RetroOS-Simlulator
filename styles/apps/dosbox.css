@@ -1,315 +1,825 @@
 /* ============================================
-   DOSBox Emulator App
+   Arcade — IlluminatOS! Game Gallery
+   ----------------------------------------------
+   90s arcade-cabinet aesthetic: marquee header,
+   chunky pixel buttons, scanline tile screens,
+   neon magenta/cyan/yellow accents over a deep
+   purple cabinet.
    ============================================ */
 
-.dosbox-app {
+.arcade-app {
+    --arc-cabinet:    #1a0d2e;
+    --arc-cabinet-2:  #240f3a;
+    --arc-panel:      #0f0a1f;
+    --arc-bezel:      #2a1647;
+    --arc-bezel-hi:   #4b2882;
+    --arc-bezel-lo:   #0c061b;
+    --arc-screen:     #0a0518;
+    --arc-screen-glow:#1a1040;
+    --arc-text:       #f5e6ff;
+    --arc-text-dim:   #b09cd1;
+    --arc-text-muted: #6e598f;
+    --arc-magenta:    #ff2db8;
+    --arc-cyan:       #2de8ff;
+    --arc-yellow:     #ffe34a;
+    --arc-green:      #5cff7a;
+    --arc-red:        #ff3a3a;
+    --arc-orange:     #ff8b1f;
+
     display: flex;
     flex-direction: column;
     height: 100%;
-    background: var(--win95-gray, #c0c0c0);
-    font-family: 'MS Sans Serif', 'Microsoft Sans Serif', Arial, sans-serif;
+    background: var(--arc-cabinet);
+    color: var(--arc-text);
+    font-family: 'MS Sans Serif', Tahoma, sans-serif;
     font-size: 12px;
+    overflow: hidden;
+    position: relative;
 }
 
-/* ── Toolbar ─────────────────────────────── */
+/* Subtle vignette so the cabinet feels enclosed */
+.arcade-app::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: radial-gradient(circle at 50% 35%, transparent 55%, rgba(0,0,0,0.55) 100%);
+    z-index: 1;
+}
 
-.dosbox-toolbar {
+.arcade-app > * { position: relative; z-index: 2; }
+
+/* ── View switcher ──────────────────────────── */
+.arcade-app[data-view="browse"] .arcade-detail,
+.arcade-app[data-view="browse"] .arcade-play   { display: none; }
+.arcade-app[data-view="detail"] .arcade-browse,
+.arcade-app[data-view="detail"] .arcade-play   { display: none; }
+.arcade-app[data-view="play"]   .arcade-browse,
+.arcade-app[data-view="play"]   .arcade-detail { display: none; }
+
+/* ── Marquee header ─────────────────────────── */
+.arcade-marquee {
     display: flex;
-    flex-wrap: wrap;
-    gap: 4px;
-    padding: 4px 6px;
-    background: var(--win95-gray, #c0c0c0);
-    border-bottom: 1px solid #808080;
-    align-items: center;
-}
-
-.dosbox-url-bar {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    flex: 1;
-    min-width: 200px;
-}
-
-.dosbox-url-label {
-    white-space: nowrap;
-    font-weight: bold;
-    font-size: 11px;
-}
-
-.dosbox-url-input {
-    flex: 1;
-    padding: 2px 4px;
-    border: 2px solid;
-    border-color: #808080 #ffffff #ffffff #808080;
-    background: #fff;
-    font-family: inherit;
-    font-size: 12px;
-    min-width: 120px;
-}
-
-.dosbox-url-input:focus {
-    outline: none;
-}
-
-.dosbox-toolbar-buttons {
-    display: flex;
-    gap: 3px;
-}
-
-.dosbox-btn {
-    padding: 3px 10px;
-    background: var(--win95-gray, #c0c0c0);
-    border-top: 2px solid #ffffff;
-    border-left: 2px solid #ffffff;
-    border-right: 2px solid #000000;
-    border-bottom: 2px solid #000000;
-    font-family: inherit;
-    font-size: 11px;
-    cursor: pointer;
-    white-space: nowrap;
-}
-
-.dosbox-btn:hover {
-    background: #d4d0c8;
-}
-
-.dosbox-btn:active {
-    border-top: 2px solid #000000;
-    border-left: 2px solid #000000;
-    border-right: 2px solid #ffffff;
-    border-bottom: 2px solid #ffffff;
-    padding: 4px 9px 2px 11px;
-}
-
-.dosbox-btn:disabled {
-    color: #808080;
-    cursor: default;
-    text-shadow: 1px 1px 0 #ffffff;
-}
-
-.dosbox-btn:disabled:active {
-    border-top: 2px solid #ffffff;
-    border-left: 2px solid #ffffff;
-    border-right: 2px solid #000000;
-    border-bottom: 2px solid #000000;
-    padding: 3px 10px;
-}
-
-/* ── Game Select Dropdown ─────────────────── */
-
-.dosbox-game-select {
-    flex: 1;
-    min-width: 200px;
-    padding: 2px 4px;
-    border: 2px solid;
-    border-color: #808080 #ffffff #ffffff #808080;
-    background: #fff;
-    color: #000;
-    font-family: inherit;
-    font-size: 12px;
-    cursor: pointer;
-}
-
-.dosbox-game-select:focus {
-    outline: none;
-}
-
-.dosbox-game-select optgroup {
-    font-weight: bold;
-    font-style: normal;
-    color: #000080;
-}
-
-.dosbox-toolbar-sub {
-    border-top: 1px solid #ffffff;
-}
-
-/* ── Featured Bar ─────────────────────────── */
-
-.dosbox-library {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    padding: 3px 6px;
-    background: var(--win95-gray, #c0c0c0);
-    border-bottom: 1px solid #808080;
-    overflow-x: auto;
+    flex-direction: column;
+    background: linear-gradient(180deg, #2a0a3e 0%, #14041e 100%);
+    border-bottom: 3px solid #000;
+    box-shadow: inset 0 -4px 0 var(--arc-magenta), inset 0 4px 0 var(--arc-cyan);
     flex-shrink: 0;
 }
 
-.dosbox-library-label {
-    font-size: 11px;
-    font-weight: bold;
-    white-space: nowrap;
-    color: #000;
+.arcade-marquee-bulbs {
+    height: 8px;
+    background-image:
+        radial-gradient(circle at 6px 4px, var(--arc-yellow) 0 3px, transparent 3.5px),
+        radial-gradient(circle at 18px 4px, var(--arc-magenta) 0 3px, transparent 3.5px),
+        radial-gradient(circle at 30px 4px, var(--arc-cyan) 0 3px, transparent 3.5px);
+    background-size: 36px 8px;
+    background-repeat: repeat-x;
+    background-color: #060010;
+    animation: arcade-bulb-chase 1.2s steps(3) infinite;
 }
 
-.dosbox-library-spacer {
-    flex: 1;
+@keyframes arcade-bulb-chase {
+    0%   { background-position: 0 0; }
+    100% { background-position: 36px 0; }
 }
 
-.dosbox-library-link {
-    font-size: 11px;
-    color: #000080;
-    text-decoration: underline;
-    white-space: nowrap;
-    cursor: pointer;
+.arcade-marquee-inner {
+    text-align: center;
+    padding: 10px 12px 12px;
+    background:
+        radial-gradient(ellipse at center, rgba(255, 45, 184, 0.12) 0%, transparent 70%),
+        linear-gradient(180deg, #1f0830 0%, #0d041a 100%);
 }
 
-.dosbox-library-link:hover {
-    color: #0000ff;
-}
-
-.dosbox-featured-item {
-    display: flex;
+.arcade-marquee-logo {
+    display: inline-flex;
     align-items: center;
-    gap: 3px;
-    padding: 2px 8px;
-    background: var(--win95-gray, #c0c0c0);
-    border-top: 2px solid #ffffff;
-    border-left: 2px solid #ffffff;
-    border-right: 2px solid #000000;
-    border-bottom: 2px solid #000000;
-    cursor: pointer;
-    font-family: inherit;
-    font-size: 11px;
-    white-space: nowrap;
+    gap: 12px;
+    font-family: 'VT323', 'Courier New', monospace;
+    font-size: 30px;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: 4px;
+    text-shadow:
+        0 0 8px var(--arc-magenta),
+        0 0 18px rgba(255, 45, 184, 0.6),
+        2px 2px 0 #000;
 }
 
-.dosbox-featured-item:hover {
-    background: #d4d0c8;
+.arcade-marquee-title {
+    color: var(--arc-yellow);
+    background: linear-gradient(180deg, var(--arc-yellow) 0%, var(--arc-orange) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 0 8px rgba(255, 227, 74, 0.8));
 }
 
-.dosbox-featured-item:active {
-    border-top: 2px solid #000000;
-    border-left: 2px solid #000000;
-    border-right: 2px solid #ffffff;
-    border-bottom: 2px solid #ffffff;
+.arcade-marquee-glyph {
+    color: var(--arc-cyan);
+    text-shadow: 0 0 6px var(--arc-cyan), 0 0 14px rgba(45, 232, 255, 0.6);
+    animation: arcade-blink 1.6s steps(2) infinite;
+}
+.arcade-marquee-glyph:last-child { animation-delay: 0.8s; }
+
+@keyframes arcade-blink {
+    0%, 49%   { opacity: 1; }
+    50%, 100% { opacity: 0.25; }
 }
 
-.dosbox-featured-icon {
-    font-size: 14px;
+.arcade-marquee-sub {
+    margin-top: 4px;
+    font-family: 'VT323', 'Courier New', monospace;
+    font-size: 13px;
+    letter-spacing: 3px;
+    color: var(--arc-cyan);
+    text-shadow: 0 0 4px rgba(45, 232, 255, 0.7);
 }
 
-.dosbox-featured-name {
-    font-size: 11px;
-}
-
-/* ── Emulator Area ───────────────────────── */
-
-.dosbox-emulator-area {
+/* ── Browse layout ──────────────────────────── */
+.arcade-browse {
     flex: 1;
-    position: relative;       /* positioning context for absolute children */
-    background: #000;
-    min-height: 200px;
-    overflow: hidden;
+    display: flex;
+    min-height: 0;
 }
 
-/* All children of the emulator area are absolutely positioned so they
-   fill the parent's actual measured box. Percentage heights through a
-   flex chain can return 0 in some Win95-window layouts and the moment
-   js-dos measures `canvas.parentElement.getBoundingClientRect()` and
-   sees 0x0, it sets `canvas.style.width = 0px` forever. With
-   position: absolute + inset: 0 the children take their dimensions
-   from the parent's actual box, bypassing the chain entirely. */
-.dosbox-splash,
-.dosbox-stage,
-.dosbox-loading {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-}
-
-/* ── Splash Screen ───────────────────────── */
-
-.dosbox-splash {
+/* ── Sidebar ────────────────────────────────── */
+.arcade-sidebar {
+    width: 175px;
+    flex-shrink: 0;
+    background: linear-gradient(180deg, var(--arc-cabinet-2) 0%, var(--arc-panel) 100%);
+    border-right: 2px solid #000;
+    box-shadow: inset -2px 0 0 var(--arc-bezel);
+    overflow-y: auto;
+    padding: 6px 0 8px;
     display: flex;
     flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    background: #000080;
-    color: #fff;
-    text-align: center;
-    gap: 8px;
 }
 
-.dosbox-splash-icon {
-    font-size: 56px;
+.arcade-sidebar-title {
+    padding: 4px 10px 6px;
+    font-family: 'VT323', 'Courier New', monospace;
+    font-size: 13px;
+    letter-spacing: 3px;
+    color: var(--arc-text-dim);
+    border-bottom: 1px dashed var(--arc-bezel);
     margin-bottom: 4px;
 }
 
-.dosbox-splash-title {
-    font-size: 24px;
-    font-weight: bold;
+.arcade-sidebar-divider {
+    height: 1px;
+    margin: 4px 8px;
+    background: linear-gradient(to right, transparent, var(--arc-bezel-hi), transparent);
+}
+
+.arcade-cat {
+    display: grid;
+    grid-template-columns: 22px 1fr auto;
+    align-items: center;
+    gap: 6px;
+    width: calc(100% - 8px);
+    margin: 2px 4px;
+    padding: 5px 8px;
+    background: transparent;
+    border: 0;
+    color: var(--arc-text-dim);
     font-family: 'VT323', 'Courier New', monospace;
-    color: #ffff00;
+    font-size: 14px;
+    letter-spacing: 1.5px;
+    text-align: left;
+    cursor: pointer;
+    border-left: 3px solid transparent;
+    transition: background 0.08s, color 0.08s, border-color 0.08s;
+}
+.arcade-cat:hover {
+    background: rgba(255, 45, 184, 0.08);
+    color: var(--arc-text);
+    border-left-color: var(--arc-magenta);
+}
+.arcade-cat--active {
+    background: linear-gradient(90deg, rgba(255, 45, 184, 0.18), transparent 80%);
+    color: var(--arc-yellow);
+    border-left-color: var(--arc-yellow);
+    text-shadow: 0 0 5px rgba(255, 227, 74, 0.5);
+}
+.arcade-cat--featured {
+    color: var(--arc-cyan);
+}
+.arcade-cat--featured.arcade-cat--active {
+    color: var(--arc-yellow);
 }
 
-.dosbox-splash-sub {
-    font-size: 13px;
-    color: #c0c0c0;
-    max-width: 360px;
-    line-height: 1.4;
+.arcade-cat-icon {
+    font-size: 14px;
+    text-align: center;
+}
+.arcade-cat-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.arcade-cat-tally {
+    font-size: 10px;
+    color: var(--arc-text-muted);
+    background: rgba(0,0,0,0.35);
+    padding: 1px 5px;
+    border-radius: 2px;
+    border: 1px solid var(--arc-bezel);
+    font-family: 'MS Sans Serif', Tahoma, sans-serif;
+    letter-spacing: 0;
+}
+.arcade-cat--active .arcade-cat-tally {
+    color: var(--arc-yellow);
+    border-color: var(--arc-yellow);
 }
 
-.dosbox-splash-hint {
+.arcade-sidebar-foot {
+    margin-top: auto;
+    padding: 8px 8px 0;
+    border-top: 1px dashed var(--arc-bezel);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.arcade-sidebar-stat {
+    display: flex;
+    justify-content: space-between;
+    font-family: 'VT323', 'Courier New', monospace;
+    font-size: 12px;
+    letter-spacing: 2px;
+    color: var(--arc-text-muted);
+}
+.arcade-sidebar-stat b {
+    color: var(--arc-cyan);
+    font-weight: normal;
+}
+
+/* ── Main / toolbar ─────────────────────────── */
+.arcade-main {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--arc-cabinet);
+}
+
+.arcade-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    background: linear-gradient(180deg, var(--arc-bezel) 0%, var(--arc-cabinet-2) 100%);
+    border-bottom: 2px solid #000;
+    box-shadow: inset 0 -1px 0 var(--arc-bezel-hi);
+    flex-shrink: 0;
+}
+
+.arcade-toolbar-section {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
+}
+
+.arcade-cat-label {
+    font-family: 'VT323', 'Courier New', monospace;
+    font-size: 18px;
+    letter-spacing: 3px;
+    color: var(--arc-yellow);
+    text-shadow: 0 0 6px rgba(255, 227, 74, 0.45);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.arcade-cat-count {
+    font-family: 'VT323', 'Courier New', monospace;
+    font-size: 14px;
+    color: var(--arc-text-muted);
+}
+
+.arcade-toolbar-search {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: var(--arc-screen);
+    padding: 3px 6px;
+    border: 2px inset var(--arc-bezel);
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.6);
+    min-width: 200px;
+}
+.arcade-search-icon {
+    font-size: 12px;
+    color: var(--arc-cyan);
+}
+.arcade-search-input {
+    flex: 1;
+    background: transparent;
+    border: 0;
+    color: var(--arc-text);
+    font-family: 'VT323', 'Courier New', monospace;
+    font-size: 14px;
+    letter-spacing: 1.5px;
+    outline: none;
+    min-width: 0;
+}
+.arcade-search-input::placeholder {
+    color: var(--arc-text-muted);
+}
+
+/* ── Tile grid ──────────────────────────────── */
+.arcade-grid {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 14px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 12px;
+    align-content: start;
+    background:
+        linear-gradient(rgba(255, 45, 184, 0.025) 50%, transparent 50%),
+        var(--arc-cabinet);
+    background-size: 100% 4px;
+}
+
+/* Custom scrollbar for the grid (WebKit) */
+.arcade-grid::-webkit-scrollbar { width: 14px; }
+.arcade-grid::-webkit-scrollbar-track {
+    background: var(--arc-panel);
+    border-left: 1px solid #000;
+}
+.arcade-grid::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, var(--arc-bezel-hi), var(--arc-bezel));
+    border: 2px solid #000;
+}
+.arcade-grid::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, var(--arc-magenta), var(--arc-bezel-hi));
+}
+
+/* ── Tile (cabinet card) ─────────────────────── */
+.arcade-tile {
+    appearance: none;
+    background: linear-gradient(180deg, var(--arc-bezel) 0%, var(--arc-cabinet-2) 100%);
+    border: 0;
+    padding: 6px 6px 0;
+    color: var(--arc-text);
+    font-family: 'MS Sans Serif', Tahoma, sans-serif;
     font-size: 11px;
-    color: #808080;
-    margin-top: 12px;
-}
-
-.dosbox-splash-hint b {
-    color: #aaa;
-}
-
-/* ── js-dos Stage / Root ─────────────────── */
-
-/* The stage hosts a fresh .dosbox-root child per emulator session,
-   so we can fully destroy and recreate the Preact tree on stop/start.
-   Sizing comes from the absolute-positioned rule above; we just
-   guarantee a positioning context for js-dos's internal absolute
-   children. */
-.dosbox-stage {
+    cursor: pointer;
+    text-align: center;
+    border-radius: 4px 4px 2px 2px;
+    box-shadow:
+        inset 0 1px 0 var(--arc-bezel-hi),
+        inset 0 -1px 0 var(--arc-bezel-lo),
+        2px 2px 0 #000,
+        4px 4px 0 rgba(0,0,0,0.5);
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+    animation: arcade-tile-in 0.36s ease-out backwards;
+    animation-delay: var(--tile-delay, 0ms);
     overflow: hidden;
 }
+.arcade-tile:hover {
+    transform: translate(-2px, -2px);
+    box-shadow:
+        inset 0 1px 0 var(--arc-bezel-hi),
+        inset 0 -1px 0 var(--arc-bezel-lo),
+        4px 4px 0 #000,
+        6px 6px 0 var(--arc-magenta);
+}
+.arcade-tile:active {
+    transform: translate(1px, 1px);
+    box-shadow:
+        inset 0 1px 0 var(--arc-bezel-lo),
+        inset 0 -1px 0 var(--arc-bezel-hi),
+        1px 1px 0 #000;
+}
 
-.dosbox-root {
+@keyframes arcade-tile-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.arcade-tile-screen {
+    position: relative;
+    background: radial-gradient(ellipse at 50% 40%, var(--arc-screen-glow), var(--arc-screen) 70%);
+    border: 2px solid #000;
+    border-radius: 8px;
+    padding: 18px 8px;
+    overflow: hidden;
+    box-shadow:
+        inset 0 0 8px rgba(0,0,0,0.8),
+        inset 0 0 22px rgba(45, 232, 255, 0.08);
+}
+
+.arcade-tile-glyph {
+    font-size: 36px;
+    line-height: 1;
+    filter: drop-shadow(0 0 6px rgba(45, 232, 255, 0.45));
+    transition: transform 0.4s ease, filter 0.2s ease;
+}
+.arcade-tile:hover .arcade-tile-glyph {
+    transform: scale(1.12) rotate(-3deg);
+    filter: drop-shadow(0 0 10px var(--arc-magenta));
+}
+
+.arcade-tile-scanlines {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+        repeating-linear-gradient(
+            to bottom,
+            rgba(0, 0, 0, 0) 0px,
+            rgba(0, 0, 0, 0) 2px,
+            rgba(0, 0, 0, 0.32) 2px,
+            rgba(0, 0, 0, 0.32) 3px
+        );
+    mix-blend-mode: multiply;
+    border-radius: 8px;
+}
+
+.arcade-tile-plate {
+    padding: 6px 4px 8px;
+}
+.arcade-tile-name {
+    font-family: 'VT323', 'Courier New', monospace;
+    font-size: 14px;
+    letter-spacing: 1px;
+    color: var(--arc-yellow);
+    text-shadow: 1px 1px 0 #000;
+    line-height: 1.1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.arcade-tile-meta {
+    margin-top: 2px;
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    font-size: 10px;
+    color: var(--arc-text-dim);
+    font-family: 'VT323', 'Courier New', monospace;
+    letter-spacing: 1px;
+}
+.arcade-tile-genre {
+    color: var(--arc-cyan);
+}
+
+/* ── Empty state ────────────────────────────── */
+.arcade-empty {
+    margin: auto;
+    text-align: center;
+    color: var(--arc-text-muted);
+    padding: 40px 20px;
+}
+.arcade-empty-icon {
+    font-size: 48px;
+    margin-bottom: 8px;
+    filter: drop-shadow(0 0 6px var(--arc-magenta));
+}
+.arcade-empty-title {
+    font-family: 'VT323', 'Courier New', monospace;
+    font-size: 18px;
+    letter-spacing: 3px;
+    color: var(--arc-yellow);
+}
+.arcade-empty-sub {
+    margin-top: 4px;
+    font-size: 11px;
+    color: var(--arc-text-dim);
+}
+
+/* ── Detail view ────────────────────────────── */
+.arcade-detail {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 20px 24px;
+    background:
+        radial-gradient(ellipse at 50% 0%, rgba(255, 45, 184, 0.10) 0%, transparent 60%),
+        var(--arc-cabinet);
+    display: flex;
+    flex-direction: column;
+}
+
+.arcade-detail-back {
+    align-self: flex-start;
+    margin-bottom: 14px;
+}
+
+.arcade-detail-card {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    gap: 22px;
+    align-items: stretch;
+    background: linear-gradient(180deg, var(--arc-bezel) 0%, var(--arc-cabinet-2) 100%);
+    padding: 18px;
+    border-radius: 6px;
+    box-shadow:
+        inset 0 1px 0 var(--arc-bezel-hi),
+        inset 0 -1px 0 var(--arc-bezel-lo),
+        4px 4px 0 #000;
+}
+
+@media (max-width: 620px) {
+    .arcade-detail-card { grid-template-columns: 1fr; }
+}
+
+.arcade-detail-cabinet {
+    display: flex;
+    flex-direction: column;
+}
+.arcade-detail-screen {
+    position: relative;
+    background: radial-gradient(ellipse at 50% 40%, var(--arc-screen-glow), var(--arc-screen) 70%);
+    border: 3px solid #000;
+    border-radius: 14px;
+    padding: 38px 12px;
+    text-align: center;
+    overflow: hidden;
+    box-shadow:
+        inset 0 0 18px rgba(0,0,0,0.85),
+        inset 0 0 32px rgba(45, 232, 255, 0.10);
+}
+.arcade-detail-glyph {
+    font-size: 96px;
+    line-height: 1;
+    filter: drop-shadow(0 0 14px var(--arc-magenta)) drop-shadow(0 0 28px rgba(255, 45, 184, 0.45));
+    animation: arcade-glyph-float 3s ease-in-out infinite;
+}
+@keyframes arcade-glyph-float {
+    0%, 100% { transform: translateY(0); }
+    50%      { transform: translateY(-4px); }
+}
+.arcade-detail-cabinet-base {
+    height: 14px;
+    margin-top: 6px;
+    background: linear-gradient(180deg, var(--arc-bezel-hi), var(--arc-bezel-lo));
+    border-radius: 0 0 8px 8px;
+    border: 2px solid #000;
+    border-top: 0;
+}
+
+.arcade-detail-info {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+}
+
+.arcade-detail-genre-tag {
+    align-self: flex-start;
+    background: var(--arc-cyan);
+    color: #001a20;
+    font-family: 'VT323', 'Courier New', monospace;
+    font-size: 12px;
+    letter-spacing: 3px;
+    padding: 2px 10px;
+    text-transform: uppercase;
+    box-shadow: 2px 2px 0 #000;
+}
+
+.arcade-detail-title {
+    margin: 4px 0 0;
+    font-family: 'VT323', 'Courier New', monospace;
+    font-size: 32px;
+    line-height: 1.05;
+    letter-spacing: 2px;
+    color: var(--arc-yellow);
+    text-shadow:
+        2px 2px 0 #000,
+        0 0 12px rgba(255, 227, 74, 0.4);
+}
+.arcade-detail-year {
+    font-family: 'VT323', 'Courier New', monospace;
+    font-size: 14px;
+    letter-spacing: 2px;
+    color: var(--arc-text-muted);
+}
+.arcade-detail-desc {
+    margin: 8px 0 0;
+    font-size: 12px;
+    line-height: 1.55;
+    color: var(--arc-text-dim);
+    max-width: 56ch;
+}
+
+.arcade-detail-actions {
+    margin-top: 14px;
+}
+
+/* ── INSERT COIN button ─────────────────────── */
+.arcade-coin-btn {
+    appearance: none;
+    border: 0;
+    cursor: pointer;
+    display: inline-grid;
+    grid-template-columns: auto auto;
+    grid-template-rows: auto auto;
+    column-gap: 12px;
+    align-items: center;
+    padding: 12px 26px;
+    background: linear-gradient(180deg, #ff5acc 0%, var(--arc-magenta) 50%, #c9098f 100%);
+    color: #fff;
+    font-family: 'VT323', 'Courier New', monospace;
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.45),
+        inset 0 -2px 0 rgba(0,0,0,0.45),
+        4px 4px 0 #000;
+    text-shadow: 1px 1px 0 #5a0044;
+    letter-spacing: 3px;
+    transition: transform 0.06s ease, box-shadow 0.06s ease, filter 0.12s ease;
+    position: relative;
+    overflow: hidden;
+}
+.arcade-coin-btn::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(120deg, transparent 30%, rgba(255,255,255,0.35) 50%, transparent 70%);
+    transform: translateX(-100%);
+    transition: transform 0.6s ease;
+}
+.arcade-coin-btn:hover::before { transform: translateX(100%); }
+.arcade-coin-btn:hover {
+    filter: brightness(1.08) saturate(1.1);
+}
+.arcade-coin-btn:active {
+    transform: translate(2px, 2px);
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.2),
+        inset 0 -1px 0 rgba(0,0,0,0.5),
+        2px 2px 0 #000;
+}
+.arcade-coin-glyph {
+    grid-row: 1 / span 2;
+    font-size: 32px;
+    line-height: 1;
+    color: var(--arc-yellow);
+    text-shadow: 0 0 6px rgba(255, 227, 74, 0.7), 1px 1px 0 #5a0044;
+    animation: arcade-coin-pulse 1s ease-in-out infinite;
+}
+@keyframes arcade-coin-pulse {
+    0%, 100% { transform: scale(1); }
+    50%      { transform: scale(1.12); }
+}
+.arcade-coin-text {
+    font-size: 22px;
+    line-height: 1;
+}
+.arcade-coin-sub {
+    font-size: 11px;
+    letter-spacing: 4px;
+    color: rgba(255,255,255,0.85);
+    text-shadow: 1px 1px 0 #5a0044;
+}
+
+.arcade-detail-meta-row {
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+}
+.arcade-detail-meta-row > div {
+    background: var(--arc-screen);
+    border: 1px solid var(--arc-bezel);
+    box-shadow: inset 0 0 10px rgba(0,0,0,0.5);
+    padding: 6px 10px;
+    text-align: center;
+    font-family: 'VT323', 'Courier New', monospace;
+}
+.arcade-detail-meta-row span {
+    display: block;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--arc-text-muted);
+}
+.arcade-detail-meta-row b {
+    display: block;
+    font-size: 14px;
+    color: var(--arc-cyan);
+    letter-spacing: 1.5px;
+    font-weight: normal;
+    margin-top: 2px;
+}
+
+/* ── Pixel button (used in play view + detail back) ── */
+.arcade-pixel-btn {
+    appearance: none;
+    cursor: pointer;
+    background: linear-gradient(180deg, var(--arc-bezel-hi) 0%, var(--arc-bezel) 100%);
+    color: var(--arc-yellow);
+    font-family: 'VT323', 'Courier New', monospace;
+    font-size: 14px;
+    letter-spacing: 2px;
+    padding: 5px 14px;
+    border: 0;
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.18),
+        inset 0 -2px 0 rgba(0,0,0,0.55),
+        2px 2px 0 #000;
+    text-shadow: 1px 1px 0 #000;
+    transition: transform 0.06s ease, box-shadow 0.06s ease, color 0.12s;
+}
+.arcade-pixel-btn:hover {
+    color: #fff;
+    background: linear-gradient(180deg, var(--arc-magenta) 0%, var(--arc-bezel-hi) 100%);
+}
+.arcade-pixel-btn:active {
+    transform: translate(2px, 2px);
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,0.1),
+        inset 0 -1px 0 rgba(0,0,0,0.6),
+        0 0 0 #000;
+}
+
+/* ── Play view ──────────────────────────────── */
+.arcade-play {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.arcade-play-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    background: linear-gradient(180deg, var(--arc-bezel) 0%, var(--arc-cabinet-2) 100%);
+    border-bottom: 2px solid #000;
+    box-shadow: inset 0 -1px 0 var(--arc-bezel-hi);
+    flex-shrink: 0;
+}
+.arcade-play-title {
+    flex: 1;
+    text-align: center;
+    font-family: 'VT323', 'Courier New', monospace;
+    font-size: 18px;
+    letter-spacing: 3px;
+    color: var(--arc-yellow);
+    text-shadow: 0 0 6px rgba(255, 227, 74, 0.5);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.arcade-play-actions {
+    display: flex;
+    gap: 4px;
+}
+
+.arcade-stage-area {
+    flex: 1;
+    position: relative;
+    background: #000;
+    min-height: 200px;
+    overflow: hidden;
+    border-top: 2px solid var(--arc-bezel-hi);
+    border-bottom: 2px solid #000;
+    box-shadow: inset 0 0 60px rgba(0,0,0,0.9);
+}
+
+/* All children of the stage area are absolute-positioned so they fill the
+   parent's measured box, bypassing the percentage-height/flex chain.
+   Without this, the embedded engine measures parent.getBoundingClientRect()
+   as 0x0 and sets canvas.style.width = 0px. */
+.arcade-stage,
+.arcade-loading {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+}
+
+.arcade-stage { overflow: hidden; }
+
+.arcade-root {
     width: 100%;
     height: 100%;
     min-width: 320px;
     min-height: 200px;
     position: relative;
     overflow: hidden;
-    /* js-dos adds .jsdos-rso to this element and renders its Preact UI
-       in place. We do not need to override any internal layout. */
 }
 
-.dosbox-root canvas {
+.arcade-root canvas {
     display: block;
     image-rendering: pixelated;
     min-width: 1px;
     min-height: 1px;
 }
 
-/* ── js-dos / IlluminatOS class-name collision resets ──
+/* ── Engine class-name collision resets ──────
  *
- * js-dos's Preact UI uses `class="window"` for its inner root div (see
- * src/window/window.tsx in caiiiycuk/js-dos). IlluminatOS's
- * styles/components/windows.css applies `.window { display: none; ... }`
- * to every Win95 OS window (they're only shown when `.open` is added).
- *
- * The two `.window` classes collide head-on: js-dos's inner div gets
- * `display: none` from the OS rule and the entire emulator render tree
- * collapses to 0x0 — the "audio plays, screen is black" symptom. The
- * scoped overrides below restore js-dos's intended Tailwind layout
- * while leaving the outer Win95 window styling untouched.
- *
- * Also resets `.title-bar` and `.background-image` defensively in case
- * js-dos ever reuses those names. */
-.dosbox-root .window {
+ * The embedded engine's UI uses `class="window"` for its inner root div.
+ * IlluminatOS's styles/components/windows.css applies
+ * `.window { display: none; ... }` to every Win95 OS window (only shown
+ * when `.open` is added). The two `.window` classes collide, so the
+ * engine's inner div gets `display: none` and the entire render tree
+ * collapses to 0x0 — symptom: audio plays but the screen is black.
+ * The scoped overrides below restore the engine's intended layout.
+ */
+.arcade-root .window {
     display: block !important;
     position: absolute !important;
     top: 0 !important;
@@ -326,12 +836,10 @@
     animation: none !important;
 }
 
-.dosbox-root .window.maximized,
-.dosbox-root .window.minimized,
-.dosbox-root .window.active,
-.dosbox-root .window.open {
-    /* Defeat IlluminatOS state-modifier rules so they can't perturb
-       js-dos's layout if its store ever happens to write one. */
+.arcade-root .window.maximized,
+.arcade-root .window.minimized,
+.arcade-root .window.active,
+.arcade-root .window.open {
     display: block !important;
     position: absolute !important;
     top: 0 !important;
@@ -341,80 +849,118 @@
     z-index: auto !important;
 }
 
-.dosbox-root .title-bar,
-.dosbox-root .background-image {
-    /* These IlluminatOS class names theoretically could collide too;
-       neutralize the OS-specific styling so js-dos's Tailwind owns
-       layout for any element with these classes inside our root. */
+.arcade-root .title-bar,
+.arcade-root .background-image {
     all: revert;
 }
 
-/* ── Loading Overlay ─────────────────────── */
-
-.dosbox-loading {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
+/* ── Loading overlay ────────────────────────── */
+.arcade-loading {
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    background: rgba(0, 0, 0, 0.85);
+    gap: 14px;
+    background: linear-gradient(180deg, #060010 0%, #000 100%);
     z-index: 10;
-    gap: 12px;
 }
 
-.dosbox-loading-spinner {
-    width: 36px;
-    height: 36px;
-    border: 4px solid #333;
-    border-top: 4px solid #ffff00;
-    border-radius: 50%;
-    animation: dosbox-spin 0.8s linear infinite;
+.arcade-loading-screen {
+    display: grid;
+    grid-template-columns: repeat(2, 18px);
+    grid-template-rows: repeat(2, 18px);
+    gap: 4px;
+    animation: arcade-spinner-rotate 1.4s linear infinite;
+}
+.arcade-loading-pixel {
+    background: var(--arc-magenta);
+    box-shadow: 0 0 6px var(--arc-magenta);
+}
+.arcade-loading-pixel:nth-child(2) { background: var(--arc-cyan);   box-shadow: 0 0 6px var(--arc-cyan); }
+.arcade-loading-pixel:nth-child(3) { background: var(--arc-yellow); box-shadow: 0 0 6px var(--arc-yellow); }
+.arcade-loading-pixel:nth-child(4) { background: var(--arc-green);  box-shadow: 0 0 6px var(--arc-green); }
+
+@keyframes arcade-spinner-rotate {
+    from { transform: rotate(0deg);   }
+    to   { transform: rotate(360deg); }
 }
 
-@keyframes dosbox-spin {
-    to { transform: rotate(360deg); }
-}
-
-.dosbox-loading-text {
-    color: #c0c0c0;
-    font-size: 14px;
+.arcade-loading-text {
     font-family: 'VT323', 'Courier New', monospace;
+    font-size: 18px;
+    letter-spacing: 3px;
+    color: var(--arc-yellow);
+    text-shadow: 0 0 6px rgba(255, 227, 74, 0.6);
+    animation: arcade-blink-text 0.8s steps(2) infinite;
+}
+@keyframes arcade-blink-text {
+    0%, 49%   { opacity: 1; }
+    50%, 100% { opacity: 0.55; }
 }
 
-/* ── Status Bar ──────────────────────────── */
+.arcade-loading-tip {
+    font-family: 'VT323', 'Courier New', monospace;
+    font-size: 12px;
+    letter-spacing: 2px;
+    color: var(--arc-cyan);
+    text-shadow: 0 0 4px rgba(45, 232, 255, 0.5);
+}
 
-.dosbox-status {
-    padding: 2px 6px;
-    background: var(--win95-gray, #c0c0c0);
-    border-top: 1px solid #808080;
-    font-size: 11px;
-    color: #000;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+/* ── Status bar ─────────────────────────────── */
+.arcade-statusbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 10px;
+    background: linear-gradient(180deg, #14041e 0%, #06000d 100%);
+    border-top: 2px solid #000;
+    box-shadow: inset 0 1px 0 var(--arc-bezel);
+    font-family: 'VT323', 'Courier New', monospace;
+    font-size: 12px;
+    letter-spacing: 2px;
+    color: var(--arc-text-dim);
+    flex-shrink: 0;
+    min-height: 22px;
+}
+
+.arcade-status-led {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--arc-green);
+    box-shadow: 0 0 6px var(--arc-green), inset 0 1px 1px rgba(255,255,255,0.4);
     flex-shrink: 0;
 }
+.arcade-status-led[data-state="ready"]   { background: var(--arc-green);   box-shadow: 0 0 6px var(--arc-green); }
+.arcade-status-led[data-state="booting"] { background: var(--arc-yellow);  box-shadow: 0 0 6px var(--arc-yellow);
+    animation: arcade-led-blink 0.5s steps(2) infinite; }
+.arcade-status-led[data-state="playing"] { background: var(--arc-magenta); box-shadow: 0 0 8px var(--arc-magenta); }
+.arcade-status-led[data-state="error"]   { background: var(--arc-red);     box-shadow: 0 0 6px var(--arc-red);
+    animation: arcade-led-blink 0.3s steps(2) infinite; }
+@keyframes arcade-led-blink {
+    0%, 49%   { opacity: 1; }
+    50%, 100% { opacity: 0.4; }
+}
 
-/* ── Fullscreen Tweaks ───────────────────── */
+.arcade-status-text {
+    color: var(--arc-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+}
+.arcade-status-spacer { flex: 1; }
+.arcade-status-credit {
+    color: var(--arc-cyan);
+    text-shadow: 0 0 4px rgba(45, 232, 255, 0.5);
+}
 
-.dosbox-emulator-area:fullscreen {
+/* ── Fullscreen tweaks ──────────────────────── */
+.arcade-stage-area:fullscreen {
     background: #000;
 }
-
-.dosbox-emulator-area:fullscreen .dosbox-stage,
-.dosbox-emulator-area:fullscreen .dosbox-root {
+.arcade-stage-area:fullscreen .arcade-stage,
+.arcade-stage-area:fullscreen .arcade-root {
     width: 100vw;
     height: 100vh;
-}
-
-/* Splash text styling helpers */
-.dosbox-splash-sub code {
-    background: rgba(255, 255, 255, 0.1);
-    padding: 0 4px;
-    border-radius: 2px;
-    font-family: 'VT323', 'Courier New', monospace;
 }

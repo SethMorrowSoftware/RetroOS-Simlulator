@@ -1,15 +1,14 @@
 /**
- * DOSBox App - DOS Emulator for IlluminatOS!
- * Run DOS programs and games in the browser via js-dos v8 (WebAssembly DOSBox / DOSBox-X).
+ * Arcade — IlluminatOS! Game Gallery
  *
- * Uses js-dos v8 (https://js-dos.com/) loaded from the official CDN at v8.js-dos.com.
- * Supports the bundled game library, arbitrary .jsdos bundle URLs, and local .jsdos files.
+ * A curated 90s-styled game launcher that browses and plays a hand-picked
+ * library of classic shareware and retro titles. Games are streamed from
+ * trusted CDNs and run inside an in-browser emulator.
  *
- * SETUP:
- *   No installation required — js-dos is loaded automatically from CDN the first time
- *   the app is used in a session. The CDN also serves the WASM/worker assets.
+ * The internal app id stays `dosbox` so existing `.retro` scripts keep
+ * working — the visible name, icon, and chrome are all rebranded.
  *
- * SCRIPTING SUPPORT:
+ * SCRIPTING SUPPORT (unchanged for back-compat):
  *   Commands: run, runFile, stop, reset, fullscreen, setVolume, pause, resume, save
  *   Queries:  getState, getLibrary, getVersion
  *   Events:   app:dosbox:started, app:dosbox:ready, app:dosbox:stopped, app:dosbox:error
@@ -27,45 +26,21 @@
 import AppBase from './AppBase.js';
 import { escapeHtml } from '../core/Sanitize.js';
 
-/** CDN base for js-dos v8 assets (script, css, WASM workers). */
+/** CDN base for the embedded emulator engine (loaded lazily). */
 const JSDOS_CDN = 'https://v8.js-dos.com/latest';
 const JSDOS_JS_URL = `${JSDOS_CDN}/js-dos.js`;
 const JSDOS_CSS_URL = `${JSDOS_CDN}/js-dos.css`;
 const EMULATORS_PATH_PREFIX = `${JSDOS_CDN}/emulators/`;
 
-/**
- * Path to the IlluminatOS PHP CORS proxy (api/dosbox-proxy.php). Relative
- * to document.baseURI so it works at any deployment subpath (e.g. /TestOS/).
- *
- * The proxy is REQUIRED for cdn.dos.zone / br.cdn.dos.zone bundles — those
- * CDNs don't send Access-Control-Allow-Origin to arbitrary embedders. The
- * proxy fetches the bundle server-side and streams it back with permissive
- * CORS headers.
- *
- * Hosts that already send proper CORS (v8.js-dos.com, same-origin URLs,
- * blob:/data:/file:) bypass the proxy.
- */
+/** Hosts that send permissive CORS — fetched directly. */
 const CORS_FRIENDLY_HOSTS = new Set(['v8.js-dos.com']);
+/** Hosts that don't send CORS — routed through the local PHP proxy. */
 const NEEDS_PROXY_HOSTS = new Set(['cdn.dos.zone', 'br.cdn.dos.zone', 'dos.zone']);
 
 /**
- * Curated game library — verified .jsdos bundles served by the official
- * js-dos CDN (v8.js-dos.com) and the DOS.Zone CDN. Both CDNs set CORS
- * headers for embedding (cdn.dos.zone goes through the local PHP proxy
- * since it doesn't send CORS to third-party origins).
- *
- * URLs intentionally carry no query string: appending `?anonymous=1` (a
- * legacy js-dos v7 quirk) breaks v8's bundle handler.
- *
- * Bundle URLs were sourced from the js-dos/dos.zone.db YAML database
- * (community-maintained, archived Dec 2021). The S3 path
- *   https://doszone-uploads.s3.dualstack.eu-central-1.amazonaws.com/<x>
- * is fronted by
- *   https://cdn.dos.zone/<x>
- * which is what we use here.
- *
- * Each entry: { name, icon, genre, year, desc, url }
- * `genre` is used to group games in the dropdown.
+ * Curated game library — verified bundles from trusted CDNs. Each entry:
+ * { name, icon, genre, year, desc, url }. URLs without query strings —
+ * the engine's bundle handler rejects `?anonymous=1` style suffixes.
  */
 const GAME_LIBRARY = [
     // === Shooter (FPS / 3D shooters) ===
@@ -146,7 +121,7 @@ const GAME_LIBRARY = [
       desc: 'The third Dangerous Dave outing',
       url: 'https://cdn.dos.zone/custom/dos/dangerous-daves-risky-rescue.jsdos' },
     { name: 'Captain Comic',       icon: '🦸', genre: 'Platformer',  year: 1988,
-      desc: 'The Adventures of Captain Comic — early DOS platformer',
+      desc: 'The Adventures of Captain Comic — early platformer',
       url: 'https://cdn.dos.zone/custom/dos/adventures-of-captain-comic.jsdos' },
     { name: 'Electro Man',         icon: '⚡', genre: 'Platformer',  year: 1993,
       desc: 'xLand Polish shareware (a.k.a. Electro Body)',
@@ -370,7 +345,7 @@ const GAME_LIBRARY = [
       desc: 'Classic arcade dig-em-up',
       url: 'https://v8.js-dos.com/bundles/digger.jsdos' },
     { name: 'Pac-Man',             icon: '👻', genre: 'Arcade',      year: 1982,
-      desc: 'Namco\'s arcade icon (DOS port)',
+      desc: 'Namco\'s arcade icon',
       url: 'https://cdn.dos.zone/original/2X/5/5cdcffbf268b3be0555025902b52a8d21ad595b9.jsdos' },
     { name: 'Arkanoid',            icon: '🟪', genre: 'Arcade',      year: 1988,
       desc: 'Taito\'s block-breaker',
@@ -394,13 +369,13 @@ const GAME_LIBRARY = [
       desc: 'Activision\'s jungle-vine classic',
       url: 'https://cdn.dos.zone/custom/dos/pitfall_.jsdos' },
     { name: 'Golden Axe',          icon: '🪓', genre: 'Arcade',      year: 1990,
-      desc: 'Sega beat-\'em-up — DOS port',
+      desc: 'Sega beat-\'em-up',
       url: 'https://cdn.dos.zone/original/2X/a/ad3686df58a0bac357d3bb81b3f2536205e9ad76.jsdos' },
     { name: 'Earthworm Jim',       icon: '🪱', genre: 'Arcade',      year: 1995,
       desc: 'Shiny Entertainment\'s wormy hero',
       url: 'https://cdn.dos.zone/original/2X/a/aad1d125300d7d93bc28058fa4d0247a7142510e.jsdos' },
     { name: 'Rampart',             icon: '🏰', genre: 'Arcade',      year: 1992,
-      desc: 'Atari castle-siege arcade port',
+      desc: 'Atari castle-siege arcade',
       url: 'https://cdn.dos.zone/original/2X/2/238b19a1c478435d83e017e03c17e53a1cf56d0e.jsdos' },
     { name: 'Toppler',             icon: '🗼', genre: 'Arcade',      year: 1990,
       desc: 'Climb the rotating tower',
@@ -414,7 +389,7 @@ const GAME_LIBRARY = [
 
     // === Fighting ===
     { name: 'Mortal Kombat',       icon: '🥊', genre: 'Fighting',    year: 1993,
-      desc: 'Midway\'s arcade fighter — DOS port',
+      desc: 'Midway\'s arcade fighter',
       url: 'https://cdn.dos.zone/original/2X/8/872f3668c36085d0b1ace46872145285364ee628.jsdos' },
 
     // === Racing / Driving ===
@@ -460,13 +435,13 @@ const GAME_LIBRARY = [
       url: 'https://cdn.dos.zone/custom/dos/reader-rabbit-3.jsdos' },
 
     // === Tools / Software ===
-    { name: 'MS Windows 3.0',      icon: '🪟', genre: 'Tools',       year: 1990,
+    { name: 'MS Windows 3.0',      icon: '🪟', genre: 'Extras',      year: 1990,
       desc: 'Microsoft Windows 3.0 + bundled mini-games',
       url: 'https://cdn.dos.zone/custom/dos/microsoft-windows-version-30-included-games.jsdos' },
-    { name: 'QBasic 4.5',          icon: '⌨️', genre: 'Tools',       year: 1988,
+    { name: 'QBasic 4.5',          icon: '⌨️', genre: 'Extras',      year: 1988,
       desc: 'Microsoft QuickBASIC 4.5',
       url: 'https://cdn.dos.zone/custom/dos/QB45.jsdos' },
-    { name: 'Dhrystone Bench',     icon: '📊', genre: 'Tools',       year: 1988,
+    { name: 'Dhrystone Bench',     icon: '📊', genre: 'Extras',      year: 1988,
       desc: 'Dhrystone 2.1 CPU benchmark',
       url: 'https://v8.js-dos.com/bundles/dhry2.jsdos' },
 ];
@@ -485,35 +460,73 @@ const GENRE_ORDER = [
     'Racing',
     'Simulation',
     'Educational',
-    'Tools',
+    'Extras',
+];
+
+/** Pixel-style emoji glyph for each category in the sidebar. */
+const GENRE_ICONS = {
+    'Shooter':         '🔫',
+    'Platformer':      '🏃',
+    'Action':          '🗡️',
+    'Adventure':       '🧭',
+    'Text Adventure':  '📜',
+    'RPG':             '🐉',
+    'Strategy':        '🏰',
+    'Puzzle':          '🧩',
+    'Arcade':          '🕹️',
+    'Fighting':        '🥊',
+    'Racing':          '🏎️',
+    'Simulation':      '✈️',
+    'Educational':     '🎓',
+    'Extras':          '💿',
+};
+
+/** Hand-picked headliners for the top "HOT PICKS" marquee. */
+const HOT_PICKS = [
+    'DOOM',
+    'Prince of Persia',
+    'SimCity 2000',
+    'Commander Keen 1-3',
+    'The Lion King',
+    'Lemmings',
+    'Oregon Trail Deluxe',
+    'Mortal Kombat',
+    'Pac-Man',
+    'Tetris (1986)',
 ];
 
 class DOSBox extends AppBase {
     constructor() {
         super({
             id: 'dosbox',
-            name: 'DOSBox',
-            icon: '💾',
-            width: 760,
-            height: 600,
-            minWidth: 520,
-            minHeight: 420,
+            name: 'Arcade',
+            icon: '🕹️',
+            width: 860,
+            height: 620,
+            minWidth: 640,
+            minHeight: 460,
             resizable: true,
             singleton: true,
             category: 'games'
         });
 
-        this.dosProps = null;            // The DosProps object returned by Dos()
-        this.dosRoot = null;             // The fresh <div> we mounted into
+        this.dosProps = null;
+        this.dosRoot = null;
         this.isRunning = false;
-        this.isReady = false;            // True once js-dos posts 'ci-ready'
+        this.isReady = false;
         this.currentBundle = null;
         this.currentBundleName = null;
-        this.activeBlobUrl = null;       // For local-file loads — revoke when done
-        this._jsdosLoadPromise = null;   // Module-level: only fetch CDN once per session
-        this._readyWatchdog = null;      // Timer that warns if ci-ready never fires
-        this._resizePumpTimers = [];     // Timers that nudge js-dos to re-measure the canvas
-        this._canvasHealthTimers = [];   // Timers that force-show the canvas if it stayed 0x0
+        this.activeBlobUrl = null;
+        this._jsdosLoadPromise = null;
+        this._readyWatchdog = null;
+        this._resizePumpTimers = [];
+        this._canvasHealthTimers = [];
+
+        // UI state — view: 'browse' | 'detail' | 'play'
+        this.view = 'browse';
+        this.activeCategory = '__hot__';   // '__hot__' = Hot Picks, '__all__' = full library, else genre
+        this.searchQuery = '';
+        this.selectedGameUrl = null;
 
         this.registerCommands();
         this.registerQueries();
@@ -578,11 +591,16 @@ class DOSBox extends AppBase {
             isRunning: this.isRunning,
             isReady: this.isReady,
             currentBundle: this.currentBundle,
-            currentBundleName: this.currentBundleName
+            currentBundleName: this.currentBundleName,
+            view: this.view,
+            activeCategory: this.activeCategory
         }));
 
         this.registerQuery('getLibrary', () =>
-            GAME_LIBRARY.map(g => ({ name: g.name, url: g.url, desc: g.desc, icon: g.icon }))
+            GAME_LIBRARY.map(g => ({
+                name: g.name, url: g.url, desc: g.desc,
+                icon: g.icon, genre: g.genre, year: g.year
+            }))
         );
 
         this.registerQuery('getVersion', () => {
@@ -597,150 +615,142 @@ class DOSBox extends AppBase {
     // ── Lifecycle ──────────────────────────────────────────────
 
     onOpen() {
-        // Build a <select> grouped by genre.
-        const byGenre = new Map();
-        for (const game of GAME_LIBRARY) {
-            if (!byGenre.has(game.genre)) byGenre.set(game.genre, []);
-            byGenre.get(game.genre).push(game);
-        }
-        const orderedGenres = [
-            ...GENRE_ORDER.filter(g => byGenre.has(g)),
-            ...[...byGenre.keys()].filter(g => !GENRE_ORDER.includes(g))
-        ];
-        const dropdownOptions = orderedGenres.map(genre => {
-            const items = byGenre.get(genre).map(game => {
-                const label = `${game.icon} ${game.name} (${game.year}) — ${game.desc}`;
-                return `<option value="${escapeHtml(game.url)}">${escapeHtml(label)}</option>`;
-            }).join('');
-            return `<optgroup label="${escapeHtml(genre)}">${items}</optgroup>`;
-        }).join('');
-
-        // Featured row — three highlight buttons for the most popular titles.
-        const featured = ['DOOM', 'Prince of Persia', 'SimCity']
-            .map(n => GAME_LIBRARY.find(g => g.name === n))
-            .filter(Boolean);
-        const featuredHtml = featured.map(game => `
-            <button class="dosbox-featured-item" data-url="${escapeHtml(game.url)}"
-                    title="${escapeHtml(game.desc)}">
-                <span class="dosbox-featured-icon">${game.icon}</span>
-                <span class="dosbox-featured-name">${escapeHtml(game.name)}</span>
-            </button>
-        `).join('');
+        const sidebar = this._buildSidebarHtml();
+        const stats = this._libraryStats();
 
         return `
-            <div class="dosbox-app">
-                <div class="dosbox-toolbar">
-                    <div class="dosbox-url-bar">
-                        <label class="dosbox-url-label">Game:</label>
-                        <select class="dosbox-game-select" id="dosboxGameSelect" title="Pick a game">
-                            <option value="">— Pick a game —</option>
-                            ${dropdownOptions}
-                        </select>
-                    </div>
-                    <div class="dosbox-toolbar-buttons">
-                        <button class="dosbox-btn" id="dosboxStopBtn" title="Stop emulator" disabled>⏹ Stop</button>
-                        <button class="dosbox-btn" id="dosboxResetBtn" title="Reload current bundle" disabled>🔄 Reset</button>
-                        <button class="dosbox-btn" id="dosboxFsBtn" title="Toggle fullscreen">⛶ Fullscreen</button>
-                    </div>
-                </div>
-                <div class="dosbox-toolbar dosbox-toolbar-sub">
-                    <div class="dosbox-url-bar">
-                        <label class="dosbox-url-label">URL:</label>
-                        <input type="text" class="dosbox-url-input" id="dosboxUrlInput"
-                               placeholder="https://cdn.dos.zone/custom/dos/your-game.jsdos" spellcheck="false" />
-                        <button class="dosbox-btn" id="dosboxRunBtn" title="Load & run this URL">▶ Run URL</button>
-                        <button class="dosbox-btn" id="dosboxFileBtn" title="Open a local .jsdos file">📂 File…</button>
-                        <input type="file" id="dosboxFileInput" accept=".jsdos,application/zip" style="display:none;" />
-                    </div>
-                </div>
-                <div class="dosbox-library" id="dosboxLibrary">
-                    <span class="dosbox-library-label">Featured:</span>
-                    ${featuredHtml}
-                    <span class="dosbox-library-spacer"></span>
-                    <a class="dosbox-library-link" href="https://dos.zone/" target="_blank" rel="noopener"
-                       title="Browse 1900+ DOS games on DOS.Zone (opens a new tab)">🌐 Browse more on dos.zone</a>
-                </div>
-                <div class="dosbox-emulator-area" id="dosboxEmulatorArea">
-                    <div class="dosbox-splash" id="dosboxSplash">
-                        <div class="dosbox-splash-icon">💾</div>
-                        <div class="dosbox-splash-title">DOSBox Emulator</div>
-                        <div class="dosbox-splash-sub">
-                            Pick a title from the <b>Game</b> dropdown, paste a <code>.jsdos</code> bundle URL,<br>
-                            or click <b>File…</b> to load a bundle from disk.
+            <div class="arcade-app" data-view="browse">
+                <!-- ── Marquee header ─────────────────── -->
+                <div class="arcade-marquee">
+                    <div class="arcade-marquee-bulbs"></div>
+                    <div class="arcade-marquee-inner">
+                        <div class="arcade-marquee-logo">
+                            <span class="arcade-marquee-glyph">▼</span>
+                            <span class="arcade-marquee-title">RETRO ARCADE</span>
+                            <span class="arcade-marquee-glyph">▼</span>
                         </div>
-                        <div class="dosbox-splash-hint">
-                            Browse 1900+ games at <b>dos.zone</b> — copy any game's bundle URL and paste it above.<br>
-                            <span style="opacity:.7;">dos.zone bundles are streamed through the local PHP proxy (<code>api/dosbox-proxy.php</code>) to bypass CORS.</span><br>
-                            <span style="opacity:.7;">Powered by <b>js-dos v8</b> — DOSBox in WebAssembly.</span>
+                        <div class="arcade-marquee-sub">CLASSIC GAMES &nbsp;✦&nbsp; INSERT COIN TO PLAY</div>
+                    </div>
+                    <div class="arcade-marquee-bulbs"></div>
+                </div>
+
+                <!-- ── Browse view (sidebar + grid) ─── -->
+                <div class="arcade-browse">
+                    <aside class="arcade-sidebar">
+                        <div class="arcade-sidebar-title">CATEGORIES</div>
+                        ${sidebar}
+                        <div class="arcade-sidebar-foot">
+                            <div class="arcade-sidebar-stat">
+                                <span>TOTAL</span><b>${stats.total}</b>
+                            </div>
+                            <div class="arcade-sidebar-stat">
+                                <span>YEARS</span><b>${stats.minYear}–${stats.maxYear}</b>
+                            </div>
+                        </div>
+                    </aside>
+
+                    <main class="arcade-main">
+                        <div class="arcade-toolbar">
+                            <div class="arcade-toolbar-section">
+                                <span class="arcade-cat-label" id="arcadeCatLabel">★ HOT PICKS</span>
+                                <span class="arcade-cat-count" id="arcadeCatCount"></span>
+                            </div>
+                            <div class="arcade-toolbar-search">
+                                <span class="arcade-search-icon">🔎</span>
+                                <input type="text" class="arcade-search-input" id="arcadeSearch"
+                                       placeholder="Search the arcade…" spellcheck="false" />
+                            </div>
+                        </div>
+                        <div class="arcade-grid" id="arcadeGrid"></div>
+                        <div class="arcade-empty" id="arcadeEmpty" hidden>
+                            <div class="arcade-empty-icon">🕹️</div>
+                            <div class="arcade-empty-title">NO GAMES FOUND</div>
+                            <div class="arcade-empty-sub">Try a different search or category.</div>
+                        </div>
+                    </main>
+                </div>
+
+                <!-- ── Game detail view ──────────────── -->
+                <div class="arcade-detail" id="arcadeDetail" hidden></div>
+
+                <!-- ── Play view (emulator) ──────────── -->
+                <div class="arcade-play" id="arcadePlay" hidden>
+                    <div class="arcade-play-bar">
+                        <button class="arcade-pixel-btn" id="arcadeBackToBrowse" title="Back to gallery">◀ EJECT</button>
+                        <div class="arcade-play-title" id="arcadePlayTitle">—</div>
+                        <div class="arcade-play-actions">
+                            <button class="arcade-pixel-btn" id="arcadeResetBtn"  title="Restart this game">↻ RESTART</button>
+                            <button class="arcade-pixel-btn" id="arcadeFsBtn"     title="Toggle fullscreen">⛶ FULLSCREEN</button>
                         </div>
                     </div>
-                    <div class="dosbox-stage" id="dosboxStage" style="display:none;"></div>
-                    <div class="dosbox-loading" id="dosboxLoading" style="display:none;">
-                        <div class="dosbox-loading-spinner"></div>
-                        <div class="dosbox-loading-text" id="dosboxLoadingText">Loading DOSBox…</div>
+                    <div class="arcade-stage-area" id="arcadeStageArea">
+                        <div class="arcade-stage" id="arcadeStage"></div>
+                        <div class="arcade-loading" id="arcadeLoading" hidden>
+                            <div class="arcade-loading-screen">
+                                <div class="arcade-loading-pixel"></div>
+                                <div class="arcade-loading-pixel"></div>
+                                <div class="arcade-loading-pixel"></div>
+                                <div class="arcade-loading-pixel"></div>
+                            </div>
+                            <div class="arcade-loading-text" id="arcadeLoadingText">NOW LOADING…</div>
+                            <div class="arcade-loading-tip" id="arcadeLoadingTip"></div>
+                        </div>
                     </div>
                 </div>
-                <div class="dosbox-status" id="dosboxStatus">Ready</div>
+
+                <!-- ── Status bar ────────────────────── -->
+                <div class="arcade-statusbar">
+                    <span class="arcade-status-led" id="arcadeStatusLed"></span>
+                    <span class="arcade-status-text" id="arcadeStatus">READY ▌</span>
+                    <span class="arcade-status-spacer"></span>
+                    <span class="arcade-status-credit">CREDITS &nbsp;∞</span>
+                </div>
             </div>
         `;
     }
 
     onMount() {
-        const gameSelect = this.getElement('#dosboxGameSelect');
-        const urlInput = this.getElement('#dosboxUrlInput');
-        const runBtn = this.getElement('#dosboxRunBtn');
-        const fileBtn = this.getElement('#dosboxFileBtn');
-        const fileInput = this.getElement('#dosboxFileInput');
-        const stopBtn = this.getElement('#dosboxStopBtn');
-        const resetBtn = this.getElement('#dosboxResetBtn');
-        const fsBtn = this.getElement('#dosboxFsBtn');
+        // Initial render
+        this.renderTiles();
 
-        this.addHandler(gameSelect, 'change', (e) => {
-            const url = e.target.value;
-            if (!url) return;
-            if (urlInput) urlInput.value = url;
-            this.loadBundle(url);
-        });
-
-        this.addHandler(runBtn, 'click', () => {
-            const url = urlInput?.value?.trim();
-            if (url) this.loadBundle(url);
-        });
-
-        this.addHandler(urlInput, 'keydown', (e) => {
-            if (e.key === 'Enter') {
-                const url = urlInput.value.trim();
-                if (url) this.loadBundle(url);
-            }
-        });
-
-        this.addHandler(fileBtn, 'click', () => fileInput?.click());
-        this.addHandler(fileInput, 'change', (e) => {
-            const file = e.target.files?.[0];
-            if (file) this.loadLocalFile(file);
-            e.target.value = ''; // allow re-selecting the same file
-        });
-
-        this.addHandler(stopBtn, 'click', () => this.stopEmulator());
-        this.addHandler(resetBtn, 'click', () => {
-            const url = this.currentBundle;
-            this.stopEmulator().then(() => { if (url) this.loadBundle(url); });
-        });
-        this.addHandler(fsBtn, 'click', () => this.toggleFullscreen());
-
-        // Featured row buttons
-        this.getElements('.dosbox-featured-item').forEach(btn => {
+        // Sidebar — category buttons
+        this.getElements('.arcade-cat').forEach(btn => {
             this.addHandler(btn, 'click', () => {
-                const url = btn.dataset.url;
-                if (urlInput) urlInput.value = url;
-                if (gameSelect) gameSelect.value = url;
-                this.loadBundle(url);
+                const cat = btn.dataset.cat;
+                this.selectCategory(cat);
             });
         });
 
-        // Start prefetching the js-dos script in the background — first launch is faster.
+        // Search
+        const search = this.getElement('#arcadeSearch');
+        this.addHandler(search, 'input', (e) => {
+            this.searchQuery = (e.target.value || '').trim().toLowerCase();
+            this.renderTiles();
+        });
+
+        // Detail/play action buttons (delegated to outer container so dynamic
+        // detail-view content keeps working after re-render).
+        const root = this.getElement('.arcade-app');
+        this.addHandler(root, 'click', (e) => {
+            const playBtn   = e.target.closest('[data-action="play"]');
+            const backBtn   = e.target.closest('[data-action="back-to-browse"]');
+            const detailBtn = e.target.closest('[data-action="open-detail"]');
+            if (playBtn)   this.loadBundle(playBtn.dataset.url);
+            if (backBtn)   this.backToBrowse();
+            if (detailBtn) this.openDetail(detailBtn.dataset.url);
+        });
+
+        // Play-view controls
+        this.addHandler(this.getElement('#arcadeBackToBrowse'), 'click', () => this.backToBrowse());
+        this.addHandler(this.getElement('#arcadeResetBtn'), 'click', () => {
+            const url = this.currentBundle;
+            this.stopEmulator(false).then(() => { if (url) this.loadBundle(url); });
+        });
+        this.addHandler(this.getElement('#arcadeFsBtn'), 'click', () => this.toggleFullscreen());
+
+        // Background-prefetch the engine — first launch feels snappy.
         this.ensureJsDosLoaded().catch((err) => {
-            console.warn('[DOSBox] Background js-dos preload failed:', err);
+            console.warn('[Arcade] Background engine preload failed:', err);
         });
     }
 
@@ -753,24 +763,211 @@ class DOSBox extends AppBase {
     }
 
     onResize() {
-        // js-dos uses ResizeObserver internally — no action needed.
+        // Embedded engine uses ResizeObserver internally — no action needed.
     }
 
-    // ── CDN Loader ─────────────────────────────────────────────
+    // ── View / UI helpers ──────────────────────────────────────
+
+    setView(view) {
+        this.view = view;
+        const root = this.getElement('.arcade-app');
+        if (root) root.dataset.view = view;
+    }
+
+    selectCategory(cat) {
+        this.activeCategory = cat;
+        this.searchQuery = '';
+        const search = this.getElement('#arcadeSearch');
+        if (search) search.value = '';
+
+        // Highlight active sidebar entry
+        this.getElements('.arcade-cat').forEach(b => {
+            b.classList.toggle('arcade-cat--active', b.dataset.cat === cat);
+        });
+
+        const label = this.getElement('#arcadeCatLabel');
+        if (label) label.textContent = this._categoryLabel(cat);
+
+        this.renderTiles();
+        this.playSound('click');
+    }
+
+    openDetail(url) {
+        const game = GAME_LIBRARY.find(g => g.url === url);
+        if (!game) return;
+        this.selectedGameUrl = url;
+        const detail = this.getElement('#arcadeDetail');
+        if (detail) {
+            detail.innerHTML = this._buildDetailHtml(game);
+            detail.hidden = false;
+        }
+        this.setView('detail');
+        this.playSound('click');
+    }
+
+    backToBrowse() {
+        // If a game is running, stop it first.
+        if (this.isRunning) {
+            this.stopEmulator();
+        }
+        const detail = this.getElement('#arcadeDetail');
+        const play   = this.getElement('#arcadePlay');
+        if (detail) detail.hidden = true;
+        if (play)   play.hidden = true;
+        this.setView('browse');
+    }
+
+    renderTiles() {
+        const grid  = this.getElement('#arcadeGrid');
+        const empty = this.getElement('#arcadeEmpty');
+        const count = this.getElement('#arcadeCatCount');
+        if (!grid) return;
+
+        const filtered = this._filterGames();
+        if (count) count.textContent = `(${filtered.length})`;
+
+        if (!filtered.length) {
+            grid.innerHTML = '';
+            if (empty) empty.hidden = false;
+            return;
+        }
+        if (empty) empty.hidden = true;
+
+        grid.innerHTML = filtered.map((g, i) => `
+            <button class="arcade-tile" data-action="open-detail" data-url="${escapeHtml(g.url)}"
+                    style="--tile-delay:${(i % 24) * 18}ms" title="${escapeHtml(g.desc)}">
+                <div class="arcade-tile-screen">
+                    <div class="arcade-tile-glyph">${g.icon}</div>
+                    <div class="arcade-tile-scanlines"></div>
+                </div>
+                <div class="arcade-tile-plate">
+                    <div class="arcade-tile-name">${escapeHtml(g.name)}</div>
+                    <div class="arcade-tile-meta">
+                        <span class="arcade-tile-year">${g.year}</span>
+                        <span class="arcade-tile-genre">${escapeHtml(g.genre)}</span>
+                    </div>
+                </div>
+            </button>
+        `).join('');
+    }
+
+    /** Render the big detail/launch panel for a single game. */
+    _buildDetailHtml(game) {
+        return `
+            <button class="arcade-pixel-btn arcade-detail-back" data-action="back-to-browse">◀ BACK</button>
+            <div class="arcade-detail-card">
+                <div class="arcade-detail-cabinet">
+                    <div class="arcade-detail-screen">
+                        <div class="arcade-detail-glyph">${game.icon}</div>
+                        <div class="arcade-tile-scanlines"></div>
+                    </div>
+                    <div class="arcade-detail-cabinet-base"></div>
+                </div>
+                <div class="arcade-detail-info">
+                    <div class="arcade-detail-genre-tag">${escapeHtml(game.genre)}</div>
+                    <h2 class="arcade-detail-title">${escapeHtml(game.name)}</h2>
+                    <div class="arcade-detail-year">© ${game.year}</div>
+                    <p class="arcade-detail-desc">${escapeHtml(game.desc)}</p>
+                    <div class="arcade-detail-actions">
+                        <button class="arcade-coin-btn" data-action="play" data-url="${escapeHtml(game.url)}">
+                            <span class="arcade-coin-glyph">▶</span>
+                            <span class="arcade-coin-text">INSERT COIN</span>
+                            <span class="arcade-coin-sub">PRESS TO PLAY</span>
+                        </button>
+                    </div>
+                    <div class="arcade-detail-meta-row">
+                        <div><span>YEAR</span><b>${game.year}</b></div>
+                        <div><span>GENRE</span><b>${escapeHtml(game.genre)}</b></div>
+                        <div><span>FORMAT</span><b>RETRO</b></div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    /** Returns the visible games for the current category + search. */
+    _filterGames() {
+        let list = GAME_LIBRARY;
+        if (this.activeCategory === '__hot__') {
+            list = HOT_PICKS
+                .map(name => GAME_LIBRARY.find(g => g.name === name))
+                .filter(Boolean);
+        } else if (this.activeCategory !== '__all__') {
+            list = list.filter(g => g.genre === this.activeCategory);
+        }
+        if (this.searchQuery) {
+            const q = this.searchQuery;
+            list = list.filter(g =>
+                g.name.toLowerCase().includes(q) ||
+                g.desc.toLowerCase().includes(q) ||
+                g.genre.toLowerCase().includes(q) ||
+                String(g.year).includes(q)
+            );
+        }
+        return list;
+    }
+
+    _buildSidebarHtml() {
+        const counts = new Map();
+        for (const g of GAME_LIBRARY) counts.set(g.genre, (counts.get(g.genre) || 0) + 1);
+        const orderedGenres = [
+            ...GENRE_ORDER.filter(g => counts.has(g)),
+            ...[...counts.keys()].filter(g => !GENRE_ORDER.includes(g))
+        ];
+
+        const headers = `
+            <button class="arcade-cat arcade-cat--featured arcade-cat--active" data-cat="__hot__">
+                <span class="arcade-cat-icon">★</span>
+                <span class="arcade-cat-name">HOT PICKS</span>
+                <span class="arcade-cat-tally">${HOT_PICKS.length}</span>
+            </button>
+            <button class="arcade-cat" data-cat="__all__">
+                <span class="arcade-cat-icon">▦</span>
+                <span class="arcade-cat-name">ALL GAMES</span>
+                <span class="arcade-cat-tally">${GAME_LIBRARY.length}</span>
+            </button>
+            <div class="arcade-sidebar-divider"></div>
+        `;
+
+        const rows = orderedGenres.map(genre => `
+            <button class="arcade-cat" data-cat="${escapeHtml(genre)}">
+                <span class="arcade-cat-icon">${GENRE_ICONS[genre] || '🎮'}</span>
+                <span class="arcade-cat-name">${escapeHtml(genre.toUpperCase())}</span>
+                <span class="arcade-cat-tally">${counts.get(genre)}</span>
+            </button>
+        `).join('');
+
+        return headers + rows;
+    }
+
+    _categoryLabel(cat) {
+        if (cat === '__hot__') return '★ HOT PICKS';
+        if (cat === '__all__') return '▦ ALL GAMES';
+        return `${GENRE_ICONS[cat] || '🎮'} ${cat.toUpperCase()}`;
+    }
+
+    _libraryStats() {
+        const years = GAME_LIBRARY.map(g => g.year).filter(Number.isFinite);
+        return {
+            total: GAME_LIBRARY.length,
+            minYear: Math.min(...years),
+            maxYear: Math.max(...years)
+        };
+    }
+
+    // ── Engine loader (lazy CDN fetch) ─────────────────────────
 
     /**
-     * Load js-dos CSS and JS from CDN (once per session, idempotent).
+     * Load the embedded emulator's CSS + JS from CDN once per session.
      * The returned promise is cached so concurrent callers share it.
-     * @returns {Promise<void>}
      */
     ensureJsDosLoaded() {
         if (typeof window.Dos === 'function') return Promise.resolve();
         if (this._jsdosLoadPromise) return this._jsdosLoadPromise;
 
-        this.setStatus('Loading js-dos engine from CDN…');
+        this.setStatus('CONNECTING TO ARCADE…');
 
         this._jsdosLoadPromise = new Promise((resolve, reject) => {
-            // CSS (no need to await — it's not gating)
             if (!document.querySelector('link[data-jsdos="1"]')) {
                 const link = document.createElement('link');
                 link.rel = 'stylesheet';
@@ -779,7 +976,6 @@ class DOSBox extends AppBase {
                 document.head.appendChild(link);
             }
 
-            // Script — if already in DOM, wait for the global
             const existing = document.querySelector('script[data-jsdos="1"]');
             const waitForGlobal = (timeoutMs) => {
                 const start = Date.now();
@@ -787,7 +983,7 @@ class DOSBox extends AppBase {
                     if (typeof window.Dos === 'function') {
                         resolve();
                     } else if (Date.now() - start > timeoutMs) {
-                        reject(new Error('js-dos loaded but window.Dos never appeared'));
+                        reject(new Error('Engine loaded but global never appeared'));
                     } else {
                         setTimeout(tick, 50);
                     }
@@ -806,8 +1002,8 @@ class DOSBox extends AppBase {
             script.dataset.jsdos = '1';
             script.onload = () => waitForGlobal(15000);
             script.onerror = () => {
-                this._jsdosLoadPromise = null; // allow a retry
-                reject(new Error('Failed to fetch js-dos from CDN (' + JSDOS_JS_URL + ')'));
+                this._jsdosLoadPromise = null;
+                reject(new Error('Failed to fetch arcade engine from CDN'));
             };
             document.head.appendChild(script);
         });
@@ -815,11 +1011,11 @@ class DOSBox extends AppBase {
         return this._jsdosLoadPromise;
     }
 
-    // ── Core Methods ──────────────────────────────────────────
+    // ── Core: load & play ─────────────────────────────────────
 
     /**
-     * Load and run a .jsdos bundle from a URL.
-     * @param {string} url - URL to a .jsdos bundle file
+     * Load and run a bundle from a URL. Switches the UI into "play" mode.
+     * @param {string} url
      */
     async loadBundle(url) {
         if (!url) return;
@@ -827,7 +1023,8 @@ class DOSBox extends AppBase {
     }
 
     /**
-     * Load a local .jsdos file via Blob URL — avoids CORS entirely.
+     * Load a local bundle file via Blob URL — avoids CORS entirely.
+     * Kept for scripting/back-compat; not exposed in the new UI.
      * @param {File} file
      */
     async loadLocalFile(file) {
@@ -841,94 +1038,78 @@ class DOSBox extends AppBase {
         await this._startEmulatorWith({ url: blobUrl, displayName: file.name });
     }
 
-    /**
-     * Internal: stop any running instance, then start a fresh one with the given URL.
-     * @private
-     */
     async _startEmulatorWith({ url, displayName }) {
-        const stage = this.getElement('#dosboxStage');
-        const splash = this.getElement('#dosboxSplash');
-        const loading = this.getElement('#dosboxLoading');
-        const loadingText = this.getElement('#dosboxLoadingText');
+        // Switch to play view
+        const detail   = this.getElement('#arcadeDetail');
+        const play     = this.getElement('#arcadePlay');
+        const stage    = this.getElement('#arcadeStage');
+        const loading  = this.getElement('#arcadeLoading');
+        const loadTxt  = this.getElement('#arcadeLoadingText');
+        const loadTip  = this.getElement('#arcadeLoadingTip');
+        const titleEl  = this.getElement('#arcadePlayTitle');
 
         if (!stage) return;
 
-        // Tear down any previous instance fully (workers, audio, store).
-        await this.stopEmulator(/* keepSplash= */ false);
+        await this.stopEmulator(false);
         this.playSound('floppy');
 
-        // Show loading overlay.
-        if (splash) splash.style.display = 'none';
-        if (stage) stage.style.display = 'block';
-        if (loading) loading.style.display = 'flex';
-        if (loadingText) loadingText.textContent = 'Loading js-dos engine…';
+        if (detail) detail.hidden = true;
+        if (play)   play.hidden = false;
+        if (loading) loading.hidden = false;
+        if (loadTxt) loadTxt.textContent = 'NOW LOADING…';
+        if (loadTip) loadTip.textContent = this._randomTip();
+        if (titleEl) titleEl.textContent = displayName.toUpperCase();
+        this.setView('play');
+        this.setStatusLed('booting');
 
         try {
             await this.ensureJsDosLoaded();
 
-            if (loadingText) loadingText.textContent = 'Fetching bundle…';
+            if (loadTxt) loadTxt.textContent = 'PRESSING START…';
 
-            // Create a fresh root div for js-dos to render into. Re-using an
-            // element across Dos() calls is unreliable — Preact may try to
-            // reconcile against state that no longer exists.
             stage.innerHTML = '';
             const root = document.createElement('div');
-            root.className = 'dosbox-root';
+            root.className = 'arcade-root';
             stage.appendChild(root);
             this.dosRoot = root;
 
-            // Let the browser compute layout so the container has dimensions
-            // before js-dos creates its canvas/WebGL context.
+            // Wait for layout so the engine can measure its container.
             await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
 
             this.currentBundle = url;
             this.currentBundleName = displayName;
             this.isRunning = true;
             this.isReady = false;
-            this.updateButtons(true);
-            this.setStatus('Starting: ' + displayName);
+            this.setStatus('STARTING ▸ ' + displayName.toUpperCase());
 
-            // Some CDNs don't set Access-Control-Allow-Origin for third-party
-            // embedders. Route those through our PHP proxy; pass everything
-            // else (v8.js-dos.com, same-origin, blob/data/file) straight to
-            // js-dos.
             const fetchUrl = this.getLoadUrl(url);
             if (fetchUrl !== url) {
-                console.log('[DOSBox] Routing bundle through proxy:', url, '→', fetchUrl);
+                console.log('[Arcade] Routing bundle through proxy:', url, '→', fetchUrl);
             }
 
-            // js-dos defaults to worker-thread + offscreenCanvas, which needs
-            // SharedArrayBuffer, which needs the page served with COOP/COEP
-            // headers (`Cross-Origin-Opener-Policy: same-origin`, `Cross-
-            // Origin-Embedder-Policy: require-corp`). Most IlluminatOS
-            // deployments are served by a plain HTTP server with no such
-            // headers, so the worker hangs after boot and ci-ready never
-            // fires (the "Booting -> black screen" symptom). Detect cross-
-            // origin isolation and pick the safe mode.
+            // Worker mode requires SharedArrayBuffer (COOP/COEP). Most plain
+            // HTTP deployments don't have those headers, so the worker hangs
+            // silently. Detect cross-origin isolation and pick a safe mode.
             const canUseWorker = (typeof self !== 'undefined') &&
                 self.crossOriginIsolated === true &&
                 typeof SharedArrayBuffer !== 'undefined';
 
             if (!canUseWorker) {
                 console.warn(
-                    '[DOSBox] crossOriginIsolated=false — running js-dos on the main thread. ' +
-                    'For better performance, serve IlluminatOS with these response headers:\n' +
+                    '[Arcade] crossOriginIsolated=false — running on the main thread. ' +
+                    'For best performance, serve with COOP/COEP headers:\n' +
                     '  Cross-Origin-Opener-Policy: same-origin\n' +
                     '  Cross-Origin-Embedder-Policy: require-corp'
                 );
             }
 
-            // Set up a watchdog: if ci-ready doesn't fire in 45s, surface
-            // a diagnostic in the status bar so the user isn't stuck on
-            // a silent "Booting...".
+            // Watchdog: warn if ci-ready never fires.
             if (this._readyWatchdog) clearTimeout(this._readyWatchdog);
             this._readyWatchdog = setTimeout(() => {
                 if (this.isRunning && !this.isReady) {
-                    console.warn('[DOSBox] Emulator did not reach ci-ready in 45s — likely stuck in WASM boot.');
-                    this.setStatus(
-                        'Stuck booting — check the browser console. ' +
-                        (canUseWorker ? '' : 'Consider serving with COOP/COEP headers.')
-                    );
+                    console.warn('[Arcade] Engine did not reach ready state in 45s.');
+                    this.setStatus('STUCK ▸ CHECK CONSOLE');
+                    this.setStatusLed('error');
                 }
             }, 45000);
 
@@ -941,43 +1122,26 @@ class DOSBox extends AppBase {
                 imageRendering: 'pixelated',
                 workerThread: canUseWorker,
                 offscreenCanvas: canUseWorker,
-                // Force the Canvas 2D backend. WebGL works on dos.zone but
-                // can silently render to a 0x0 framebuffer when the canvas's
-                // parent is briefly 0-sized at init time inside our Win95
-                // window flex chain — symptom: emulator runs (audio works)
-                // but the screen is solid black. Canvas 2D is slower but
-                // resizes correctly via ResizeObserver in every browser.
+                // Canvas 2D — WebGL can render to a 0x0 framebuffer when its
+                // parent is briefly 0-sized inside our flex chain.
                 renderBackend: 'canvas',
-                // Fit fills the available area instead of letterboxing the
-                // game inside a black 4:3 box. js-dos's resizeCanvas() bails
-                // out early when frameHeight is 0; Fit + the resize-pump
-                // below guarantees the canvas reaches a sane size.
                 renderAspect: 'Fit',
-                // Shrink the sidebar so the game gets most of the window.
                 thinSidebar: true,
                 onEvent: (event, arg) => {
-                    console.log('[DOSBox] js-dos event:', event, arg);
+                    console.log('[Arcade] engine event:', event, arg);
                     this._handleJsDosEvent(event, arg);
                 }
             });
 
-            // The js-dos UI shows cloud buttons by default — hide them since
-            // we don't ship cloud accounts. Set via the props method (the
-            // option key `noCloud` doesn't exist in v8).
+            // Hide cloud chrome — we don't ship cloud accounts.
             if (typeof this.dosProps.setNoCloud === 'function') {
                 this.dosProps.setNoCloud(true);
             }
 
-            // Hide loading overlay; js-dos draws its own splash now.
-            if (loading) loading.style.display = 'none';
+            if (loading) loading.hidden = true;
 
-            // Resize pump. js-dos's renderer measures
-            // `canvas.parentElement.getBoundingClientRect()` once at setup
-            // and again only when a ResizeObserver fires. If our flex chain
-            // is briefly 0-sized at that moment, the canvas gets style.width
-            // = 0px and stays invisible. Firing window resize events at
-            // several intervals wakes up the observers so the canvas gets a
-            // real size before/just-after the first frame arrives.
+            // Resize pump — wakes the engine's ResizeObserver in case our
+            // flex chain is briefly 0-sized at first measurement.
             if (this._resizePumpTimers) {
                 this._resizePumpTimers.forEach(clearTimeout);
             }
@@ -988,13 +1152,13 @@ class DOSBox extends AppBase {
                     const r = root.getBoundingClientRect();
                     const c = root.querySelector('canvas');
                     if (!c) {
-                        console.log(`[DOSBox] @${ms}ms root: ${r.width.toFixed(0)}x${r.height.toFixed(0)} (no canvas yet)`);
+                        console.log(`[Arcade] @${ms}ms root: ${r.width.toFixed(0)}x${r.height.toFixed(0)} (no canvas yet)`);
                         return;
                     }
                     const cRect = c.getBoundingClientRect();
                     const pRect = c.parentElement ? c.parentElement.getBoundingClientRect() : null;
                     console.log(
-                        `[DOSBox] @${ms}ms root: ${r.width.toFixed(0)}x${r.height.toFixed(0)}, ` +
+                        `[Arcade] @${ms}ms root: ${r.width.toFixed(0)}x${r.height.toFixed(0)}, ` +
                         `canvas attr: ${c.width}x${c.height}, ` +
                         `canvas rect: ${cRect.width.toFixed(0)}x${cRect.height.toFixed(0)}, ` +
                         `canvas parent: ${pRect ? pRect.width.toFixed(0) + 'x' + pRect.height.toFixed(0) : 'none'}, ` +
@@ -1003,39 +1167,34 @@ class DOSBox extends AppBase {
                 }, ms)
             );
 
-            // Canvas health checks. The collapse is usually a parent of
-            // the canvas (one of js-dos's internal divs computes to 0px
-            // height in our flex chain). Each check walks the parent
-            // chain and force-stamps every collapsed link to fill the
-            // root box. Schedule several so transient races are caught.
+            // Canvas health checks — a parent-of-canvas may compute to 0px
+            // height inside our flex chain. Walk the chain and force-stamp
+            // every collapsed link to fill the root box.
             this._canvasHealthTimers = [500, 1500, 3500, 7000, 12000].map(ms =>
                 setTimeout(() => this._healCanvas(root, ms), ms)
             );
 
             this.emitAppEvent('started', { url, name: displayName, workerThread: canUseWorker });
         } catch (err) {
-            console.error('[DOSBox] Failed to load bundle:', err);
-            this.setStatus('Error: ' + (err?.message || err));
-            if (loading) loading.style.display = 'none';
-            if (stage) stage.style.display = 'none';
-            if (splash) splash.style.display = 'flex';
+            console.error('[Arcade] Failed to load bundle:', err);
+            this.setStatus('ERROR ▸ ' + (err?.message || err));
+            this.setStatusLed('error');
+            if (loading) loading.hidden = true;
             this.isRunning = false;
             this.isReady = false;
-            this.updateButtons(false);
             this.emitAppEvent('error', { error: err?.message || String(err), url });
+            // Send the user back to browse so the game grid is visible.
+            const playEl = this.getElement('#arcadePlay');
+            if (playEl) playEl.hidden = true;
+            this.setView('browse');
         }
     }
 
-    /**
-     * Handle js-dos lifecycle events. js-dos posts "emu-ready" when the
-     * emulator is configured, "ci-ready" when the command interface is
-     * available (game is interactable), and "fullscreen-change" on entry/exit.
-     * @private
-     */
     _handleJsDosEvent(event, arg) {
         switch (event) {
             case 'emu-ready':
-                this.setStatus('Booting: ' + this.currentBundleName);
+                this.setStatus('BOOTING ▸ ' + this.currentBundleName.toUpperCase());
+                this.setStatusLed('booting');
                 this.emitAppEvent('booting', { name: this.currentBundleName });
                 break;
             case 'ci-ready':
@@ -1044,14 +1203,14 @@ class DOSBox extends AppBase {
                     clearTimeout(this._readyWatchdog);
                     this._readyWatchdog = null;
                 }
-                this.setStatus('Running: ' + this.currentBundleName);
+                this.setStatus('PLAYING ▸ ' + this.currentBundleName.toUpperCase());
+                this.setStatusLed('playing');
                 this.emitAppEvent('ready', { name: this.currentBundleName });
                 break;
             case 'fullscreen-change':
                 this.emitAppEvent('fullscreen', { active: !!arg });
                 break;
             case 'open-key':
-                // js-dos may emit this when the user needs to enter a key.
                 break;
             case 'bnd-play':
                 this.emitAppEvent('play', { name: this.currentBundleName });
@@ -1063,22 +1222,19 @@ class DOSBox extends AppBase {
 
     /**
      * Stop the running emulator and fully tear down workers, audio, and DOM.
-     * @param {boolean} [keepSplash=true] - If false, caller will swap content immediately.
+     * @param {boolean} [returnToBrowse=true] - If true, switch UI back to browse.
      */
-    async stopEmulator(keepSplash = true) {
-        const stage = this.getElement('#dosboxStage');
-        const splash = this.getElement('#dosboxSplash');
+    async stopEmulator(returnToBrowse = true) {
+        const stage = this.getElement('#arcadeStage');
 
         if (this._readyWatchdog) {
             clearTimeout(this._readyWatchdog);
             this._readyWatchdog = null;
         }
-
         if (this._resizePumpTimers && this._resizePumpTimers.length) {
             this._resizePumpTimers.forEach(clearTimeout);
             this._resizePumpTimers = [];
         }
-
         if (this._canvasHealthTimers && this._canvasHealthTimers.length) {
             this._canvasHealthTimers.forEach(clearTimeout);
             this._canvasHealthTimers = [];
@@ -1086,23 +1242,18 @@ class DOSBox extends AppBase {
 
         if (this.dosProps) {
             try {
-                // props.stop() hides UI and calls ci.exit() which terminates
-                // the worker; it's safe to call even if the emulator never
-                // reached "ci-ready".
                 if (typeof this.dosProps.stop === 'function') {
                     await this.dosProps.stop();
                 }
             } catch (e) {
-                console.warn('[DOSBox] Error during props.stop():', e);
+                console.warn('[Arcade] Error during props.stop():', e);
             }
             this.dosProps = null;
         }
 
-        // Drop the entire DOM subtree so workers/canvases get GC'd.
         if (stage) stage.innerHTML = '';
         this.dosRoot = null;
 
-        // Revoke any blob URL we created for a local file.
         if (this.activeBlobUrl && this.currentBundle === this.activeBlobUrl) {
             URL.revokeObjectURL(this.activeBlobUrl);
             this.activeBlobUrl = null;
@@ -1110,21 +1261,18 @@ class DOSBox extends AppBase {
 
         this.isRunning = false;
         this.isReady = false;
-        this.updateButtons(false);
 
-        if (keepSplash) {
-            if (stage) stage.style.display = 'none';
-            if (splash) splash.style.display = 'flex';
-            this.setStatus('Ready');
+        if (returnToBrowse) {
+            const play = this.getElement('#arcadePlay');
+            if (play) play.hidden = true;
+            this.setView('browse');
+            this.setStatus('READY ▌');
+            this.setStatusLed('ready');
         }
 
         this.emitAppEvent('stopped', {});
     }
 
-    /**
-     * Toggle fullscreen on the emulator stage.
-     * @param {boolean} [want]
-     */
     toggleFullscreen(want) {
         if (this.dosProps?.setFullScreen) {
             const next = typeof want === 'boolean'
@@ -1134,26 +1282,22 @@ class DOSBox extends AppBase {
                 this.dosProps.setFullScreen(next);
                 return;
             } catch (e) {
-                console.warn('[DOSBox] setFullScreen failed, falling back to DOM API:', e);
+                console.warn('[Arcade] setFullScreen failed, falling back to DOM API:', e);
             }
         }
 
-        const stage = this.getElement('#dosboxEmulatorArea');
-        if (!stage) return;
+        const stageArea = this.getElement('#arcadeStageArea');
+        if (!stageArea) return;
 
         if (document.fullscreenElement) {
             document.exitFullscreen().catch(() => {});
         } else {
-            stage.requestFullscreen().catch(err => {
-                console.warn('[DOSBox] Fullscreen error:', err);
+            stageArea.requestFullscreen().catch(err => {
+                console.warn('[Arcade] Fullscreen error:', err);
             });
         }
     }
 
-    /**
-     * Set audio volume (0-1).
-     * @param {number} volume
-     */
     setVolume(volume) {
         const v = Math.max(0, Math.min(1, Number(volume) || 0));
         if (this.dosProps?.setVolume) {
@@ -1164,15 +1308,26 @@ class DOSBox extends AppBase {
     // ── Helpers ────────────────────────────────────────────────
 
     setStatus(text) {
-        const el = this.getElement('#dosboxStatus');
+        const el = this.getElement('#arcadeStatus');
         if (el) el.textContent = text;
     }
 
-    updateButtons(running) {
-        const stopBtn = this.getElement('#dosboxStopBtn');
-        const resetBtn = this.getElement('#dosboxResetBtn');
-        if (stopBtn) stopBtn.disabled = !running;
-        if (resetBtn) resetBtn.disabled = !running;
+    setStatusLed(state) {
+        const led = this.getElement('#arcadeStatusLed');
+        if (!led) return;
+        led.dataset.state = state || 'ready';
+    }
+
+    _randomTip() {
+        const tips = [
+            'TIP: PRESS F11 IN-GAME FOR FULLSCREEN',
+            'TIP: USE ARROW KEYS TO MOVE',
+            'TIP: SAVE OFTEN!',
+            'TIP: RIGHT-CLICK FOR ENGINE OPTIONS',
+            'TIP: KEEP MULTIPLE GAMES IN ROTATION',
+            'TIP: HIGH SCORE OR HIGH SCORE? YOU PICK',
+        ];
+        return tips[Math.floor(Math.random() * tips.length)];
     }
 
     getBundleName(url) {
@@ -1189,22 +1344,16 @@ class DOSBox extends AppBase {
     }
 
     /**
-     * Canvas health check / diagnostic.
-     *
-     * Logs the parent chain so future regressions are one-screenshot
-     * diagnosable. If the canvas's parent is still 0x0 (the CSS reset
-     * for .dosbox-root .window in styles/apps/dosbox.css should prevent
-     * this), it nudges js-dos's renderer with a resize event.
-     *
+     * Canvas health check / diagnostic. Logs the parent chain so future
+     * regressions are one-screenshot diagnosable. If the canvas's parent
+     * is still 0x0, nudge the engine with a resize event.
      * @private
-     * @param {HTMLElement} root - The .dosbox-root element
-     * @param {number} elapsedMs - For logging
      */
     _healCanvas(root, elapsedMs) {
         if (!this.isRunning || !root || !root.isConnected) return;
         const canvas = root.querySelector('canvas');
         if (!canvas) {
-            console.log(`[DOSBox] healCanvas @${elapsedMs}ms — no canvas in DOM yet`);
+            console.log(`[Arcade] healCanvas @${elapsedMs}ms — no canvas in DOM yet`);
             return;
         }
 
@@ -1215,24 +1364,18 @@ class DOSBox extends AppBase {
         this._logParentChain(canvas, root, elapsedMs);
 
         if (cRect.width >= 16 && cRect.height >= 16) {
-            console.log(`[DOSBox] healCanvas @${elapsedMs}ms — canvas OK at ${cRect.width.toFixed(0)}x${cRect.height.toFixed(0)}`);
+            console.log(`[Arcade] healCanvas @${elapsedMs}ms — canvas OK at ${cRect.width.toFixed(0)}x${cRect.height.toFixed(0)}`);
             return;
         }
 
         console.warn(
-            `[DOSBox] healCanvas @${elapsedMs}ms — canvas ${cRect.width.toFixed(0)}x${cRect.height.toFixed(0)} ` +
+            `[Arcade] healCanvas @${elapsedMs}ms — canvas ${cRect.width.toFixed(0)}x${cRect.height.toFixed(0)} ` +
             `inside parent ${pRect ? pRect.width.toFixed(0) + 'x' + pRect.height.toFixed(0) : 'unknown'}. ` +
-            `Nudging js-dos with a resize event.`
+            `Nudging engine with a resize event.`
         );
         window.dispatchEvent(new Event('resize'));
     }
 
-    /**
-     * Walk from the canvas up to the .dosbox-root and log each element's
-     * tag, class, and rendered size. The collapsed link in the chain is
-     * the first ancestor whose getBoundingClientRect is 0x0.
-     * @private
-     */
     _logParentChain(canvas, root, elapsedMs) {
         const lines = [];
         let el = canvas;
@@ -1249,23 +1392,17 @@ class DOSBox extends AppBase {
             el = el.parentElement;
             depth++;
         }
-        console.log(`[DOSBox] parent chain @${elapsedMs}ms:\n${lines.join('\n')}`);
+        console.log(`[Arcade] parent chain @${elapsedMs}ms:\n${lines.join('\n')}`);
     }
 
     /**
-     * Resolve a user-facing bundle URL into the URL js-dos should actually
-     * fetch. Hosts that don't send `Access-Control-Allow-Origin` to third-
-     * party origins (the entire cdn.dos.zone family) are routed through the
-     * IlluminatOS PHP proxy. Hosts that do send CORS (v8.js-dos.com), same-
-     * origin URLs, and local schemes (blob:, data:, file:) are passed
-     * through unchanged.
+     * Resolve a user-facing URL into the URL the engine should fetch. Hosts
+     * that don't send CORS to third-party origins are routed through the
+     * local PHP proxy. Hosts that do send CORS, same-origin URLs, and
+     * blob:/data:/file: are passed through unchanged.
      *
-     * Deployments can override the proxy URL by setting
+     * Deployments can override the proxy URL via:
      *   window.__DOSBOX_PROXY_URL = 'https://example.com/proxy.php';
-     * before the DOSBox app launches.
-     *
-     * @param {string} originalUrl
-     * @returns {string} URL to pass to Dos({ url })
      */
     getLoadUrl(originalUrl) {
         if (!originalUrl) return originalUrl;
@@ -1273,19 +1410,15 @@ class DOSBox extends AppBase {
             const u = new URL(originalUrl, document.baseURI);
             const host = u.hostname.toLowerCase();
 
-            // Local / already-resolved schemes — never proxy
             if (u.protocol === 'blob:' || u.protocol === 'data:' || u.protocol === 'file:') {
                 return originalUrl;
             }
-            // Same-origin — no CORS issue
             if (host === location.hostname.toLowerCase()) {
                 return originalUrl;
             }
-            // CORS-friendly upstream — fetch directly
             if (CORS_FRIENDLY_HOSTS.has(host)) {
                 return originalUrl;
             }
-            // CORS-blocked upstream — route through the IlluminatOS proxy
             if (NEEDS_PROXY_HOSTS.has(host) || host.endsWith('.dos.zone')) {
                 const customProxy = (typeof window !== 'undefined' && window.__DOSBOX_PROXY_URL) || null;
                 const proxyBase = customProxy
@@ -1294,8 +1427,6 @@ class DOSBox extends AppBase {
                 const sep = proxyBase.includes('?') ? '&' : '?';
                 return proxyBase + sep + 'url=' + encodeURIComponent(originalUrl);
             }
-            // Unknown host — try direct first; if it CORS-fails the user
-            // gets a clear error in the console.
             return originalUrl;
         } catch {
             return originalUrl;
