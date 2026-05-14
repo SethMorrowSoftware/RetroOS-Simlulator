@@ -51,37 +51,415 @@ const EJS_LOADER_URL = `${EJS_DATA_PATH}loader.js`;
 const C64_CORE = 'c64';
 
 /**
- * Curated C64 library — freeware / public-domain / clearly-licensed
- * homebrew, hosted on Internet Archive (which sends permissive CORS for
- * direct downloads). Add entries that have a clean redistribution story;
- * leave commercial ROMs to the user's local files.
+ * Curated C64 library — modeled on DOSBox's GAME_LIBRARY in scope and shape.
  *
- * Each entry: { name, icon, category, year, desc, url }
+ * Each entry: { name, icon, category, year, desc, iaItem? | url? }
+ *   - `iaItem`: Internet Archive item ID; the actual .d64/.prg/.crt file
+ *               is resolved at runtime via `_resolveIAItemToUrl()`. This
+ *               avoids hardcoding filenames that change inside an item.
+ *   - `url`:    Explicit download URL (used for BASIC's empty sentinel,
+ *               and for any non-IA source you might add later).
+ *
+ * The metadata API at `https://archive.org/metadata/<itemId>` sends
+ * permissive CORS headers, so the resolver fetch works straight from the
+ * browser with no proxy.
+ *
+ * URL hygiene
+ *   - IA's `archive.org/download/<itemId>/<file>` endpoints send
+ *     `Access-Control-Allow-Origin: *` — EmulatorJS can fetch them.
+ *   - If a specific item ID is wrong (404 from the metadata API), the
+ *     resolver surfaces the error in the status bar so the user knows
+ *     to pick another title.
+ *   - To add titles: find the item on archive.org, copy the URL segment
+ *     after `/details/`, paste it here as `iaItem`. The resolver picks
+ *     the most appropriate file (.d64 > .prg > .crt > .t64 > .zip).
+ *
+ * Legality posture matches the existing DOSBox app: we link to a public
+ * preservation archive, we don't redistribute. Demoscene and homebrew
+ * entries are explicit freeware; commercial titles fall under the same
+ * archive-preservation framing IA uses across its Software Library.
  */
 const GAME_LIBRARY = [
-    // === Demoscene (legally released by the authors) ===
+    // === Arcade Classics (ports of coin-op hits) ============================
+    { name: 'Pac-Man',              icon: '🟡', category: 'Arcade',     year: 1983,
+      desc: 'Namco\'s maze-chomper port',
+      iaItem: 'c64_Pac-Man' },
+    { name: 'Ms. Pac-Man',          icon: '🎀', category: 'Arcade',     year: 1984,
+      desc: 'Atari\'s arcade follow-up',
+      iaItem: 'c64_Ms_Pac-Man' },
+    { name: 'Donkey Kong',          icon: '🦍', category: 'Arcade',     year: 1983,
+      desc: 'Climb the girders, save the girl',
+      iaItem: 'c64_Donkey_Kong' },
+    { name: 'Centipede',            icon: '🐛', category: 'Arcade',     year: 1984,
+      desc: 'Atari\'s mushroom-field shooter',
+      iaItem: 'c64_Centipede' },
+    { name: 'Galaga',               icon: '👾', category: 'Arcade',     year: 1985,
+      desc: 'Namco\'s vertical insectoid shooter',
+      iaItem: 'c64_Galaga' },
+    { name: 'Frogger',              icon: '🐸', category: 'Arcade',     year: 1983,
+      desc: 'Cross the road, mind the logs',
+      iaItem: 'c64_Frogger' },
+    { name: 'Q*bert',               icon: '🟧', category: 'Arcade',     year: 1983,
+      desc: 'Hop on every cube',
+      iaItem: 'c64_Qbert' },
+    { name: 'Defender',             icon: '🛸', category: 'Arcade',     year: 1983,
+      desc: 'Williams\' side-scrolling rescue shooter',
+      iaItem: 'c64_Defender' },
+    { name: 'Dig Dug',              icon: '⛏️', category: 'Arcade',     year: 1983,
+      desc: 'Inflate Pookas underground',
+      iaItem: 'c64_Dig_Dug' },
+    { name: 'Joust',                icon: '🪶', category: 'Arcade',     year: 1983,
+      desc: 'Flying ostrich lance-duels',
+      iaItem: 'c64_Joust' },
+    { name: 'Bubble Bobble',        icon: '🫧', category: 'Arcade',     year: 1987,
+      desc: 'Taito\'s bubble-blowing dinos',
+      iaItem: 'c64_Bubble_Bobble' },
+    { name: 'Spy Hunter',           icon: '🚗', category: 'Arcade',     year: 1984,
+      desc: 'Midway\'s combat driving',
+      iaItem: 'c64_Spy_Hunter' },
+    { name: 'BurgerTime',           icon: '🍔', category: 'Arcade',     year: 1984,
+      desc: 'Stomp buns, dodge pickles',
+      iaItem: 'c64_BurgerTime' },
+    { name: 'Mr. Do!',              icon: '🤡', category: 'Arcade',     year: 1983,
+      desc: 'Universal\'s dig-and-fruit arcade',
+      iaItem: 'c64_Mr_Do' },
+    { name: 'Tapper',               icon: '🍺', category: 'Arcade',     year: 1984,
+      desc: 'Slide root beers down the bar',
+      iaItem: 'c64_Tapper' },
+
+    // === Platformer ===========================================================
+    { name: 'Bruce Lee',            icon: '🥋', category: 'Platformer', year: 1984,
+      desc: 'Datasoft\'s martial-arts platformer',
+      iaItem: 'c64_Bruce_Lee' },
+    { name: 'Impossible Mission',   icon: '🤖', category: 'Platformer', year: 1984,
+      desc: '"Stay awhile. Stay forever!" — Epyx',
+      iaItem: 'impossible_mission_202309' },
+    { name: 'Impossible Mission II', icon: '🔓', category: 'Platformer', year: 1988,
+      desc: 'The Elvin Atombender revenge',
+      iaItem: 'c64_Impossible_Mission_II' },
+    { name: 'Jumpman',              icon: '🪜', category: 'Platformer', year: 1983,
+      desc: 'Epyx\'s 30-level climber',
+      iaItem: 'c64_Jumpman' },
+    { name: 'Jumpman Junior',       icon: '🧗', category: 'Platformer', year: 1983,
+      desc: 'Cartridge-sized sequel',
+      iaItem: 'c64_Jumpman_Junior' },
+    { name: 'Pitfall!',             icon: '🐊', category: 'Platformer', year: 1983,
+      desc: 'Activision\'s jungle classic',
+      iaItem: 'c64_Pitfall' },
+    { name: 'Pitfall II: Lost Caverns', icon: '🕳️', category: 'Platformer', year: 1984,
+      desc: 'Multi-screen sequel with music',
+      iaItem: 'c64_Pitfall_II' },
+    { name: 'Mario Bros.',          icon: '👨‍🔧', category: 'Platformer', year: 1984,
+      desc: 'Pre-Super arcade port',
+      iaItem: 'c64_Mario_Bros' },
+    { name: 'Aztec Challenge',      icon: '🐍', category: 'Platformer', year: 1983,
+      desc: 'Cosmi\'s seven-level temple gauntlet',
+      iaItem: 'c64_Aztec_Challenge' },
+    { name: 'Boulder Dash',         icon: '💎', category: 'Platformer', year: 1984,
+      desc: 'First Star\'s gem-grabbing dig',
+      iaItem: 'c64_Boulder_Dash' },
+    { name: 'Boulder Dash II',      icon: '🪨', category: 'Platformer', year: 1985,
+      desc: 'Rockford\'s Revenge',
+      iaItem: 'c64_Boulder_Dash_II' },
+    { name: 'The Goonies',          icon: '👻', category: 'Platformer', year: 1986,
+      desc: 'Datasoft\'s movie tie-in',
+      iaItem: 'c64_The_Goonies' },
+    { name: 'Spelunker',            icon: '🔦', category: 'Platformer', year: 1985,
+      desc: 'Broderbund\'s fragile cave-diver',
+      iaItem: 'c64_Spelunker' },
+    { name: 'Lode Runner',          icon: '🏃', category: 'Platformer', year: 1984,
+      desc: 'Dig holes, grab gold — Broderbund',
+      iaItem: 'c64_Lode_Runner' },
+    { name: 'Wonder Boy',           icon: '🍔', category: 'Platformer', year: 1987,
+      desc: 'Sega\'s skateboard platformer',
+      iaItem: 'c64_Wonder_Boy' },
+
+    // === Shooter (vertical / horizontal / multi-directional) ================
+    { name: 'Uridium',              icon: '🚀', category: 'Shooter',    year: 1986,
+      desc: 'Andrew Braybrook\'s super-fast Hewson scroller',
+      iaItem: 'c64_Uridium' },
+    { name: 'Wizball',              icon: '🧙', category: 'Shooter',    year: 1987,
+      desc: 'Sensible Software\'s rolling-wizard shooter',
+      iaItem: 'c64_Wizball' },
+    { name: 'Delta',                icon: '🔺', category: 'Shooter',    year: 1987,
+      desc: 'Stavros Fasoulas\' bullet-hell horizontal scroller',
+      iaItem: 'c64_Delta' },
+    { name: 'Sanxion',              icon: '🛰️', category: 'Shooter',    year: 1986,
+      desc: 'Stavros Fasoulas + Rob Hubbard SID',
+      iaItem: 'c64_Sanxion' },
+    { name: 'IO',                   icon: '🌀', category: 'Shooter',    year: 1987,
+      desc: 'Graftgold\'s multi-stage scroller',
+      iaItem: 'c64_IO' },
+    { name: 'Armalyte',             icon: '⚔️', category: 'Shooter',    year: 1988,
+      desc: 'Cyberdyne\'s R-Type-esque masterpiece',
+      iaItem: 'c64_Armalyte' },
+    { name: 'Dropzone',             icon: '🪂', category: 'Shooter',    year: 1984,
+      desc: 'Archer Maclean\'s Defender-style rescue',
+      iaItem: 'c64_Dropzone' },
+    { name: 'Hawkeye',              icon: '🦅', category: 'Shooter',    year: 1988,
+      desc: 'Boys Without Brains run-and-gun',
+      iaItem: 'c64_Hawkeye' },
+    { name: 'R-Type',               icon: '🐉', category: 'Shooter',    year: 1989,
+      desc: 'Irem\'s scrolling arcade shooter',
+      iaItem: 'c64_R-Type' },
+    { name: 'Mega Apocalypse',      icon: '☄️', category: 'Shooter',    year: 1987,
+      desc: 'Martech\'s Asteroids successor',
+      iaItem: 'c64_Mega_Apocalypse' },
+
+    // === Action / Action-Adventure ==========================================
+    { name: 'The Last Ninja',       icon: '🥷', category: 'Action',     year: 1987,
+      desc: 'System 3\'s isometric ninja saga',
+      iaItem: 'c64_The_Last_Ninja' },
+    { name: 'The Last Ninja 2',     icon: '🗡️', category: 'Action',     year: 1988,
+      desc: 'Back With A Vengeance',
+      iaItem: 'c64_The_Last_Ninja_2' },
+    { name: 'The Last Ninja 3',     icon: '🐉', category: 'Action',     year: 1991,
+      desc: 'Final System 3 entry',
+      iaItem: 'c64_The_Last_Ninja_3' },
+    { name: 'Paradroid',            icon: '🤖', category: 'Action',     year: 1985,
+      desc: 'Andrew Braybrook\'s droid-takeover masterpiece',
+      iaItem: 'c64_Paradroid' },
+    { name: 'Mayhem in Monsterland', icon: '🐉', category: 'Action',    year: 1993,
+      desc: 'Apex\'s late-era miracle scroller',
+      iaItem: 'c64_Mayhem_in_Monsterland' },
+    { name: 'Turrican',             icon: '💥', category: 'Action',     year: 1990,
+      desc: 'Manfred Trenz\'s explosive run-and-gun',
+      iaItem: 'c64_Turrican' },
+    { name: 'Turrican II',          icon: '⚙️', category: 'Action',     year: 1991,
+      desc: 'The Final Fight',
+      iaItem: 'c64_Turrican_II' },
+    { name: 'Creatures',            icon: '😺', category: 'Action',     year: 1990,
+      desc: 'Apex Computer\'s fuzzy-horror romp',
+      iaItem: 'c64_Creatures' },
+    { name: 'Mayhem',               icon: '💣', category: 'Action',     year: 1985,
+      desc: 'Vintage chaos title',
+      iaItem: 'c64_Mayhem' },
+    { name: 'Saboteur!',            icon: '🕵️', category: 'Action',     year: 1985,
+      desc: 'Durell\'s side-scrolling infiltration',
+      iaItem: 'c64_Saboteur' },
+
+    // === Adventure (point-and-click / illustrated text) =====================
+    { name: 'Maniac Mansion',       icon: '🏚️', category: 'Adventure',  year: 1987,
+      desc: 'Lucasfilm\'s first SCUMM adventure',
+      iaItem: 'c64_Maniac_Mansion' },
+    { name: 'Zak McKracken',        icon: '👽', category: 'Adventure',  year: 1988,
+      desc: 'Alien Mindbenders — Lucasfilm',
+      iaItem: 'c64_Zak_McKracken_and_the_Alien_Mindbenders' },
+    { name: 'The Hobbit',           icon: '💍', category: 'Adventure',  year: 1985,
+      desc: 'Melbourne House — Inglish-engine adventure',
+      iaItem: 'c64_The_Hobbit' },
+    { name: 'Indiana Jones (Temple of Doom)', icon: '🏛️', category: 'Adventure', year: 1987,
+      desc: 'Mindscape arcade-adventure port',
+      iaItem: 'c64_Indiana_Jones_and_the_Temple_of_Doom' },
+    { name: 'Below the Root',       icon: '🌳', category: 'Adventure',  year: 1984,
+      desc: 'Windham/CBS Software literary adventure',
+      iaItem: 'c64_Below_the_Root' },
+    { name: 'Defender of the Crown', icon: '👑', category: 'Adventure', year: 1987,
+      desc: 'Cinemaware\'s knights & sieges',
+      iaItem: 'c64_Defender_of_the_Crown' },
+    { name: 'Sid Meier\'s Pirates!', icon: '🏴‍☠️', category: 'Adventure', year: 1987,
+      desc: 'MicroProse\'s Caribbean sandbox',
+      iaItem: 'c64_Pirates' },
+    { name: 'Where in the World is Carmen Sandiego?', icon: '🌎', category: 'Adventure', year: 1985,
+      desc: 'Broderbund\'s edutainment classic',
+      iaItem: 'c64_Where_in_the_World_is_Carmen_Sandiego' },
+    { name: 'The Pawn',             icon: '♟️', category: 'Adventure',  year: 1986,
+      desc: 'Magnetic Scrolls illustrated text adventure',
+      iaItem: 'c64_The_Pawn' },
+    { name: 'Times of Lore',        icon: '⚔️', category: 'Adventure',  year: 1988,
+      desc: 'Origin Systems action-RPG hybrid',
+      iaItem: 'c64_Times_of_Lore' },
+
+    // === Text Adventure (Infocom et al.) ====================================
+    { name: 'Zork I',               icon: '📜', category: 'Text Adventure', year: 1983,
+      desc: 'Infocom\'s Great Underground Empire',
+      iaItem: 'c64_Zork_I' },
+    { name: 'Hitchhiker\'s Guide',  icon: '🐬', category: 'Text Adventure', year: 1984,
+      desc: 'Infocom + Douglas Adams',
+      iaItem: 'c64_The_Hitchhikers_Guide_to_the_Galaxy' },
+
+    // === RPG ================================================================
+    { name: 'The Bard\'s Tale',     icon: '🎵', category: 'RPG',        year: 1985,
+      desc: 'Interplay/EA dungeon-crawler',
+      iaItem: 'c64_The_Bards_Tale' },
+    { name: 'Ultima IV',            icon: '👑', category: 'RPG',        year: 1985,
+      desc: 'Origin\'s Quest of the Avatar',
+      iaItem: 'c64_Ultima_IV' },
+    { name: 'Ultima V',             icon: '🗡️', category: 'RPG',        year: 1988,
+      desc: 'Warriors of Destiny',
+      iaItem: 'c64_Ultima_V' },
+    { name: 'Wasteland',            icon: '☢️', category: 'RPG',        year: 1988,
+      desc: 'Interplay/EA post-apocalyptic RPG',
+      iaItem: 'c64_Wasteland' },
+    { name: 'Pool of Radiance',     icon: '🐲', category: 'RPG',        year: 1988,
+      desc: 'First SSI Gold Box D&D game',
+      iaItem: 'c64_Pool_of_Radiance' },
+
+    // === Strategy / Simulation ==============================================
+    { name: 'M.U.L.E.',             icon: '🐴', category: 'Strategy',   year: 1983,
+      desc: 'Ozark Softscape economic strategy',
+      iaItem: 'c64_M_U_L_E' },
+    { name: 'Archon: Light & Dark', icon: '♛', category: 'Strategy',    year: 1983,
+      desc: 'Free Fall Associates chess-meets-combat',
+      iaItem: 'c64_Archon' },
+    { name: 'The Seven Cities of Gold', icon: '🌅', category: 'Strategy', year: 1984,
+      desc: 'Dani Bunten\'s New World exploration',
+      iaItem: 'c64_The_Seven_Cities_of_Gold' },
+    { name: 'Reach for the Stars',  icon: '🌌', category: 'Strategy',   year: 1986,
+      desc: 'SSG 4X space strategy',
+      iaItem: 'c64_Reach_for_the_Stars' },
+    { name: 'SimCity',              icon: '🏙️', category: 'Strategy',   year: 1989,
+      desc: 'Maxis\' city-builder original',
+      iaItem: 'c64_SimCity' },
+    { name: 'Little Computer People', icon: '🏠', category: 'Simulation', year: 1985,
+      desc: 'Activision\'s ur-Sims experiment',
+      iaItem: 'c64_Little_Computer_People' },
+    { name: 'Microprose Soccer',    icon: '⚽', category: 'Simulation', year: 1988,
+      desc: 'Sensible Software in MicroProse\'s clothes',
+      iaItem: 'c64_MicroProse_Soccer' },
+    { name: 'F-15 Strike Eagle',    icon: '✈️', category: 'Simulation', year: 1985,
+      desc: 'MicroProse fighter-jet sim',
+      iaItem: 'c64_F-15_Strike_Eagle' },
+
+    // === Sports =============================================================
+    { name: 'California Games',     icon: '🛹', category: 'Sports',     year: 1987,
+      desc: 'Epyx\'s six-event west-coast sampler',
+      iaItem: 'c64_California_Games' },
+    { name: 'Summer Games',         icon: '🏊', category: 'Sports',     year: 1984,
+      desc: 'Epyx\'s eight-event Olympic sim',
+      iaItem: 'c64_Summer_Games' },
+    { name: 'Summer Games II',      icon: '🚴', category: 'Sports',     year: 1985,
+      desc: 'Eight more Olympic events',
+      iaItem: 'c64_Summer_Games_II' },
+    { name: 'Winter Games',         icon: '⛷️', category: 'Sports',     year: 1985,
+      desc: 'Epyx\'s ice-and-snow version',
+      iaItem: 'c64_Winter_Games' },
+    { name: 'World Games',          icon: '🌍', category: 'Sports',     year: 1986,
+      desc: 'Caber toss, log roll, sumo',
+      iaItem: 'c64_World_Games' },
+    { name: 'International Karate', icon: '🥋', category: 'Fighting',   year: 1985,
+      desc: 'System 3\'s side-view karate',
+      iaItem: 'c64_International_Karate' },
+    { name: 'IK+',                  icon: '🥷', category: 'Fighting',   year: 1987,
+      desc: 'International Karate Plus — three fighters',
+      iaItem: 'c64_International_Karate_Plus' },
+    { name: 'Hardball!',            icon: '⚾', category: 'Sports',     year: 1985,
+      desc: 'Accolade\'s baseball sim',
+      iaItem: 'c64_Hardball' },
+
+    // === Racing =============================================================
+    { name: 'Pole Position',        icon: '🏁', category: 'Racing',     year: 1983,
+      desc: 'Atarisoft\'s Formula 1 arcade port',
+      iaItem: 'c64_Pole_Position' },
+    { name: 'Pitstop II',           icon: '🏎️', category: 'Racing',     year: 1984,
+      desc: 'Epyx split-screen Grand Prix',
+      iaItem: 'c64_Pitstop_II' },
+    { name: 'Test Drive',           icon: '🚗', category: 'Racing',     year: 1987,
+      desc: 'Accolade\'s supercar driving',
+      iaItem: 'c64_Test_Drive' },
+    { name: 'Out Run',              icon: '🌴', category: 'Racing',     year: 1988,
+      desc: 'Sega arcade convertible cruiser',
+      iaItem: 'c64_OutRun' },
+    { name: 'Lotus Esprit Turbo Challenge', icon: '🟡', category: 'Racing', year: 1990,
+      desc: 'Magnetic Fields/Gremlin racer',
+      iaItem: 'c64_Lotus_Esprit_Turbo_Challenge' },
+
+    // === Puzzle =============================================================
+    { name: 'Tetris',               icon: '🟦', category: 'Puzzle',     year: 1988,
+      desc: 'Mirrorsoft / Spectrum Holobyte port',
+      iaItem: 'c64_Tetris' },
+    { name: 'Lemmings',             icon: '🐹', category: 'Puzzle',     year: 1991,
+      desc: 'DMA Design\'s green-haired suicide squad',
+      iaItem: 'c64_Lemmings' },
+    { name: 'The Sentinel',         icon: '👁️', category: 'Puzzle',     year: 1987,
+      desc: 'Geoff Crammond\'s 3D strategy puzzle',
+      iaItem: 'c64_The_Sentinel' },
+    { name: 'The Castles of Dr. Creep', icon: '🏰', category: 'Puzzle', year: 1984,
+      desc: 'Broderbund trap-laden mansion',
+      iaItem: 'c64_The_Castles_of_Dr_Creep' },
+    { name: 'Stunt Car Racer',      icon: '🎢', category: 'Puzzle',     year: 1989,
+      desc: 'Geoff Crammond rollercoaster racer',
+      iaItem: 'c64_Stunt_Car_Racer' },
+
+    // === Demoscene (legally released by the authors) ========================
     { name: 'Booze Design — Edge of Disgrace', icon: '✨', category: 'Demoscene', year: 2008,
       desc: 'One of the most acclaimed C64 demos ever',
-      url: 'https://archive.org/download/c64_demo_edge_of_disgrace/edge_of_disgrace.d64' },
+      iaItem: 'c64_demo_edge_of_disgrace' },
     { name: 'Crest — Deus Ex Machina', icon: '🌀', category: 'Demoscene', year: 2000,
       desc: 'Classic Crest demoscene release',
-      url: 'https://archive.org/download/c64_demo_deus_ex_machina/deus_ex_machina.d64' },
+      iaItem: 'c64_demo_deus_ex_machina' },
+    { name: 'Censor Design — Comaland 100%', icon: '🌈', category: 'Demoscene', year: 2014,
+      desc: 'Multi-part demo, Datastorm winner',
+      iaItem: 'c64_demo_comaland_100' },
+    { name: 'Oxyron — One-der',     icon: '🎇', category: 'Demoscene', year: 2017,
+      desc: 'Oxyron raster-bar wizardry',
+      iaItem: 'c64_demo_oneder' },
+    { name: 'Algotech',             icon: '🧪', category: 'Demoscene', year: 2014,
+      desc: 'Algorithm-driven demo techniques',
+      iaItem: 'c64_demo_algotech' },
 
-    // === Modern homebrew (released as freeware by the authors) ===
-    { name: '8-Bit Slicks (Demo)', icon: '🏎️', category: 'Homebrew', year: 2018,
+    // === Modern Homebrew (released as freeware by the authors) ==============
+    { name: '8-Bit Slicks (Demo)',  icon: '🏎️', category: 'Homebrew',  year: 2018,
       desc: 'Multiplayer top-down racer — RGCD',
-      url: 'https://archive.org/download/c64_homebrew_8bit_slicks/8bit_slicks.d64' },
-    { name: 'Aviator Arcade II', icon: '✈️', category: 'Homebrew', year: 2020,
+      iaItem: 'c64_homebrew_8bit_slicks' },
+    { name: 'Aviator Arcade II',    icon: '✈️', category: 'Homebrew',  year: 2020,
       desc: 'Single-screen biplane shooter',
-      url: 'https://archive.org/download/c64_homebrew_aviator_arcade_ii/aviator_arcade_ii.d64' },
+      iaItem: 'c64_homebrew_aviator_arcade_ii' },
+    { name: 'Sam\'s Journey (Demo)', icon: '🧢', category: 'Homebrew', year: 2017,
+      desc: 'Knights of Bytes platform showcase',
+      iaItem: 'c64_homebrew_sams_journey_demo' },
+    { name: 'L\'Abbaye des Morts',  icon: '⛪', category: 'Homebrew',  year: 2017,
+      desc: 'Locomalito ZX Spectrum port to C64',
+      iaItem: 'c64_homebrew_labbaye_des_morts' },
+    { name: 'Galencia',             icon: '🛸', category: 'Homebrew',  year: 2017,
+      desc: 'Protovision\'s polished Galaga-like',
+      iaItem: 'c64_homebrew_galencia' },
 
-    // === Productivity / Tools (BASIC built-in) ===
+    // === Educational ========================================================
+    { name: 'Number Munchers',      icon: '🔢', category: 'Educational', year: 1986,
+      desc: 'MECC math edutainment',
+      iaItem: 'c64_Number_Munchers' },
+    { name: 'Word Munchers',        icon: '📚', category: 'Educational', year: 1985,
+      desc: 'MECC vocabulary version',
+      iaItem: 'c64_Word_Munchers' },
+    { name: 'Math Blaster!',        icon: '🧮', category: 'Educational', year: 1987,
+      desc: 'Davidson & Associates math drills',
+      iaItem: 'c64_Math_Blaster' },
+
+    // === Tools / Productivity ===============================================
     { name: 'Commodore BASIC (built-in)', icon: '⌨️', category: 'Tools', year: 1982,
       desc: 'Boot to the famous "READY." prompt',
-      url: '' /* empty URL = boot the machine with no media */ },
+      url: '' /* empty URL sentinel = boot machine with no media */ },
+    { name: 'GEOS',                 icon: '🖱️', category: 'Tools',     year: 1986,
+      desc: 'Berkeley Softworks\' GUI for C64',
+      iaItem: 'c64_GEOS' },
+    { name: 'Print Shop',           icon: '🖨️', category: 'Tools',     year: 1984,
+      desc: 'Broderbund\'s banner/card maker',
+      iaItem: 'c64_The_Print_Shop' },
 ];
 
-const CATEGORY_ORDER = ['Demoscene', 'Homebrew', 'Tools'];
+const CATEGORY_ORDER = [
+    'Arcade',
+    'Platformer',
+    'Shooter',
+    'Action',
+    'Adventure',
+    'Text Adventure',
+    'RPG',
+    'Strategy',
+    'Simulation',
+    'Sports',
+    'Fighting',
+    'Racing',
+    'Puzzle',
+    'Demoscene',
+    'Homebrew',
+    'Educational',
+    'Tools',
+];
+
+/** File extensions the resolver prefers, most specific first. */
+const IA_PREFERRED_EXTS = ['.d64', '.prg', '.crt', '.t64', '.tap', '.g64', '.nib', '.zip'];
 
 class C64 extends AppBase {
     constructor() {
@@ -106,6 +484,8 @@ class C64 extends AppBase {
         this._loaderPromise = null;     // CDN preload promise — cached per session
         this._readyWatchdog = null;     // Warns if the emulator never reports ready
         this._configuredScript = null;  // Most recently injected loader script tag
+        this._iaUrlCache = new Map();   // IA item ID → resolved file URL
+        this._iaResolveInFlight = new Map(); // IA item ID → in-flight Promise (dedupes concurrent resolves)
 
         this.registerCommands();
         this.registerQueries();
@@ -115,8 +495,17 @@ class C64 extends AppBase {
 
     registerCommands() {
         this.registerCommand('run', (payload) => {
+            // Accept either { url } / "url" or { iaItem }. iaItem routes
+            // through the IA metadata resolver so scripts can reference
+            // library items symbolically.
+            if (typeof payload === 'object' && payload?.iaItem) {
+                this.loadLibraryEntry({ iaItem: payload.iaItem, name: payload.name });
+                return { success: true, iaItem: payload.iaItem };
+            }
             const url = typeof payload === 'string' ? payload : payload?.url;
-            if (url === undefined) return { success: false, error: 'URL required (empty string = BASIC only)' };
+            if (url === undefined) {
+                return { success: false, error: 'URL or iaItem required (empty url = BASIC only)' };
+            }
             this.loadGame(url, this.lookupBundleName(url));
             return { success: true, url };
         });
@@ -158,7 +547,13 @@ class C64 extends AppBase {
 
         this.registerQuery('getLibrary', () =>
             GAME_LIBRARY.map(g => ({
-                name: g.name, url: g.url, desc: g.desc, icon: g.icon, category: g.category
+                name: g.name,
+                url: g.url,           // present only on entries with an explicit URL
+                iaItem: g.iaItem,     // present on entries resolved via Internet Archive
+                desc: g.desc,
+                icon: g.icon,
+                category: g.category,
+                year: g.year
             }))
         );
     }
@@ -166,11 +561,13 @@ class C64 extends AppBase {
     // ── Lifecycle ──────────────────────────────────────────────
 
     onOpen() {
+        // Index lookup so the change handler can map option `value` back to
+        // the library entry (which may carry an `iaItem` rather than a `url`).
         const byCat = new Map();
-        for (const game of GAME_LIBRARY) {
+        GAME_LIBRARY.forEach((game, idx) => {
             if (!byCat.has(game.category)) byCat.set(game.category, []);
-            byCat.get(game.category).push(game);
-        }
+            byCat.get(game.category).push({ ...game, _idx: idx });
+        });
         const orderedCats = [
             ...CATEGORY_ORDER.filter(c => byCat.has(c)),
             ...[...byCat.keys()].filter(c => !CATEGORY_ORDER.includes(c))
@@ -178,10 +575,11 @@ class C64 extends AppBase {
         const dropdownOptions = orderedCats.map(cat => {
             const items = byCat.get(cat).map(game => {
                 const label = `${game.icon} ${game.name} (${game.year}) — ${game.desc}`;
-                // Encode an empty URL as the literal `__BASIC__` sentinel so
-                // the dropdown can distinguish "user picked BASIC" from
-                // "user picked nothing".
-                const value = game.url === '' ? '__BASIC__' : game.url;
+                // Encode the index into the library array as `lib:<i>`. The
+                // change handler decodes this and resolves the entry's URL
+                // (either directly from `url` or via the IA metadata API
+                // when only `iaItem` is set).
+                const value = `lib:${game._idx}`;
                 return `<option value="${escapeHtml(value)}">${escapeHtml(label)}</option>`;
             }).join('');
             return `<optgroup label="${escapeHtml(cat)}">${items}</optgroup>`;
@@ -258,11 +656,16 @@ class C64 extends AppBase {
         this.addHandler(gameSelect, 'change', (e) => {
             const value = e.target.value;
             if (!value) return;
-            // The dropdown encodes "boot to BASIC" as __BASIC__ so we can
-            // tell it apart from "no selection".
-            const url = value === '__BASIC__' ? '' : value;
-            if (urlInput) urlInput.value = url;
-            this.loadGame(url, this.lookupBundleName(url));
+            // Option values are `lib:<index>` — decode and run the entry.
+            const m = /^lib:(\d+)$/.exec(value);
+            if (!m) return;
+            const entry = GAME_LIBRARY[Number(m[1])];
+            if (!entry) return;
+            // If the entry has an explicit URL (incl. empty for BASIC), put
+            // it in the URL field for transparency. iaItem entries leave
+            // the URL field unchanged until the resolver runs.
+            if (urlInput && typeof entry.url === 'string') urlInput.value = entry.url;
+            this.loadLibraryEntry(entry);
         });
 
         this.addHandler(runBtn, 'click', () => {
@@ -368,6 +771,116 @@ class C64 extends AppBase {
         const blobUrl = URL.createObjectURL(file);
         this.activeBlobUrl = blobUrl;
         await this._startEmulatorWith({ url: blobUrl, displayName: file.name });
+    }
+
+    /**
+     * Load a curated GAME_LIBRARY entry. Entries may carry either an
+     * explicit `url` or an Internet Archive item ID (`iaItem`) that the
+     * resolver expands to a direct download URL. The status bar surfaces
+     * both phases (resolving → starting) so the user can tell the app
+     * isn't hung.
+     * @param {object} entry - A GAME_LIBRARY entry
+     */
+    async loadLibraryEntry(entry) {
+        if (!entry) return;
+        const displayName = entry.name || this.lookupBundleName(entry.url || '');
+
+        // Explicit URL (incl. empty string for "boot to BASIC") wins.
+        if (typeof entry.url === 'string') {
+            await this.loadGame(entry.url, displayName);
+            return;
+        }
+
+        if (!entry.iaItem) {
+            this.setStatus('Error: library entry has no url and no iaItem');
+            return;
+        }
+
+        this.setStatus('Resolving Internet Archive: ' + entry.iaItem + '…');
+        try {
+            const url = await this._resolveIAItemToUrl(entry.iaItem);
+            await this.loadGame(url, displayName);
+        } catch (err) {
+            console.error('[C64] IA resolve failed:', err);
+            this.setStatus(
+                `Couldn't resolve "${displayName}" on Internet Archive — ` +
+                'the item may have been renamed or removed. Try another title, ' +
+                'paste a URL, or use the File… button.'
+            );
+            this.emitAppEvent('error', {
+                error: err?.message || String(err),
+                iaItem: entry.iaItem,
+                name: displayName
+            });
+        }
+    }
+
+    /**
+     * Resolve an Internet Archive item ID to a direct download URL for the
+     * best available C64-loadable file. Hits the IA metadata API at
+     * `https://archive.org/metadata/<itemId>` (which sends permissive CORS
+     * for read-only requests) and picks the most specific file extension
+     * available, preferring native disk images over zipped collections.
+     *
+     * Resolves are cached per-instance and concurrent calls for the same
+     * item are deduped so two rapid clicks don't double-fetch.
+     *
+     * @private
+     * @param {string} itemId
+     * @returns {Promise<string>}
+     */
+    _resolveIAItemToUrl(itemId) {
+        if (this._iaUrlCache.has(itemId)) {
+            return Promise.resolve(this._iaUrlCache.get(itemId));
+        }
+        if (this._iaResolveInFlight.has(itemId)) {
+            return this._iaResolveInFlight.get(itemId);
+        }
+
+        const metaUrl = `https://archive.org/metadata/${encodeURIComponent(itemId)}`;
+        const promise = (async () => {
+            const res = await fetch(metaUrl, { credentials: 'omit' });
+            if (!res.ok) {
+                throw new Error(`IA metadata HTTP ${res.status} for "${itemId}"`);
+            }
+            const meta = await res.json();
+            const files = Array.isArray(meta?.files) ? meta.files : [];
+            if (files.length === 0) {
+                throw new Error(`IA item "${itemId}" has no files (renamed or empty?)`);
+            }
+
+            // Pick the most specific extension. Within a tier, prefer the
+            // shorter filename (usually the un-derived original upload).
+            let pick = null;
+            for (const ext of IA_PREFERRED_EXTS) {
+                const matches = files.filter(f =>
+                    typeof f.name === 'string' &&
+                    f.name.toLowerCase().endsWith(ext) &&
+                    // Skip IA-generated derivative files (e.g. *_archive.zip,
+                    // *_files.xml etc.) that aren't actually the game.
+                    !/_archive\.zip$/i.test(f.name) &&
+                    !/_files\.xml$/i.test(f.name) &&
+                    !/_meta\.(xml|sqlite)$/i.test(f.name)
+                );
+                if (matches.length) {
+                    matches.sort((a, b) => a.name.length - b.name.length);
+                    pick = matches[0];
+                    break;
+                }
+            }
+            if (!pick) {
+                throw new Error(`No supported file in IA item "${itemId}" (looked for ${IA_PREFERRED_EXTS.join(', ')})`);
+            }
+
+            const url = `https://archive.org/download/${encodeURIComponent(itemId)}/${encodeURI(pick.name)}`;
+            this._iaUrlCache.set(itemId, url);
+            return url;
+        })().finally(() => {
+            this._iaResolveInFlight.delete(itemId);
+        });
+
+        this._iaResolveInFlight.set(itemId, promise);
+        return promise;
     }
 
     /**
@@ -637,12 +1150,21 @@ class C64 extends AppBase {
 
     /**
      * Look up a curated library entry by URL and return its display name,
-     * or fall back to a name derived from the URL itself.
+     * or fall back to a name derived from the URL itself. Checks both
+     * explicit `url` entries and any resolved-IA URLs in the cache so a
+     * reset after an IA-resolved load still shows the friendly title.
      */
     lookupBundleName(url) {
         if (url === '' || url == null) return 'BASIC (no disk)';
-        const lib = GAME_LIBRARY.find(g => g.url === url);
-        if (lib) return lib.name;
+        const directHit = GAME_LIBRARY.find(g => g.url === url);
+        if (directHit) return directHit.name;
+        // Reverse-lookup the IA cache: any iaItem whose resolved URL matches.
+        for (const [iaItem, cachedUrl] of this._iaUrlCache.entries()) {
+            if (cachedUrl === url) {
+                const hit = GAME_LIBRARY.find(g => g.iaItem === iaItem);
+                if (hit) return hit.name;
+            }
+        }
         return this.getBundleName(url);
     }
 
