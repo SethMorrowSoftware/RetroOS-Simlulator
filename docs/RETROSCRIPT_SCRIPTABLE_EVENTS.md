@@ -1426,7 +1426,7 @@ These functions are available in RetroScript via `call functionName(args)`.
 | `getApps()` | List all registered apps | *(none)* |
 | `getEnv()` | Get system environment | *(none)* |
 | `query(type, ...)` | Query system state | `type`, args... |
-| `exec(command, payload)` | Execute a CommandBus command | `command`, `payload` |
+| `exec(command, payload)` | Execute a registered command (via `EventBus.executeCommand`) | `command`, `payload` |
 | `copyToClipboard(text)` | Copy text to clipboard | `text` |
 | `getStorage(key)` | Get from localStorage | `key` |
 | `setStorage(key, value)` | Set in localStorage | `key`, `value` |

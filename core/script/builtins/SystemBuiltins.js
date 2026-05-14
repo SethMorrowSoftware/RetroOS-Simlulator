@@ -98,10 +98,10 @@ export function registerSystemBuiltins(interpreter) {
 
     // Execute command
     interpreter.registerBuiltin('exec', async (command, payload) => {
-        const CommandBus = interpreter.context.CommandBus;
-        if (CommandBus) {
+        const EventBus = interpreter.context.EventBus;
+        if (EventBus) {
             try {
-                return await CommandBus.execute(command, payload || {});
+                return await EventBus.executeCommand(command, payload || {});
             } catch (error) {
                 console.error('[SystemBuiltins] exec error:', error);
                 return null;

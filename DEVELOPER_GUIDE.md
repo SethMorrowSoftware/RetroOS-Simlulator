@@ -374,7 +374,7 @@ EventBus.registerCommand('myapp:doThing', async (payload) => {
 await EventBus.executeCommand('myapp:doThing', { foo: 1 });
 ```
 
-`CommandBus.register()` / `CommandBus.execute()` still work — they're a thin facade that delegates to the unified API — but `CommandBus.js` is `@deprecated` and slated for Wave 4 removal. Use the bus directly for new code.
+`CommandBus.register()` / `CommandBus.execute()` still work — they're a thin facade that delegates to the unified API — but `CommandBus.js` is `@deprecated`. The script engine no longer takes `CommandBus` in its context (every visitor and builtin now goes through `context.EventBus.executeCommand`), and `apps/ScriptRunner.js` no longer imports the file. Boot still calls `CommandBus.initialize()` because that's where the `command:fs:*` / `command:window:*` / `command:terminal:*` handler set is registered — full file removal is tracked as P2.1 in `docs/MIGRATION_ROADMAP.md`. Use the bus directly for new code.
 
 Common command surfaces: app lifecycle actions, window actions, filesystem actions, dialog/notification/sound/system settings actions. If you add app-specific script control, register commands from the app and document them.
 

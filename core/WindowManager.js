@@ -55,6 +55,15 @@ class WindowManagerClass {
             EventBus.emit(Events.TASKBAR_UPDATE);
         });
 
+        // P2.7 — state.ui.activeWindow is the single source of truth for which
+        // window has focus. The DOM `.active` class is a derived view: this
+        // subscription mirrors the state value onto the DOM so focus() callers
+        // never need to touch the class list directly. The dual-write pattern
+        // (state + DOM in every focus path) was the audit's CC-2 row 4 drift.
+        StateManager.subscribe('ui.activeWindow', (activeId) => {
+            this._renderActiveWindow(activeId);
+        });
+
         // Create snap preview element
         this.snapPreview = document.createElement('div');
         this.snapPreview.className = 'snap-preview';
@@ -346,25 +355,39 @@ class WindowManagerClass {
             return; // restore() already calls focus()
         }
 
-        // Remove active from all windows
-        document.querySelectorAll('.window').forEach(w => {
-            w.classList.remove('active');
-        });
-
         // Compact z-indices periodically to prevent unbounded growth
         if (this.zCounter > 10000) {
             this.compactZIndices();
         }
 
-        // Activate this window
-        windowEl.classList.add('active');
         windowEl.style.zIndex = ++this.zCounter;
 
-        // Update state
+        // Update state — the `ui.activeWindow` subscription in initialize()
+        // mirrors the change onto the DOM `.active` class. Don't write the
+        // class here, or focus paths drift from each other.
         StateManager.focusWindow(id);
 
         // Emit focus event
         EventBus.emit(Events.WINDOW_FOCUS, { id });
+    }
+
+    /**
+     * Mirror `state.ui.activeWindow` onto the DOM `.active` class. Single
+     * writer of the class — every other code path must go through state.
+     *
+     * @param {string|null} activeId - Window ID that is now active, or null.
+     * @private
+     */
+    _renderActiveWindow(activeId) {
+        document.querySelectorAll('.window.active').forEach(w => {
+            if (w.id !== `window-${activeId}`) {
+                w.classList.remove('active');
+            }
+        });
+        if (activeId) {
+            const el = document.getElementById(`window-${activeId}`);
+            if (el) el.classList.add('active');
+        }
     }
 
     /**
@@ -392,10 +415,18 @@ class WindowManagerClass {
 
         windowEl.classList.add('minimizing');
 
+        // If this is the active window, clear state.ui.activeWindow — the
+        // subscription will pull the `.active` class off the DOM as part of
+        // the next render. Keeps state and DOM in lockstep.
+        const wasActive = StateManager.getState('ui.activeWindow') === id;
+
         setTimeout(() => {
-            windowEl.classList.remove('active', 'minimizing');
+            windowEl.classList.remove('minimizing');
             windowEl.classList.add('minimized'); // Hide the window
             StateManager.updateWindow(id, { minimized: true });
+            if (wasActive) {
+                StateManager.setState('ui.activeWindow', null);
+            }
             EventBus.emit(Events.WINDOW_MINIMIZE, { id });
         }, 200);
 

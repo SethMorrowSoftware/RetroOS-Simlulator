@@ -11,7 +11,6 @@
 import AppBase from './AppBase.js';
 import EventBus from '../core/EventBus.js';
 import ScriptEngine from '../core/script/ScriptEngine.js';
-import CommandBus from '../core/CommandBus.js';
 import FileSystemManager from '../core/FileSystemManager.js';
 import WindowManager from '../core/WindowManager.js';
 import { escapeHtml } from '../core/Sanitize.js';
@@ -4161,7 +4160,7 @@ TYPE FUNCTIONS:
 SYSTEM FUNCTIONS:
   call getWindows           List open windows
   call getApps              List available apps
-  call exec cmd payload     Execute CommandBus command
+  call exec cmd payload     Execute a registered command
 
 QUICK EXAMPLES:
 
@@ -4248,7 +4247,7 @@ QUICK EXAMPLES:
                 setTimeout(() => this.setupRecordedTabButtons(), 0);
                 break;
             case 'commands':
-                const commands = CommandBus.getCommands();
+                const commands = EventBus.getCommands();
                 outputText.innerHTML = 'Available Commands:\n\n' + commands.map(c =>
                     `  command:${c}`
                 ).join('\n');

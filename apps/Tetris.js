@@ -1,6 +1,6 @@
 /**
  * Tetris - Classic block-stacking puzzle game
- * Vibrant neon arcade aesthetic with CRT scanlines, scriptable via CommandBus.
+ * Vibrant neon arcade aesthetic with CRT scanlines, scriptable via EventBus commands.
  */
 
 import AppBase from './AppBase.js';

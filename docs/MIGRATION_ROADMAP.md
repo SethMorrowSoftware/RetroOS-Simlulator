@@ -134,22 +134,21 @@ Once the apps are migrated, the platform itself has follow-up tidying that's now
 
 ### P2.1 — Delete `core/CommandBus.js` (or shrink to a re-export)
 
-**Status:** open. **Blocker:** the 15 `CommandBus.execute(...)` call sites inside `core/script/interpreter/Interpreter.js` and `core/script/builtins/*.js`.
+**Status:** 🟡 partial — call-site migration ✅; file deletion ⏳.
 
-Steps:
-1. Migrate each call site: `CommandBus.execute(...)` → `EventBus.executeCommand(...)`.
-2. Move the timer + macro handler state (`this.timers`, `this.macros`, `this.isRecording`, etc.) into either a new `core/CommandRegistry.js` or directly into `SemanticEventBus`.
-3. Drop the `command:*` wildcard router (or keep it as a top-level subscription in the new home).
-4. Delete `core/CommandBus.js`.
-5. Update `index.js` to call `CommandRegistry.initialize(...)` instead of `CommandBus.initialize()`.
+The 14 script-engine `CommandBus.execute(...)` call sites are migrated: every visitor in `core/script/interpreter/Interpreter.js` and every builtin in `core/script/builtins/{MediaBuiltins,MultimediaBuiltins,SystemBuiltins}.js` now goes through `EventBus.executeCommand(...)`. `apps/ScriptRunner.js` no longer imports `CommandBus` either — its commands-tab diagnostic uses `EventBus.getCommands()`.
 
-**Estimated effort:** 1 small PR. Mechanical.
+What's left before deletion:
+1. ⏳ Move the timer + macro handler state (`this.timers`, `this.macros`, `this.isRecording`, etc.) into either a new `core/CommandRegistry.js` or directly into `SemanticEventBus`.
+2. ⏳ Drop the `command:*` wildcard router (or keep it as a top-level subscription in the new home).
+3. ⏳ Migrate `index.js` boot — `CommandBus.initialize()` is still needed today because it registers every `command:fs:*` / `command:window:*` / `command:terminal:*` handler. Deletion requires moving these registrations into a non-deprecated home.
+4. ⏳ Delete `core/CommandBus.js`.
 
-### P2.2 — Migrate `EventBus.executeCommand` callers off `context.CommandBus`
+**Estimated effort:** 1 small PR. Now purely about relocating timer/macro/handler state — no behavioral change for callers.
 
-The `ScriptEngine.initialize(context)` currently passes `CommandBus` in the context object. Scripts/builtins reach into `context.CommandBus.execute(...)`. Migrate to `context.EventBus.executeCommand(...)`, then drop `CommandBus` from the context.
+### P2.2 — Migrate `EventBus.executeCommand` callers off `context.CommandBus` ✅
 
-**Estimated effort:** 1 small PR. Done as part of P2.1.
+`ScriptEngine.initialize(context)` no longer accepts `CommandBus` — the field was dropped from the call in `index.js`, and every script-engine call site (`context.CommandBus.execute(...)`) was rewritten to use `context.EventBus.executeCommand(...)`. The autoexec loader's context object is also slimmed down. Net effect: nothing inside `core/script/` depends on the `CommandBus` import any more, even though the file itself still exists.
 
 ### P2.3 — Reauth UI for `auth:expired`
 
@@ -175,11 +174,9 @@ W3.2 currently does FS → state at boot only. For full bidirectional sync at ru
 
 **Estimated effort:** 1 small PR per feature.
 
-### P2.7 — Active-window dual source of truth (Cross-Cutting Theme CC-2)
+### P2.7 — Active-window dual source of truth (Cross-Cutting Theme CC-2) ✅
 
-`StateManager.ui.activeWindow` and the DOM `.active` class can drift. Pick one as truth — the state value, since the DOM class is a presentation detail — and have `WindowManager` read/write only the state value, with the DOM class as a derived view.
-
-**Estimated effort:** 1 small PR.
+`StateManager.ui.activeWindow` is now the single writer. `WindowManager.initialize()` subscribes to that path and the new `_renderActiveWindow(activeId)` mirrors it onto the DOM `.active` class. `WindowManager.focus()` no longer touches the class list at all — it just updates z-index and calls `StateManager.focusWindow(id)`. `minimize()` clears `ui.activeWindow` when the minimized window was active, so the DOM class follows naturally. The class-list `.remove('active')` calls inside `focus()` and `minimize()` are gone; the only writer is the state subscription.
 
 ### P2.8 — `AppBase.setContent()` replaces innerHTML without unregistering DOM listeners
 
@@ -259,7 +256,7 @@ These rules apply to every PR in Phase 1 and Phase 2.
 |---|---|---|
 | Phase 0 | Verification & baseline | ⏳ Pending — needs manual smoke (no automated harness for these scenarios) |
 | Phase 1 | App + feature audit and migration | ⏳ Pending — 44 apps + 12 features to walk |
-| Phase 2 | Internal cleanup | ⏳ Pending — 9 items |
+| Phase 2 | Internal cleanup | 🟡 In progress — P2.2 + P2.7 ✅, P2.1 partially landed (call sites migrated, file deletion deferred), 6 items still open |
 | Phase 3 | Documentation polish | ⏳ Pending — gated on Phase 2 |
 
 Total effort estimate: roughly one PR per app/feature (Phase 1) + one PR per Phase 2 item ≈ **50–60 small PRs**. Most are individually trivial; the total represents the long tail of "all the existing code now needs to use the new APIs the platform exposes."

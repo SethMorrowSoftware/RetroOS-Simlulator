@@ -72,9 +72,8 @@ export function registerMediaBuiltins(interpreter) {
      * options: { volume, loop, fullscreen, name }
      */
     interpreter.registerBuiltin('playVideo', async (source, options = {}) => {
-        const CommandBus = interpreter.context.CommandBus;
         const EventBus = interpreter.context.EventBus;
-        if (!CommandBus || !source) return false;
+        if (!EventBus || !source) return false;
 
         let src = String(source);
         if (src.includes('C:') || src.includes('c:')) {
@@ -86,7 +85,7 @@ export function registerMediaBuiltins(interpreter) {
         const name = options.name || src.split('/').pop().replace(/\.[^/.]+$/, '');
 
         try {
-            await CommandBus.execute('app:launch', {
+            await EventBus.executeCommand('app:launch', {
                 appId: 'mediaplayer',
                 params: {
                     src,
@@ -101,9 +100,7 @@ export function registerMediaBuiltins(interpreter) {
             return false;
         }
 
-        if (EventBus) {
-            EventBus.emit('mediaplayer:requested', { src, options });
-        }
+        EventBus.emit('mediaplayer:requested', { src, options });
 
         return true;
     });
@@ -112,11 +109,11 @@ export function registerMediaBuiltins(interpreter) {
      * stopVideo() - Stop video playback
      */
     interpreter.registerBuiltin('stopVideo', async () => {
-        const CommandBus = interpreter.context.CommandBus;
-        if (!CommandBus) return false;
+        const EventBus = interpreter.context.EventBus;
+        if (!EventBus) return false;
 
         try {
-            await CommandBus.execute('mediaplayer:stop', {});
+            await EventBus.executeCommand('mediaplayer:stop', {});
             return true;
         } catch {
             return false;
@@ -187,21 +184,10 @@ export function registerMediaBuiltins(interpreter) {
      * openMediaPlayer() - Open the MediaPlayer app
      */
     interpreter.registerBuiltin('openMediaPlayer', () => {
-        const CommandBus = interpreter.context.CommandBus;
-        if (!CommandBus) return false;
+        const EventBus = interpreter.context.EventBus;
+        if (!EventBus) return false;
 
-        CommandBus.execute('app:launch', { appId: 'mediaplayer' });
-        return true;
-    });
-
-    /**
-     * openMediaPlayer() - Open the Media Player app
-     */
-    interpreter.registerBuiltin('openMediaPlayer', () => {
-        const CommandBus = interpreter.context.CommandBus;
-        if (!CommandBus) return false;
-
-        CommandBus.execute('app:launch', { appId: 'mediaplayer' });
+        EventBus.executeCommand('app:launch', { appId: 'mediaplayer' });
         return true;
     });
 }

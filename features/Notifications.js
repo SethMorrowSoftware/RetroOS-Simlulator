@@ -110,7 +110,7 @@ class NotificationsFeature extends FeatureBase {
             });
         }));
 
-        // General-purpose notification:show event (used by CommandBus, StorageManager, scripts, etc.)
+        // General-purpose notification:show event (used by command handlers, StorageManager, scripts, etc.)
         this._eventUnsubscribers.push(EventBus.on('notification:show', (data) => {
             this.show({
                 title: data.title || 'Notice',

@@ -113,7 +113,6 @@ function makeInterpreter(out, eventBus) {
     const interp = new Interpreter({
         context: {
             EventBus: eventBus,
-            CommandBus: null,
         },
         onOutput: (line) => out.push(line),
     });

@@ -29,7 +29,7 @@ export class Interpreter {
      * @param {Object} options - Interpreter options
      * @param {SafetyLimits} [options.limits] - Safety limits
      * @param {Object} [options.builtins] - Built-in function registry
-     * @param {Object} [options.context] - Execution context (EventBus, CommandBus, etc.)
+     * @param {Object} [options.context] - Execution context (EventBus, FileSystemManager, StateManager, etc.)
      */
     constructor(options = {}) {
         this.limits = options.limits || new SafetyLimits();
@@ -502,9 +502,9 @@ export class Interpreter {
     }
 
     async visitLaunchStatement(stmt) {
-        const CommandBus = this.context.CommandBus;
-        if (!CommandBus) {
-            console.warn('[Interpreter] CommandBus not available for launch');
+        const EventBus = this.context.EventBus;
+        if (!EventBus) {
+            console.warn('[Interpreter] EventBus not available for launch');
             return;
         }
 
@@ -514,23 +514,23 @@ export class Interpreter {
             params[key] = await this.visitExpression(valueExpr);
         }
 
-        await CommandBus.execute('app:launch', { appId: stmt.appId, params });
+        await EventBus.executeCommand('app:launch', { appId: stmt.appId, params });
     }
 
     async visitCloseStatement(stmt) {
-        const CommandBus = this.context.CommandBus;
-        if (!CommandBus) return;
+        const EventBus = this.context.EventBus;
+        if (!EventBus) return;
 
         if (stmt.target) {
             const target = await this.visitExpression(stmt.target);
-            await CommandBus.execute('window:close', { windowId: target });
+            await EventBus.executeCommand('window:close', { windowId: target });
         } else {
             // Close the most recently focused window
             const StateManager = this.context.StateManager;
             if (StateManager) {
                 const activeWindow = StateManager.getState('ui.activeWindow');
                 if (activeWindow) {
-                    await CommandBus.execute('window:close', { windowId: activeWindow });
+                    await EventBus.executeCommand('window:close', { windowId: activeWindow });
                 }
             }
         }
@@ -545,27 +545,27 @@ export class Interpreter {
     }
 
     async visitFocusStatement(stmt) {
-        const CommandBus = this.context.CommandBus;
-        if (!CommandBus) return;
+        const EventBus = this.context.EventBus;
+        if (!EventBus) return;
 
         const target = await this.visitExpression(stmt.target);
-        await CommandBus.execute('window:focus', { windowId: target });
+        await EventBus.executeCommand('window:focus', { windowId: target });
     }
 
     async visitMinimizeStatement(stmt) {
-        const CommandBus = this.context.CommandBus;
-        if (!CommandBus) return;
+        const EventBus = this.context.EventBus;
+        if (!EventBus) return;
 
         const target = await this.visitExpression(stmt.target);
-        await CommandBus.execute('window:minimize', { windowId: target });
+        await EventBus.executeCommand('window:minimize', { windowId: target });
     }
 
     async visitMaximizeStatement(stmt) {
-        const CommandBus = this.context.CommandBus;
-        if (!CommandBus) return;
+        const EventBus = this.context.EventBus;
+        if (!EventBus) return;
 
         const target = await this.visitExpression(stmt.target);
-        await CommandBus.execute('window:maximize', { windowId: target });
+        await EventBus.executeCommand('window:maximize', { windowId: target });
     }
 
     async visitWriteStatement(stmt) {
@@ -762,8 +762,7 @@ export class Interpreter {
 
     async visitVideoStatement(stmt) {
         const EventBus = this.context.EventBus;
-        const CommandBus = this.context.CommandBus;
-        if (!EventBus && !CommandBus) return;
+        if (!EventBus) return;
 
         // Resolve the source (can be literal or variable)
         const source = await this.visitExpression(stmt.source);
@@ -786,21 +785,18 @@ export class Interpreter {
         }
 
         // Launch Media Player with the video source
-        if (CommandBus) {
-            await CommandBus.execute('app:launch', {
-                appId: 'mediaplayer',
-                params: {
-                    src,
-                    name: options.name || src.split('/').pop(),
-                    volume: options.volume,
-                    loop: options.loop || false,
-                    fullscreen: options.fullscreen || false
-                }
-            });
-        }
+        await EventBus.executeCommand('app:launch', {
+            appId: 'mediaplayer',
+            params: {
+                src,
+                name: options.name || src.split('/').pop(),
+                volume: options.volume,
+                loop: options.loop || false,
+                fullscreen: options.fullscreen || false
+            }
+        });
 
         // Also emit a video play event for scripts listening
-        if (!EventBus) return;
         EventBus.emit('mediaplayer:requested', {
             src,
             options: options,
@@ -831,14 +827,13 @@ export class Interpreter {
             return;
         }
 
-        // Fallback: try CommandBus for built-in commands
-        const CommandBus = this.context.CommandBus;
-        if (CommandBus) {
+        // Fallback: try the unified command registry for built-in commands
+        if (EventBus) {
             const payload = (resolvedArgs.length > 0 && typeof resolvedArgs[0] === 'object' && resolvedArgs[0] !== null)
                 ? resolvedArgs[0]
                 : {};
             try {
-                await CommandBus.execute(stmt.command, payload);
+                await EventBus.executeCommand(stmt.command, payload);
             } catch (error) {
                 console.warn(`[Command] Failed to execute '${stmt.command}':`, error.message);
             }
