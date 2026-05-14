@@ -276,11 +276,26 @@ class FeatureRegistryClass {
         // Check if other features depend on this one
         const dependents = this.getDependents(featureId);
         if (dependents.length > 0) {
-            // Disable dependents first
+            // Disable dependents first. Isolate failures so one dependent's
+            // broken cleanup() doesn't leave the rest of the graph half-disabled.
+            const failures = [];
             for (const depId of dependents) {
                 if (this.isEnabled(depId)) {
-                    await this.disable(depId);
+                    try {
+                        await this.disable(depId);
+                    } catch (err) {
+                        failures.push({ depId, error: err });
+                        console.error(`[FeatureRegistry] Dependent ${depId} failed to disable cleanly:`, err);
+                        EventBus.emit('feature:disable:error', {
+                            featureId: depId,
+                            dependencyOf: featureId,
+                            error: err && err.message ? err.message : String(err)
+                        });
+                    }
                 }
+            }
+            if (failures.length > 0) {
+                console.warn(`[FeatureRegistry] ${failures.length} dependent(s) of ${featureId} failed to disable; continuing.`);
             }
         }
 

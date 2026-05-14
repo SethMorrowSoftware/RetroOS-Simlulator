@@ -15,6 +15,7 @@ import FileSystemManager from '../core/FileSystemManager.js';
 import { PATHS } from '../core/Constants.js';
 import { getConfig } from '../core/ConfigLoader.js';
 import LoginScreen from '../core/LoginScreen.js';
+import SessionManager from '../core/SessionManager.js';
 import { escapeHtml } from '../core/Sanitize.js';
 
 // Feature metadata
@@ -942,6 +943,12 @@ class SystemDialogs extends FeatureBase {
             StateManager.setState('user.userName', null, true);
             StateManager.setState('user.loginMode', null, true);
 
+            // Tear down realtime channels, presence, session token, and
+            // volatile in-memory state. Before this, sockets stayed open
+            // with the previous user's token and the next user briefly saw
+            // the previous user's icons/windows after login resolved.
+            await SessionManager.logout({ reason: 'logoff' });
+
             // Fade out the logoff overlay
             screen.classList.add('fading');
             await new Promise(r => setTimeout(r, 600));
@@ -951,6 +958,10 @@ class SystemDialogs extends FeatureBase {
             const loginResult = await LoginScreen.show();
             StateManager.setState('user.userName', loginResult.username, true);
             StateManager.setState('user.loginMode', loginResult.mode, true);
+            EventBus.emit(Events.USER_LOGIN, {
+                username: loginResult.username,
+                mode: loginResult.mode
+            });
         }, 800);
     }
 

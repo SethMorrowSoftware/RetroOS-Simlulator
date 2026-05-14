@@ -68,6 +68,51 @@ export const systemEvents = {
     },
 
     // ==========================================
+    // USER SESSION LIFECYCLE
+    // ==========================================
+    'user:login': {
+        namespace: 'user',
+        action: 'login',
+        description: 'A user has logged in (after token is set and storage is rescoped)',
+        payload: {
+            username: 'string',
+            mode: 'string?' // 'login' | 'signup' | 'guest'
+        },
+        example: { username: 'alice', mode: 'login' }
+    },
+
+    'user:logout': {
+        namespace: 'user',
+        action: 'logout',
+        description: 'User session ended; realtime channels and in-memory state already torn down',
+        payload: {
+            reason: 'string?' // 'user_requested' | 'auth_expired' | etc.
+        },
+        example: { reason: 'user_requested' }
+    },
+
+    'user:switch': {
+        namespace: 'user',
+        action: 'switch',
+        description: 'Active user changed; storage rescoped to the new user',
+        payload: {
+            previous: 'string?',
+            next: 'string?'
+        },
+        example: { previous: 'alice', next: 'bob' }
+    },
+
+    'auth:expired': {
+        namespace: 'auth',
+        action: 'expired',
+        description: 'Server returned 401; session token has been cleared and the user must reauthenticate',
+        payload: {
+            endpoint: 'string?'
+        },
+        example: { endpoint: '/api/v2/user/state' }
+    },
+
+    // ==========================================
     // SCREENSAVER EVENTS (Settings & Control)
     // ==========================================
     'screensaver:start': {
