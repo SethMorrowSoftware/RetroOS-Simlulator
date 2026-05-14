@@ -58,6 +58,28 @@ export const EventTopology = [
     // ── Users ───────────────────────────────────────────────
     { backend: 'user.updated', transports: ['sse'], description: 'User account updated (admin or self)' },
 
+    // ── Campaigns (admin → live OS) ─────────────────────────
+    // Dispatched by CampaignController. Frontend handlers in index.js
+    // refresh CampaignManager state and surface a toast on activation.
+    { backend: 'campaign.activated', transports: ['sse'], frontend: 'campaign:activated', description: 'Campaign marked as the active live campaign' },
+    { backend: 'campaign.deactivated', transports: ['sse'], frontend: 'campaign:deactivated', description: 'Active campaign cleared' },
+    { backend: 'campaign.published', transports: ['sse'], frontend: 'campaign:published', description: 'Campaign status moved to published' },
+
+    // ── Timeline (admin → live OS) ──────────────────────────
+    // `timeline.fired` is a wrapper event dispatched by TimelineController
+    // alongside the operator's chosen event_type, so any client subscribed
+    // to "all timeline activity" can react without enumerating every
+    // possible inner event_type.
+    { backend: 'timeline.fired', transports: ['sse'], frontend: 'timeline:fired', description: 'A timeline entry was fired (carries inner event_type in payload)' },
+
+    // ── Session revocation (server → owning client) ─────────
+    // Payload's `token` field is stripped by EventService::sanitizeForExternal
+    // before delivery; clients see only `token_fingerprint`, `user_id`,
+    // `reason`. Frontend handlers compare to the current session and trigger
+    // SessionManager.logout if the revocation targets this client.
+    { backend: 'session.revoked', transports: ['sse'], frontend: 'session:revoked', description: 'Session revoked (logout). Triggers graceful client-side logout if it matches the current session.' },
+    { backend: 'session.evicted', transports: ['sse'], frontend: 'session:evicted', description: 'Session evicted by admin / user deletion. Same client-side handling as session.revoked.' },
+
     // ── System control plane ────────────────────────────────
     // NOTE: `frontend` is intentionally omitted for entries where the
     // existing index.js handler does payload transformation (defaults,

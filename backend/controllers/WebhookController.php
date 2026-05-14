@@ -9,9 +9,6 @@ class WebhookController
      */
     public function list(array $params): void
     {
-        Middleware::auth(true)($params);
-        Middleware::requireRole('admin', 'superadmin')($params);
-
         $webhooks = Webhook::list();
         jsonResponse(['webhooks' => $webhooks, 'total' => count($webhooks)]);
     }
@@ -21,9 +18,6 @@ class WebhookController
      */
     public function get(array $params): void
     {
-        Middleware::auth(true)($params);
-        Middleware::requireRole('admin', 'superadmin')($params);
-
         $webhook = $this->findOr404($params['id'] ?? '');
         jsonResponse(['webhook' => $webhook]);
     }
@@ -31,13 +25,13 @@ class WebhookController
     /**
      * POST /webhooks
      * Required: url, events[]
-     * Optional: secret, description, active
+     * Optional: secret (auto-generated if omitted), description, active
+     *
+     * The response body includes the full `secret` exactly once, on
+     * creation. Subsequent reads return only `secret_set` + `secret_preview`.
      */
     public function create(array $params): void
     {
-        Middleware::auth(true)($params);
-        Middleware::requireRole('admin', 'superadmin')($params);
-
         $url    = trim((string) input('url', ''));
         $events = input('events', []);
         $secret = trim((string) input('secret', ''));
@@ -47,6 +41,12 @@ class WebhookController
         $this->validateUrl($url);
         $this->validateEvents($events);
         if (strlen($description) > 500) jsonError('Description too long (max 500)');
+
+        // Auto-generate a signing secret if the admin didn't pick one —
+        // matches the admin UI's "save this secret, shown only once" UX.
+        if ($secret === '') {
+            $secret = generateToken(48);
+        }
 
         $actor = currentUser();
         $id = Webhook::create([
@@ -63,7 +63,7 @@ class WebhookController
             'events' => $events,
         ]);
 
-        jsonResponse(['webhook' => Webhook::findById($id)], 201);
+        jsonResponse(['webhook' => Webhook::findByIdWithSecret($id)], 201);
     }
 
     /**
@@ -71,9 +71,6 @@ class WebhookController
      */
     public function update(array $params): void
     {
-        Middleware::auth(true)($params);
-        Middleware::requireRole('admin', 'superadmin')($params);
-
         $webhook = $this->findOr404($params['id'] ?? '');
 
         $updates = [];
@@ -116,9 +113,6 @@ class WebhookController
      */
     public function delete(array $params): void
     {
-        Middleware::auth(true)($params);
-        Middleware::requireRole('admin', 'superadmin')($params);
-
         $webhook = $this->findOr404($params['id'] ?? '');
         Webhook::delete((int) $webhook['id']);
 
@@ -134,9 +128,6 @@ class WebhookController
      */
     public function test(array $params): void
     {
-        Middleware::auth(true)($params);
-        Middleware::requireRole('admin', 'superadmin')($params);
-
         $webhook = $this->findOr404($params['id'] ?? '');
         $actor = currentUser();
 
@@ -164,9 +155,6 @@ class WebhookController
      */
     public function deliveries(array $params): void
     {
-        Middleware::auth(true)($params);
-        Middleware::requireRole('admin', 'superadmin')($params);
-
         $webhook = $this->findOr404($params['id'] ?? '');
         $limit  = max(1, min(200, (int) ($_GET['limit'] ?? 50)));
         $offset = max(0, (int) ($_GET['offset'] ?? 0));
@@ -204,6 +192,14 @@ class WebhookController
             jsonError('URL must use http or https');
         }
         if (strlen($url) > 500) jsonError('URL too long (max 500)');
+
+        $host = $parsed['host'] ?? '';
+        if ($host === '' || WebhookDispatcher::resolveSafe($host) === null) {
+            // Match the dispatcher's runtime check so admins can't register a
+            // URL that would be refused at delivery time. Defends against the
+            // common SSRF cases (loopback, RFC 1918, link-local, metadata IPs).
+            jsonError('URL host resolves to a blocked address range (loopback / private / link-local)');
+        }
     }
 
     private function validateEvents($events): void

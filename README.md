@@ -121,16 +121,13 @@ php -S localhost:8000
 cp backend/env.example.php backend/env.php
 # Edit backend/env.php with your MySQL credentials
 
-# 2. Run migrations
+# 2. Run migrations (CLI). Web equivalent: api/v2/migrate.php
 php backend/migrate.php
 
-# 3. Seed default admin user (optional)
-php backend/seed.php
-
-# 4. Start server
+# 3. Start server
 php -S localhost:8000
 
-# 5. First-run setup wizard (optional)
+# 4. First-run setup wizard (creates the default admin user)
 # Visit http://localhost:8000/setup.php
 ```
 

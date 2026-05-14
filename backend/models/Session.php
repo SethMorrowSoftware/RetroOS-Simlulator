@@ -48,22 +48,28 @@ class Session
 
     /**
      * Invalidate a single session (logout).
+     *
+     * The full payload (including `token`) is recorded in event_log so the
+     * internal /auth/revocations endpoint can drive the WebSocket server's
+     * graceful disconnect. The `token` field is stripped from outgoing SSE
+     * and webhook deliveries by EventService::sanitizeForExternal so it is
+     * never visible to clients or webhook receivers; `token_fingerprint`
+     * is what they get instead.
      */
     public static function invalidate(string $token): bool
     {
-        // Capture the user_id before deleting so the event-log payload is intact
         $row = Database::fetchOne('SELECT user_id FROM sessions WHERE token = ?', [$token]);
         $userId = $row ? (int) $row['user_id'] : 0;
 
         $affected = Database::execute('DELETE FROM sessions WHERE token = ?', [$token]) > 0;
 
         if ($affected) {
-            // Log the revocation so the WebSocket server can drop matching sockets
             try {
                 EventService::dispatch('session.revoked', [
-                    'token'   => $token,
-                    'user_id' => $userId,
-                    'reason'  => 'logout',
+                    'token'             => $token,
+                    'token_fingerprint' => self::fingerprint($token),
+                    'user_id'           => $userId,
+                    'reason'            => 'logout',
                 ], $userId);
             } catch (\Throwable $e) {
                 // Non-fatal
@@ -88,9 +94,10 @@ class Session
         foreach ($tokens as $row) {
             try {
                 EventService::dispatch('session.evicted', [
-                    'token'   => $row['token'],
-                    'user_id' => $userId,
-                    'reason'  => $reason,
+                    'token'             => $row['token'],
+                    'token_fingerprint' => self::fingerprint((string) $row['token']),
+                    'user_id'           => $userId,
+                    'reason'            => $reason,
                 ], $userId);
             } catch (\Throwable $e) {
                 // Non-fatal
@@ -98,6 +105,15 @@ class Session
         }
 
         return $count;
+    }
+
+    /**
+     * Short non-reversible fingerprint for correlating revocation events with
+     * live sockets without leaking the token itself. Truncated SHA-256 hex.
+     */
+    private static function fingerprint(string $token): string
+    {
+        return substr(hash('sha256', $token), 0, 12);
     }
 
     /**

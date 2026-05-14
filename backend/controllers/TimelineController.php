@@ -18,9 +18,6 @@ class TimelineController
      */
     public function list(array $params): void
     {
-        Middleware::auth(true)($params);
-        Middleware::requireRole('admin', 'superadmin')($params);
-
         $limit       = max(1, min(200, (int) ($_GET['limit'] ?? 100)));
         $offset      = max(0, (int) ($_GET['offset'] ?? 0));
         $campaignId  = isset($_GET['campaign_id']) ? (int) $_GET['campaign_id'] : null;
@@ -47,9 +44,6 @@ class TimelineController
      */
     public function get(array $params): void
     {
-        Middleware::auth(true)($params);
-        Middleware::requireRole('admin', 'superadmin')($params);
-
         $entry = $this->findOr404($params['id'] ?? '');
         jsonResponse(['entry' => $entry]);
     }
@@ -61,9 +55,6 @@ class TimelineController
      */
     public function create(array $params): void
     {
-        Middleware::auth(true)($params);
-        Middleware::requireRole('admin', 'superadmin')($params);
-
         $eventType  = trim((string) input('event_type', ''));
         $label      = trim((string) input('label', ''));
         $payload    = input('payload', []);
@@ -112,9 +103,6 @@ class TimelineController
      */
     public function update(array $params): void
     {
-        Middleware::auth(true)($params);
-        Middleware::requireRole('admin', 'superadmin')($params);
-
         $entry = $this->findOr404($params['id'] ?? '');
         if ($entry['state'] === TimelineEntry::STATE_FIRED) {
             jsonError('Cannot edit a fired entry', 409);
@@ -176,9 +164,6 @@ class TimelineController
      */
     public function delete(array $params): void
     {
-        Middleware::auth(true)($params);
-        Middleware::requireRole('admin', 'superadmin')($params);
-
         $entry = $this->findOr404($params['id'] ?? '');
         TimelineEntry::delete((int) $entry['id']);
 
@@ -193,9 +178,6 @@ class TimelineController
      */
     public function fire(array $params): void
     {
-        Middleware::auth(true)($params);
-        Middleware::requireRole('admin', 'superadmin')($params);
-
         $entry = $this->findOr404($params['id'] ?? '');
         if ($entry['state'] === TimelineEntry::STATE_FIRED) {
             jsonError('Entry already fired', 409);
@@ -226,9 +208,6 @@ class TimelineController
      */
     public function runDue(array $params): void
     {
-        Middleware::auth(true)($params);
-        Middleware::requireRole('admin', 'superadmin')($params);
-
         $due = TimelineEntry::due(100);
         $fired = [];
 
@@ -259,13 +238,19 @@ class TimelineController
 
     /**
      * Dispatch a timeline entry through EventService and mark it fired.
+     *
+     * Two events fire: the operator's chosen event_type (which may or may
+     * not be in EventTopology, depending on what they scheduled), AND a
+     * stable `timeline.fired` wrapper carrying the same payload plus the
+     * inner event_type. Frontend modules that want "react to any timeline
+     * entry firing" subscribe to timeline.fired and don't need to enumerate
+     * every event_type the operator might pick.
      */
     private function fireEntry(array $entry): int
     {
         $actor = currentUser();
         $payload = is_array($entry['payload']) ? $entry['payload'] : [];
 
-        // Inject context fields so consumers can correlate
         $payload['_timeline_id'] = (int) $entry['id'];
         if ($entry['campaign_id']) {
             $payload['_campaign_id'] = (int) $entry['campaign_id'];
@@ -276,6 +261,19 @@ class TimelineController
 
         $eventId = EventService::dispatch($entry['event_type'], $payload, (int) $actor['id']);
         TimelineEntry::markFired((int) $entry['id'], $eventId);
+
+        try {
+            EventService::dispatch('timeline.fired', [
+                'event_type'  => $entry['event_type'],
+                'timeline_id' => (int) $entry['id'],
+                'campaign_id' => $entry['campaign_id'] !== null ? (int) $entry['campaign_id'] : null,
+                'label'       => $entry['label'] ?? '',
+                'event_id'    => $eventId,
+                'payload'     => $payload,
+            ], (int) $actor['id']);
+        } catch (\Throwable $e) {
+            error_log('[Timeline] timeline.fired wrapper dispatch failed: ' . $e->getMessage());
+        }
 
         return $eventId;
     }

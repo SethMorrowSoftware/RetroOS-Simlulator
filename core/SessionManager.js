@@ -75,6 +75,23 @@ class SessionManagerClass {
     }
 
     /**
+     * First-login variant: set the user scope and emit `user:switch` without
+     * running the teardown. The teardown would clear the session token that
+     * LoginScreen just set and reset volatile state that boot already
+     * initialized. Use this from the boot login flow; use switchUser() when
+     * an already-logged-in user is being replaced.
+     * @param {string|null} newUsername
+     */
+    attachInitialUser(newUsername) {
+        const previous = StorageManager.userScope || null;
+        StorageManager.setUserScope(newUsername);
+        EventBus.emit(Events.USER_SWITCH, {
+            previous,
+            next: newUsername || null
+        });
+    }
+
+    /**
      * Internal teardown sequence shared by logout() and switchUser().
      * Each step is wrapped so one failure doesn't skip the rest — we want
      * the cascade to make best-effort progress through every layer.

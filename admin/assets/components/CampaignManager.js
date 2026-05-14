@@ -109,7 +109,7 @@ export function renderCampaignManager() {
                     <button class="btn btn-success" id="btnCampSave">Save Campaign</button>
                     <button class="btn btn-secondary" id="btnCampValidate">Validate JSON</button>
                 </div>
-                <span id="campStatus" class="bc-status"></span>
+                <span id="campSaveStatus" class="bc-status"></span>
             </div>
 
             <!-- ─── Campaign List ────────────────────────── -->
@@ -392,7 +392,7 @@ function wireRowHandlers(api) {
 }
 
 function setStatus(message, isError = false) {
-    const el = document.getElementById('campStatus');
+    const el = document.getElementById('campSaveStatus');
     if (!el) return;
     el.textContent = message;
     el.className = 'bc-status ' + (isError ? 'bc-status-error' : 'bc-status-ok');

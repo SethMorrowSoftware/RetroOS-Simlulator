@@ -337,6 +337,48 @@ export const narrativeEvents = {
     },
 
     // ==========================================
+    // ADMIN → LIVE OS EVENTS (PR: audit-unification-admin)
+    // Emitted by index.js SSE bridges in response to backend
+    // campaign.*/timeline.fired events. Anything in features/CampaignManager
+    // that wants to refresh after an admin action subscribes to these.
+    // ==========================================
+
+    'campaign:registry:refresh': {
+        namespace: 'campaign',
+        action: 'registry:refresh',
+        description: 'Admin acted on a campaign (activate/deactivate/publish) — registry view should refresh',
+        payload: {
+            reason: 'string',        // 'activated' | 'deactivated' | 'published'
+            id: 'number?',
+            slug: 'string?',
+            name: 'string?'
+        },
+        example: { reason: 'activated', id: 7, slug: 'erebus-v65', name: 'EREBUS' }
+    },
+
+    'timeline:activity': {
+        namespace: 'timeline',
+        action: 'activity',
+        description: 'A scheduled timeline entry fired — wraps the operator-chosen event_type',
+        payload: {
+            event_type: 'string',
+            timeline_id: 'number',
+            campaign_id: 'number?',
+            label: 'string?',
+            event_id: 'number?',
+            payload: 'object?'
+        },
+        example: {
+            event_type: 'narrative.story.advance',
+            timeline_id: 42,
+            campaign_id: 7,
+            label: 'Act II opening',
+            event_id: 901,
+            payload: {}
+        }
+    },
+
+    // ==========================================
     // CONTENT DELIVERY EVENTS (Phase 3 — Workstream G)
     // ==========================================
 
