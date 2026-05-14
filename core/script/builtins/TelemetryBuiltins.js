@@ -12,6 +12,7 @@
 
 import TelemetryCollector from '../../TelemetryCollector.js';
 import ReplayEngine from '../../ReplayEngine.js';
+import { RuntimeError } from '../errors/ScriptError.js';
 
 /**
  * Register all telemetry builtins with the interpreter.
@@ -25,7 +26,7 @@ export function registerTelemetryBuiltins(interpreter) {
 
     interpreter.registerBuiltin('telemetry.checkpoint', (checkpointId, meta) => {
         if (typeof checkpointId !== 'string' || !checkpointId) {
-            throw new Error('telemetry.checkpoint: checkpointId is required (string)');
+            throw new RuntimeError('telemetry.checkpoint: checkpointId is required (string)');
         }
         const EventBus = (typeof window !== 'undefined' && window.__RETROS_DEBUG?.eventBus)
             ? window.__RETROS_DEBUG.eventBus
@@ -42,7 +43,7 @@ export function registerTelemetryBuiltins(interpreter) {
 
     interpreter.registerBuiltin('telemetry.puzzleAttempt', (puzzleId, success, hintUsed) => {
         if (typeof puzzleId !== 'string' || !puzzleId) {
-            throw new Error('telemetry.puzzleAttempt: puzzleId is required (string)');
+            throw new RuntimeError('telemetry.puzzleAttempt: puzzleId is required (string)');
         }
         const EventBus = (typeof window !== 'undefined' && window.__RETROS_DEBUG?.eventBus)
             ? window.__RETROS_DEBUG.eventBus
@@ -69,10 +70,10 @@ export function registerTelemetryBuiltins(interpreter) {
 
     interpreter.registerBuiltin('telemetry.setSampling', (namespace, rate) => {
         if (typeof namespace !== 'string') {
-            throw new Error('telemetry.setSampling: namespace is required (string)');
+            throw new RuntimeError('telemetry.setSampling: namespace is required (string)');
         }
         if (typeof rate !== 'number' || rate < 0 || rate > 1) {
-            throw new Error('telemetry.setSampling: rate must be a number between 0 and 1');
+            throw new RuntimeError('telemetry.setSampling: rate must be a number between 0 and 1');
         }
         TelemetryCollector.setSamplingRate(namespace, rate);
         return true;
@@ -129,7 +130,7 @@ export function registerTelemetryBuiltins(interpreter) {
 
     interpreter.registerBuiltin('replay.load', (snapshot) => {
         if (!snapshot || typeof snapshot !== 'object') {
-            throw new Error('replay.load: snapshot object is required');
+            throw new RuntimeError('replay.load: snapshot object is required');
         }
         return ReplayEngine.loadSnapshot(snapshot);
     });
@@ -173,7 +174,7 @@ export function registerTelemetryBuiltins(interpreter) {
 
     interpreter.registerBuiltin('replay.setExpectedBranch', (scenes) => {
         if (!Array.isArray(scenes)) {
-            throw new Error('replay.setExpectedBranch: array of scene IDs is required');
+            throw new RuntimeError('replay.setExpectedBranch: array of scene IDs is required');
         }
         ReplayEngine.setExpectedBranch(scenes);
         return true;

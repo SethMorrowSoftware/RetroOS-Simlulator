@@ -40,6 +40,7 @@ import EventBus, { Events } from './EventBus.js';
 import StateManager from './StateManager.js';
 import StorageManager from './StorageManager.js';
 import { getConfig } from './ConfigLoader.js';
+import SubscriptionManager from './SubscriptionManager.js';
 
 class FeatureBase {
     /**
@@ -114,7 +115,11 @@ class FeatureBase {
                         config: this.config
                     });
 
-                    await this.initialize();
+                    // SubscriptionManager.runAs binds any subscriptions created
+                    // inside initialize() to this feature's ID, so they auto-clean
+                    // on disable() even if the feature bypasses the FeatureBase
+                    // `this.subscribe()` helper.
+                    await SubscriptionManager.runAs(this.id, () => this.initialize());
                     this.initialized = true;
 
                     // Emit ready event
@@ -202,6 +207,11 @@ class FeatureBase {
             });
         });
         this.boundHandlers.clear();
+
+        // Release any subscriptions tracked against this feature's ID by
+        // SubscriptionManager (raw EventBus.on() / StateManager.subscribe()
+        // calls made inside initialize() that bypassed this.subscribe()).
+        SubscriptionManager.unsubscribeAll(this.id);
     }
 
     // ===== STATE HELPERS =====

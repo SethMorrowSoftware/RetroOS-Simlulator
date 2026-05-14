@@ -36,7 +36,7 @@ class TaskbarRendererClass {
         this._unsubs.push(StateManager.subscribe('ui.activeWindow', () => this.renderButtons()));
 
         // Listen for taskbar update events
-        this._unsubs.push(EventBus.on('taskbar:update', () => this.renderButtons()));
+        this._unsubs.push(EventBus.on('ui:taskbar:update', () => this.renderButtons()));
 
         // Setup static elements
         this.setupStartButton();

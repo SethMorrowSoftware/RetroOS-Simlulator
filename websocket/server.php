@@ -486,19 +486,17 @@ while ($running) {
 
             @fwrite($socket, $response);
 
-            // Token sources, in order of preference:
-            //   1. Sec-WebSocket-Protocol: token.<jwt>   (preferred; tokens
-            //      stay out of URLs / proxy logs / browser history)
-            //   2. Authorization: Bearer <jwt>           (programmatic clients)
-            //   3. ?token=<jwt> query param              (legacy; deprecated)
+            // W4.3 — Subprotocol auth is the only supported method.
+            //
+            // The legacy `Authorization: Bearer` header and `?token=` query
+            // param were accepted for backward compatibility with pre-PR-1
+            // clients. Both leaked tokens into proxy logs / browser history /
+            // server access logs; both have been removed.
+            //
+            // External clients (the React Native app, integrations) must
+            // pass the token via `Sec-WebSocket-Protocol: token.<jwt>`. See
+            // `core/MultiplayerClient.js` for the canonical client-side form.
             $token = WebSocketFrame::parseSubprotocolToken($httpHeader);
-            if (!$token) {
-                $token = WebSocketFrame::parseAuthHeader($httpHeader);
-            }
-            if (!$token) {
-                $params = WebSocketFrame::parseQueryParams($httpHeader);
-                $token = $params['token'] ?? '';
-            }
 
             if (!$token) {
                 $closeFrame = WebSocketFrame::encodeClose(4001, 'Authentication required');

@@ -28,6 +28,7 @@ import { setSessionToken } from './ConfigLoader.js';
 import MultiplayerClient from './MultiplayerClient.js';
 import { closeRealtime } from './RealtimeClient.js';
 import PresenceManager from './PresenceManager.js';
+import SubscriptionManager from './SubscriptionManager.js';
 
 class SessionManagerClass {
     constructor() {
@@ -83,6 +84,11 @@ class SessionManagerClass {
         this._safe('RealtimeClient.closeRealtime', () => closeRealtime());
         this._safe('PresenceManager.destroy', () => PresenceManager.destroy());
         this._safe('ConfigLoader.setSessionToken(null)', () => setSessionToken(null));
+        // Release any subscriptions registered under the 'session' owner —
+        // these are boot-time wires (SSE handlers in index.js, etc.) that
+        // should drop on logout so the next session starts clean.
+        this._safe('SubscriptionManager.unsubscribeAll(session)',
+            () => SubscriptionManager.unsubscribeAll('session'));
         this._safe('StateManager.resetVolatile', () => StateManager.resetVolatile());
     }
 

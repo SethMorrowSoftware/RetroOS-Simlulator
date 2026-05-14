@@ -63,25 +63,6 @@ class WebSocketFrame
     }
 
     /**
-     * Parse the query string from a WebSocket HTTP upgrade request.
-     *
-     * @param string $httpHeader Raw HTTP header string
-     * @return array Parsed query parameters
-     */
-    public static function parseQueryParams(string $httpHeader): array
-    {
-        if (!preg_match('/GET\s+([^\s]+)\s+HTTP/i', $httpHeader, $matches)) {
-            return [];
-        }
-
-        $urlParts = parse_url($matches[1]);
-        if (!isset($urlParts['query'])) return [];
-
-        parse_str($urlParts['query'], $params);
-        return $params;
-    }
-
-    /**
      * Parse the request path from a WebSocket HTTP upgrade request.
      *
      * @param string $httpHeader Raw HTTP header string
@@ -95,19 +76,11 @@ class WebSocketFrame
         return $matches[1];
     }
 
-    /**
-     * Parse Authorization header from HTTP upgrade request.
-     *
-     * @param string $httpHeader Raw HTTP header
-     * @return string|null Bearer token or null
-     */
-    public static function parseAuthHeader(string $httpHeader): ?string
-    {
-        if (preg_match('/Authorization:\s*Bearer\s+(\S+)\r\n/i', $httpHeader, $matches)) {
-            return trim($matches[1]);
-        }
-        return null;
-    }
+    // W4.3 — `parseQueryParams` and `parseAuthHeader` removed. Tokens must
+    // arrive via `Sec-WebSocket-Protocol: token.<jwt>` (see
+    // `parseSubprotocolToken` below). URL query and Authorization-header
+    // auth were dropped in Wave 4 because both leaked tokens into proxy
+    // logs / browser history / server access logs.
 
     /**
      * Parse a token from the Sec-WebSocket-Protocol header.

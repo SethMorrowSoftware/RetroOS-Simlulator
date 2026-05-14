@@ -243,9 +243,97 @@ export function setSessionToken(token) {
     }
 }
 
+/**
+ * Tracks whether a 401 trap is currently being handled. Prevents recursive
+ * logouts (the trap can run while in-flight requests from the same user
+ * also resolve to 401).
+ */
+let _authExpiredInFlight = false;
+
+/**
+ * Authenticated fetch wrapper with a 401 trap.
+ *
+ * Adds the `Authorization: Bearer <token>` header and the `X-Requested-With`
+ * CSRF sentinel automatically. On a 401 response, clears the session token,
+ * triggers the unified logout cascade via `SessionManager`, and emits
+ * `auth:expired` so reauth UI can react. The first 401 wins — subsequent
+ * 401s during the same teardown are observed but don't re-fire the cascade.
+ *
+ * Replaces the ~10 raw `fetch()` callers scattered across `UserStateSync`,
+ * `LoginScreen`, `FileSystemManager`, `RealtimeClient`, etc. that all had
+ * to manually add headers and silently logged warnings on 401.
+ *
+ * @param {string|URL|Request} input - URL or Request object
+ * @param {RequestInit} [init] - Standard fetch options. Pass `skipAuth: true`
+ *                                in `init` to opt out of the Bearer header
+ *                                (e.g. for the initial session bootstrap).
+ * @returns {Promise<Response>}
+ */
+export async function fetchWithAuth(input, init = {}) {
+    const { skipAuth = false, ...fetchInit } = init || {};
+    const headers = new Headers(fetchInit.headers || {});
+    headers.set('X-Requested-With', 'XMLHttpRequest');
+    if (!skipAuth && _sessionToken && !headers.has('Authorization')) {
+        headers.set('Authorization', `Bearer ${_sessionToken}`);
+    }
+
+    const response = await fetch(input, { ...fetchInit, headers });
+
+    if (response.status === 401 && !skipAuth && _sessionToken) {
+        await _handleAuthExpired(input);
+    }
+
+    return response;
+}
+
+/**
+ * Internal helper for the 401 trap. Imports SessionManager and EventBus
+ * lazily to avoid the circular dependency
+ * `ConfigLoader → SessionManager → MultiplayerClient → ConfigLoader`.
+ *
+ * @param {string|URL|Request} endpoint
+ * @private
+ */
+async function _handleAuthExpired(endpoint) {
+    if (_authExpiredInFlight) return;
+    _authExpiredInFlight = true;
+    try {
+        const endpointStr = (() => {
+            if (typeof endpoint === 'string') return endpoint;
+            if (endpoint instanceof URL) return endpoint.toString();
+            if (endpoint instanceof Request) return endpoint.url;
+            return String(endpoint);
+        })();
+
+        // Dynamic import — see docstring for the circular-dep reason.
+        const [{ default: EventBus, Events }, { default: SessionManager }] = await Promise.all([
+            import('./EventBus.js'),
+            import('./SessionManager.js')
+        ]);
+
+        try {
+            await SessionManager.logout({ reason: 'auth_expired' });
+        } catch (err) {
+            console.error('[ConfigLoader] SessionManager.logout failed during 401 trap:', err);
+        }
+
+        try {
+            EventBus.emit(Events.AUTH_EXPIRED, {
+                reason: 'session_expired',
+                endpoint: endpointStr
+            });
+        } catch (err) {
+            console.error('[ConfigLoader] auth:expired emit failed:', err);
+        }
+    } finally {
+        _authExpiredInFlight = false;
+    }
+}
+
 export { getApiBasePath };
 
 export default {
     loadConfig, getConfig, hasServerConfig, isBackendAvailable,
-    getApiBasePath, getApiVersion, getSessionToken, getAuthHeaders, setSessionToken, initSession
+    getApiBasePath, getApiVersion, getSessionToken, getAuthHeaders, setSessionToken,
+    initSession, fetchWithAuth
 };

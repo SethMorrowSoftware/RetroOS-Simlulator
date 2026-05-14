@@ -16,21 +16,30 @@
  */
 
 import EventSchema from './EventSchema.js';
+import SubscriptionManager from './SubscriptionManager.js';
 
-// Legacy event name mapping - maps old event names to semantic ones
-// This is integrated directly into the bus so ALL consumers get mapping automatically
-const LEGACY_EVENT_MAPPING = {
-    'startmenu:toggle': 'ui:menu:start:toggle',
-    'contextmenu:show': 'ui:menu:context:show',
-    'contextmenu:hide': 'ui:menu:context:hide',
-    'taskbar:update': 'ui:taskbar:update',
-    'menu:action': 'ui:menu:action',
-    'boot:complete': 'system:ready',
-    'screensaver:end': 'system:screensaver:end',
-    'pet:toggle': 'feature:pet:toggle',
-    'pet:change': 'feature:pet:change',
-    // Note: 'setting:changed' and 'desktop:render' were self-mapping (no-ops) and removed
-};
+// W4.1 — `LEGACY_EVENT_MAPPING` removed.
+//
+// Until Wave 4, the bus secretly rewrote old event names into their semantic
+// equivalents inside `on()` and `emit()`. Calling
+// `EventBus.emit('pet:toggle')` would dispatch as `feature:pet:toggle`,
+// invisible to grep. That made debugging awful — a developer searching for
+// `'pet:toggle'` saw call sites that "should work" but actually fired a
+// different event than the name suggested.
+//
+// All call sites have been migrated to the semantic names:
+//   pet:toggle        → feature:pet:toggle
+//   pet:change        → feature:pet:change
+//   taskbar:update    → ui:taskbar:update
+//   boot:complete     → system:ready
+//   startmenu:toggle  → ui:menu:start:toggle
+//   contextmenu:show  → ui:menu:context:show
+//   contextmenu:hide  → ui:menu:context:hide
+//   menu:action       → ui:menu:action
+//   screensaver:end   → system:screensaver:end
+//
+// The schema entries in `core/schema/*.js` retain a `legacyAction` field for
+// reference, but the bus no longer rewrites — what you write is what fires.
 
 class SemanticEventBusClass {
     constructor() {
@@ -83,6 +92,12 @@ class SemanticEventBusClass {
         // Throttle/debounce timers
         this.throttleTimers = new Map();
         this.debounceTimers = new Map();
+
+        // Command registry — single source of truth for command execution.
+        // Backed by the same handler set CommandBus uses. New code should
+        // call registerCommand()/executeCommand() directly; CommandBus.js is
+        // a thin facade slated for removal in Wave 4.
+        this.commandHandlers = new Map(); // command name (no 'command:' prefix) -> handler fn
 
         // Cached regex for pattern matching (avoid re-creating on every emit)
         this._regexCache = new Map();
@@ -137,9 +152,6 @@ class SemanticEventBusClass {
     on(eventName, callback, options = {}) {
         const { priority = this.PRIORITY.NORMAL, once = false } = options;
 
-        // Map legacy event names
-        eventName = LEGACY_EVENT_MAPPING[eventName] || eventName;
-
         // Guard against prototype-pollution event names
         if (!this._isValidEventName(eventName.replace(/\*/g, '_'))) {
             console.error(`[SemanticEventBus] Rejected invalid event name in on(): "${eventName}"`);
@@ -163,8 +175,11 @@ class SemanticEventBusClass {
         // Sort by priority (descending - higher priority first)
         listeners.sort((a, b) => b.priority - a.priority);
 
-        // Return unsubscribe function
-        return () => this.off(eventName, callback);
+        // Return unsubscribe function, tracked against the active owner
+        // (set by SubscriptionManager.runAs). If no owner is active, the
+        // unsub is returned unwrapped — caller manages cleanup.
+        const unsub = () => this.off(eventName, callback);
+        return SubscriptionManager.track(unsub);
     }
 
     /**
@@ -184,8 +199,6 @@ class SemanticEventBusClass {
      * @param {Function} callback - Handler to remove
      */
     off(eventName, callback) {
-        // Map legacy event names
-        eventName = LEGACY_EVENT_MAPPING[eventName] || eventName;
         if (this.listeners.has(eventName)) {
             const listeners = this.listeners.get(eventName);
             const index = listeners.findIndex(l => l.callback === callback);
@@ -213,9 +226,6 @@ class SemanticEventBusClass {
      */
     emit(eventName, payload = {}, options = {}) {
         this.stats.emitted++;
-
-        // Map legacy event names
-        eventName = LEGACY_EVENT_MAPPING[eventName] || eventName;
 
         // Guard against prototype-pollution event names
         if (!this._isValidEventName(eventName)) {
@@ -631,8 +641,8 @@ class SemanticEventBusClass {
         // Sort by priority (descending)
         listeners.sort((a, b) => b.priority - a.priority);
 
-        // Return unsubscribe function
-        return () => {
+        // Return unsubscribe function, tracked against the active owner
+        const unsub = () => {
             if (this.patternListeners.has(pattern)) {
                 const patternListeners = this.patternListeners.get(pattern);
                 const index = patternListeners.findIndex(l => l.callback === callback);
@@ -641,6 +651,7 @@ class SemanticEventBusClass {
                 }
             }
         };
+        return SubscriptionManager.track(unsub);
     }
 
     /**
@@ -1095,6 +1106,94 @@ class SemanticEventBusClass {
         }
 
         return result;
+    }
+
+    // ==========================================
+    // COMMAND REGISTRY (unified with CommandBus)
+    // ==========================================
+
+    /**
+     * Register a command handler. Replaces the parallel `CommandBus.register`
+     * mechanism. The handler receives the payload and may return a value
+     * (or Promise) — the requestId/action:result protocol is handled here.
+     *
+     * @param {string} command - Command name without the `command:` prefix
+     *                           (e.g. `app:launch`, `fs:read`).
+     * @param {Function} handler - async (payload) => result
+     * @returns {Function} Unregister function (tracked by SubscriptionManager
+     *                     when called inside a `runAs` scope).
+     */
+    registerCommand(command, handler) {
+        if (typeof command !== 'string' || !command.trim()) {
+            console.error('[SemanticEventBus] registerCommand: invalid command name', command);
+            return () => {};
+        }
+        if (typeof handler !== 'function') {
+            console.error(`[SemanticEventBus] registerCommand("${command}"): handler is not a function`);
+            return () => {};
+        }
+        this.commandHandlers.set(command, handler);
+        const unsub = () => {
+            // Only delete if still owned by this handler (avoids stomping a
+            // re-register from a different owner).
+            if (this.commandHandlers.get(command) === handler) {
+                this.commandHandlers.delete(command);
+            }
+        };
+        return SubscriptionManager.track(unsub);
+    }
+
+    /**
+     * Execute a registered command. Emits `action:result` when the payload
+     * carries a `requestId`, matching the legacy CommandBus protocol.
+     *
+     * @param {string} command - Command name without the `command:` prefix.
+     * @param {object} payload - Command payload (may include `requestId`).
+     * @returns {Promise<{success: boolean, data?: any, error?: string}>}
+     */
+    async executeCommand(command, payload = {}) {
+        const { requestId } = payload || {};
+        const handler = this.commandHandlers.get(command);
+
+        if (!handler) {
+            console.warn(`[SemanticEventBus] Unknown command: ${command}`);
+            if (requestId) {
+                this.emit('action:result', { requestId, success: false, error: `Unknown command: ${command}` });
+            }
+            return { success: false, error: `Unknown command: ${command}` };
+        }
+
+        try {
+            const result = await handler(payload);
+            if (requestId) {
+                this.emit('action:result', { requestId, success: true, data: result });
+            }
+            return { success: true, data: result };
+        } catch (error) {
+            const message = error?.message || String(error);
+            console.error(`[SemanticEventBus] Error executing "${command}":`, error);
+            if (requestId) {
+                this.emit('action:result', { requestId, success: false, error: message });
+            }
+            return { success: false, error: message };
+        }
+    }
+
+    /**
+     * Check whether a command is registered.
+     * @param {string} command
+     * @returns {boolean}
+     */
+    hasCommand(command) {
+        return this.commandHandlers.has(command);
+    }
+
+    /**
+     * List registered commands (for diagnostics).
+     * @returns {string[]}
+     */
+    getCommands() {
+        return [...this.commandHandlers.keys()];
     }
 
     // ===== Multiplayer Bridge =====

@@ -13,7 +13,8 @@
  */
 
 import EventBus from './EventBus.js';
-import { getApiBasePath, isBackendAvailable } from './ConfigLoader.js';
+import { getApiBasePath, isBackendAvailable, fetchWithAuth } from './ConfigLoader.js';
+import { getBackendEventsForTransport, getFrontendEventName } from './EventTopology.js';
 
 let abortController = null;
 let lastEventId = null;
@@ -24,45 +25,14 @@ let _token = null;
 let _connected = false;
 
 /**
- * Bridge specific event types to the EventBus
+ * SSE-bridged event names, derived from the central EventTopology so the
+ * allowlist can never drift from the index.js SSE handlers or the WS
+ * bridge in MultiplayerClient. Adding a new SSE event = adding one entry
+ * to EventTopology.
+ *
+ * Memoized into a Set for O(1) membership checks.
  */
-const bridgedEvents = [
-    'config.changed',
-    'config.reset',
-    'announcement.created',
-    'announcement.updated',
-    'announcement.deleted',
-    'theme.created',
-    'theme.updated',
-    'theme.deleted',
-    'user.updated',
-    'system.message',
-    'system.dialog',
-    'system.notification',
-    'system.sound',
-    'system.media',
-    'system.effect',
-    'system.app.launch',
-    'system.filesystem.command',
-    'system.default_filesystem.updated',
-    'narrative.story.advance',
-    'narrative.story.branch',
-    'narrative.story.reveal',
-    'narrative.story.flashback',
-    'narrative.mood.shift',
-    'narrative.mood.glitch',
-    'narrative.mood.dream',
-    'narrative.character.appear',
-    'narrative.character.speak',
-    'narrative.character.leave',
-    'narrative.world.unlock',
-    'narrative.world.change',
-    'narrative.world.timer',
-    'narrative.puzzle.hint',
-    'narrative.puzzle.solve',
-    'narrative.puzzle.new',
-    'narrative.custom',
-];
+const bridgedEvents = new Set(getBackendEventsForTransport('sse'));
 
 /**
  * Initialize the SSE connection.
@@ -147,16 +117,24 @@ function handleSSEEvent(evt) {
     }
 
     // Bridge known event types to EventBus
-    if (bridgedEvents.includes(evt.event)) {
+    if (bridgedEvents.has(evt.event)) {
         try {
             const data = JSON.parse(evt.data);
+            // Legacy emission — existing handlers subscribe to `sse:<backend>`.
             EventBus.emit(`sse:${evt.event}`, data);
 
+            // If the topology defines a frontend (internal) event name,
+            // emit that too so new handlers can subscribe to the
+            // semantic name instead of the transport-prefixed alias.
+            const frontend = getFrontendEventName(evt.event);
+            if (frontend) {
+                EventBus.emit(frontend, data);
+            }
+
+            // Hard-coded compatibility aliases retained until existing
+            // subscribers migrate to the semantic names above.
             if (evt.event === 'config.changed') {
                 EventBus.emit('system:config-updated', data);
-            }
-            if (evt.event === 'announcement.created') {
-                EventBus.emit('system:announcement', data);
             }
         } catch (err) {
             console.warn('[RealtimeClient] Failed to parse event data:', err);
@@ -180,11 +158,12 @@ async function connect() {
     abortController = new AbortController();
 
     try {
-        const response = await fetch(url, {
-            headers: {
-                'Authorization': `Bearer ${_token}`,
-                'Accept': 'text/event-stream',
-            },
+        // fetchWithAuth adds Authorization + X-Requested-With automatically
+        // and traps 401 by routing through SessionManager.logout. The 401
+        // path emits auth:expired and clears the token before we'd try
+        // to reconnect, so the loop stops on its own.
+        const response = await fetchWithAuth(url, {
+            headers: { 'Accept': 'text/event-stream' },
             signal: abortController.signal,
         });
 

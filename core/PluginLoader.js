@@ -24,6 +24,7 @@
 import FeatureRegistry from './FeatureRegistry.js';
 import EventBus from './EventBus.js';
 import StorageManager from './StorageManager.js';
+import SubscriptionManager from './SubscriptionManager.js';
 
 class PluginLoaderClass {
     constructor() {
@@ -60,6 +61,93 @@ class PluginLoaderClass {
                     enabled: plugin.enabled !== false
                 }))
         };
+    }
+
+    /**
+     * Validate the shape of a plugin module before any registration runs.
+     * Returns a string explaining the first problem found, or `null` if the
+     * plugin looks well-formed. Caller is expected to reject and not load.
+     *
+     * Catches the cases that used to produce silent half-loads:
+     *   - missing/empty `id`
+     *   - `features` / `apps` declared but not an array
+     *   - duplicate feature IDs within the plugin
+     *   - duplicate app IDs within the plugin
+     *   - feature `dependencies` that don't resolve in the current registry
+     *
+     * @param {Object} plugin
+     * @returns {string|null}
+     * @private
+     */
+    _validatePluginManifest(plugin) {
+        if (!plugin || typeof plugin !== 'object') {
+            return 'plugin module did not export an object';
+        }
+        if (typeof plugin.id !== 'string' || !plugin.id.trim()) {
+            return 'plugin is missing a string `id`';
+        }
+        if (plugin.id.length > 64) {
+            return `plugin id "${plugin.id}" is too long (max 64 chars)`;
+        }
+        if (!/^[a-zA-Z0-9._-]+$/.test(plugin.id)) {
+            return `plugin id "${plugin.id}" must match /^[a-zA-Z0-9._-]+$/`;
+        }
+        if (plugin.features !== undefined && !Array.isArray(plugin.features)) {
+            return '`features` must be an array';
+        }
+        if (plugin.apps !== undefined && !Array.isArray(plugin.apps)) {
+            return '`apps` must be an array';
+        }
+        if (plugin.onLoad !== undefined && typeof plugin.onLoad !== 'function') {
+            return '`onLoad` must be a function';
+        }
+        if (plugin.onUnload !== undefined && typeof plugin.onUnload !== 'function') {
+            return '`onUnload` must be a function';
+        }
+
+        // Catch duplicate feature/app IDs within the plugin so we can fail
+        // before partial registration.
+        if (Array.isArray(plugin.features)) {
+            const seen = new Set();
+            for (const feature of plugin.features) {
+                if (!feature || typeof feature.id !== 'string' || !feature.id) {
+                    return 'every entry in `features` must have a string id';
+                }
+                if (seen.has(feature.id)) {
+                    return `duplicate feature id "${feature.id}" within plugin`;
+                }
+                seen.add(feature.id);
+
+                // Validate declared feature dependencies up front so we don't
+                // register a feature whose dep won't resolve. Plugin features
+                // can depend on either core features or features earlier in
+                // this same manifest, so check both registries.
+                if (Array.isArray(feature.dependencies)) {
+                    for (const dep of feature.dependencies) {
+                        const knownLocally = plugin.features.some(f => f.id === dep);
+                        const knownGlobally = FeatureRegistry.get(dep) !== undefined;
+                        if (!knownLocally && !knownGlobally) {
+                            return `feature "${feature.id}" depends on missing "${dep}"`;
+                        }
+                    }
+                }
+            }
+        }
+
+        if (Array.isArray(plugin.apps)) {
+            const seen = new Set();
+            for (const app of plugin.apps) {
+                if (!app || typeof app.id !== 'string' || !app.id) {
+                    return 'every entry in `apps` must have a string id';
+                }
+                if (seen.has(app.id)) {
+                    return `duplicate app id "${app.id}" within plugin`;
+                }
+                seen.add(app.id);
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -105,90 +193,76 @@ class PluginLoaderClass {
      * @returns {boolean} Success status
      */
     async loadPlugin(pluginModule) {
+        const plugin = pluginModule?.default || pluginModule;
+
+        // W3.7 — manifest validation BEFORE any registration. A plugin
+        // with a missing id, duplicate feature ids, or a feature whose
+        // declared dependency doesn't exist used to silently half-load.
+        // Now we reject up front.
+        const validationError = this._validatePluginManifest(plugin);
+        if (validationError) {
+            console.error(`[PluginLoader] Rejected plugin: ${validationError}`);
+            return false;
+        }
+
+        // Check if already loaded (covered above by id presence guarantee)
+        if (this.plugins.has(plugin.id)) {
+            console.warn(`[PluginLoader] Plugin "${plugin.id}" already loaded`);
+            return false;
+        }
+
+        // W3.7 — transactional load. We collect which features/apps we
+        // managed to register so we can roll them back precisely if any
+        // later step (onLoad, app registration, feature init) throws.
+        // The plugin is NOT marked `loaded: true` until everything succeeds.
+        const registeredFeatureIds = [];
+        const registeredAppIds = [];
+
         try {
-            const plugin = pluginModule.default || pluginModule;
+            // Register features if provided
+            if (Array.isArray(plugin.features)) {
+                for (const feature of plugin.features) {
+                    // Mark feature as plugin-provided
+                    feature.category = 'plugin';
+                    feature.pluginId = plugin.id;
 
-            // Validate plugin structure
-            if (!plugin || !plugin.id) {
-                console.error('[PluginLoader] Invalid plugin structure - missing id');
-                return false;
+                    FeatureRegistry.register(feature);
+                    this.pluginFeatures.set(feature.id, plugin.id);
+                    registeredFeatureIds.push(feature.id);
+                }
             }
 
-            // Check if already loaded
-            if (this.plugins.has(plugin.id)) {
-                console.warn(`[PluginLoader] Plugin "${plugin.id}" already loaded`);
-                return false;
+            // Register apps if provided (if AppRegistry is available)
+            if (Array.isArray(plugin.apps)) {
+                // Import AppRegistry dynamically to avoid circular dependencies
+                const { default: AppRegistry } = await import('../apps/AppRegistry.js');
+                for (const app of plugin.apps) {
+                    app.pluginId = plugin.id;
+                    const registrationResult = AppRegistry.register(app);
+                    this._trackRegisteredPluginApp(app, plugin.id, registrationResult);
+                    if (registrationResult === true) {
+                        registeredAppIds.push(app.id);
+                    }
+                }
             }
 
-            // Register plugin
+            // Call plugin's onLoad hook if provided.
+            // Wrap in SubscriptionManager.runAs so any raw EventBus.on() /
+            // StateManager.subscribe() calls inside onLoad are tracked
+            // against this plugin's ID and cleaned up on unload.
+            if (typeof plugin.onLoad === 'function') {
+                await SubscriptionManager.runAs(plugin.id, () => plugin.onLoad());
+            }
+
+            // Everything succeeded — NOW it's safe to mark the plugin as loaded.
             this.plugins.set(plugin.id, {
                 ...plugin,
                 loaded: true,
                 loadTime: Date.now()
             });
 
-            // Register features if provided
-            if (plugin.features && Array.isArray(plugin.features)) {
-                for (const feature of plugin.features) {
-                    try {
-                        // Mark feature as plugin-provided
-                        feature.category = 'plugin';
-                        feature.pluginId = plugin.id;
-
-                        FeatureRegistry.register(feature);
-                        this.pluginFeatures.set(feature.id, plugin.id);
-                    } catch (err) {
-                        console.error(`[PluginLoader] Failed to register feature '${feature?.id}' from plugin '${plugin.id}':`, err);
-                    }
-                }
-            }
-
-            // Register apps if provided (if AppRegistry is available)
-            if (plugin.apps && Array.isArray(plugin.apps)) {
-                // Import AppRegistry dynamically to avoid circular dependencies
-                const { default: AppRegistry } = await import('../apps/AppRegistry.js');
-                for (const app of plugin.apps) {
-                    try {
-                        app.pluginId = plugin.id;
-                        const registrationResult = AppRegistry.register(app);
-                        this._trackRegisteredPluginApp(app, plugin.id, registrationResult);
-                    } catch (err) {
-                        console.error(`[PluginLoader] Failed to register app '${app?.id}' from plugin '${plugin.id}':`, err);
-                    }
-                }
-            }
-
-            // Call plugin's onLoad hook if provided
-            if (typeof plugin.onLoad === 'function') {
-                try {
-                    await plugin.onLoad();
-                } catch (error) {
-                    console.error(`[PluginLoader] Error in plugin ${plugin.id} onLoad - rolling back:`, error);
-
-                    // Roll back: unregister features
-                    if (plugin.features && Array.isArray(plugin.features)) {
-                        for (const feature of plugin.features) {
-                            try { await FeatureRegistry.unregister(feature.id); } catch (e) { /* ignore */ }
-                            this.pluginFeatures.delete(feature.id);
-                        }
-                    }
-
-                    // Roll back: unregister apps
-                    if (plugin.apps && Array.isArray(plugin.apps)) {
-                        for (const app of plugin.apps) {
-                            try { await this._unregisterPluginApp(app.id, plugin.id); } catch (e) { /* ignore */ }
-                        }
-                    }
-
-                    // Remove plugin from registry
-                    this.plugins.delete(plugin.id);
-                    return false;
-                }
-            }
-
             console.log(`[PluginLoader] Loaded plugin: ${plugin.name || plugin.id} v${plugin.version || '1.0.0'}`);
 
-            // Emit event
             EventBus.emit('plugin:loaded', {
                 pluginId: plugin.id,
                 name: plugin.name,
@@ -197,30 +271,41 @@ class PluginLoaderClass {
 
             return true;
         } catch (error) {
-            console.error('[PluginLoader] Failed to load plugin:', error);
+            console.error(`[PluginLoader] Failed to load plugin "${plugin.id}" — rolling back:`, error);
 
-            // Rollback any partially-registered features and apps
-            try {
-                const plugin = typeof pluginModule === 'object'
-                    ? (pluginModule.default || pluginModule) : null;
-                if (plugin && plugin.id) {
-                    // Rollback features
-                    for (const [featureId, pid] of this.pluginFeatures) {
-                        if (pid === plugin.id) {
-                            try { await FeatureRegistry.unregister(featureId); } catch (e) { /* ignore */ }
-                            this.pluginFeatures.delete(featureId);
-                        }
-                    }
-                    // Rollback apps
-                    for (const [appId, pid] of this.pluginApps) {
-                        if (pid === plugin.id) {
-                            try { await this._unregisterPluginApp(appId, plugin.id); } catch (e) { /* ignore */ }
-                        }
-                    }
-                    this.plugins.delete(plugin.id);
+            // Roll back ONLY the registrations we tracked above. We don't
+            // walk pluginFeatures/pluginApps blindly because another plugin
+            // could share a feature ID transiently (unlikely, but the maps
+            // are the wrong source of truth for "what did THIS load do").
+            for (const featureId of registeredFeatureIds) {
+                try {
+                    await FeatureRegistry.unregister(featureId);
+                } catch (e) {
+                    console.warn(`[PluginLoader] Rollback unregister feature "${featureId}" failed:`, e);
                 }
-            } catch (rollbackError) {
-                console.error('[PluginLoader] Rollback also failed:', rollbackError);
+                this.pluginFeatures.delete(featureId);
+            }
+            for (const appId of registeredAppIds) {
+                try {
+                    await this._unregisterPluginApp(appId, plugin.id);
+                } catch (e) {
+                    console.warn(`[PluginLoader] Rollback unregister app "${appId}" failed:`, e);
+                }
+            }
+
+            // Release any subscriptions that onLoad managed to register
+            // before it threw.
+            SubscriptionManager.unsubscribeAll(plugin.id);
+
+            // Run onUnload as a courtesy if it's defined, so plugins that
+            // hold non-subscription resources (timers, fetch handles) can
+            // clean themselves up symmetrically.
+            if (typeof plugin.onUnload === 'function') {
+                try {
+                    await plugin.onUnload();
+                } catch (e) {
+                    console.warn(`[PluginLoader] Plugin onUnload during rollback also failed:`, e);
+                }
             }
 
             return false;
@@ -314,6 +399,11 @@ class PluginLoaderClass {
                     console.error(`[PluginLoader] Error in plugin ${pluginId} onUnload:`, error);
                 }
             }
+
+            // Release any subscriptions still tracked against this plugin
+            // (raw EventBus.on() / StateManager.subscribe() calls inside
+            // onLoad that bypassed feature-level cleanup).
+            SubscriptionManager.unsubscribeAll(pluginId);
 
             this.plugins.delete(pluginId);
 

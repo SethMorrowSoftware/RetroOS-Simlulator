@@ -1,33 +1,73 @@
 /**
  * CommandBus - Command execution layer for scripting support
  *
- * Provides a unified interface to execute actions via semantic events.
- * All command:* events are handled here and routed to appropriate handlers.
+ * @deprecated Use `SemanticEventBus.registerCommand()` and
+ *             `SemanticEventBus.executeCommand()` directly. This file is now
+ *             a thin facade that delegates to `SemanticEventBus.commandHandlers`
+ *             and exists so existing imports keep working. It will be removed
+ *             in Wave 4 of the unification roadmap.
  *
- * For scripting:
+ * The `handlers` Map is intentionally a *reference* to
+ * `SemanticEventBus.commandHandlers` — both objects see the same registrations,
+ * so `CommandBus.execute('foo')` and `SemanticEventBus.executeCommand('foo')`
+ * are equivalent. Timer/macro state remains here (those are CommandBus
+ * features, not part of the unified bus surface).
+ *
+ * Original responsibility (now shared with SemanticEventBus):
  *   - Commands trigger actions (command:app:launch, command:fs:write, etc.)
  *   - Queries retrieve state (query:windows, query:fs:list, etc.)
  *   - All commands support requestId for async response tracking
  *
- * Usage:
+ * Usage (legacy — still works):
  *   import CommandBus from './CommandBus.js';
  *   CommandBus.initialize();
- *
- *   // Execute command directly
  *   CommandBus.execute('app:launch', { appId: 'notepad' });
  *
- *   // Or via events
- *   EventBus.emit('command:app:launch', { appId: 'notepad', requestId: 'cmd-1' });
+ * Usage (preferred for new code):
+ *   import EventBus from './EventBus.js';
+ *   EventBus.registerCommand('app:launch', async (payload) => { ... });
+ *   await EventBus.executeCommand('app:launch', { appId: 'notepad' });
  */
 
 import EventBus from './EventBus.js';
 import StateManager from './StateManager.js';
 import WindowManager from './WindowManager.js';
 import FileSystemManager from './FileSystemManager.js';
+import { validateScriptPath } from './script/utils/PathValidation.js';
+
+/**
+ * Validate a path passed to a `command:fs:*` handler against the same
+ * allowlist that script-driven file ops use (W3.10).
+ *
+ * Before this guard, a script could escape the script-engine path check by
+ * emitting `command:fs:write { path: "C:/anything" }` instead of using the
+ * `write` statement — the CommandBus handler reached straight into
+ * `FileSystemManager` with no validation. This wrapper closes that hole:
+ * the script and command surfaces now share one boundary.
+ *
+ * The underlying validator throws a RuntimeError; we rethrow as a plain
+ * Error here so the CommandBus error envelope ({ success: false, error })
+ * carries a clean message instead of a ScriptError with line:0 column:0.
+ *
+ * @param {string} path
+ * @param {string} commandName - e.g. 'fs:write', for the error message
+ * @returns {string} normalized path
+ */
+function validateCommandFsPath(path, commandName) {
+    try {
+        return validateScriptPath(path);
+    } catch (err) {
+        const msg = err && err.message ? err.message : `Invalid path for ${commandName}`;
+        throw new Error(`[${commandName}] ${msg}`);
+    }
+}
 
 class CommandBusClass {
     constructor() {
-        this.handlers = new Map();
+        // Share the command registry with SemanticEventBus so the two surfaces
+        // see the same handler set. Any registration via CommandBus.register
+        // is visible to SemanticEventBus.executeCommand and vice versa.
+        this.handlers = EventBus.commandHandlers;
         this.timers = new Map();
         this.macros = new Map();
         this.isRecording = false;
@@ -70,45 +110,28 @@ class CommandBusClass {
     }
 
     /**
-     * Register a command handler
+     * Register a command handler.
+     * @deprecated Use `EventBus.registerCommand(command, handler)` directly.
+     *             Both surfaces share the same registry, so existing callers
+     *             continue to work — this facade returns the unregister
+     *             function from the unified API.
      * @param {string} command - Command name (without 'command:' prefix)
      * @param {Function} handler - Handler function (payload, requestId) => result
+     * @returns {Function} Unregister function
      */
     register(command, handler) {
-        this.handlers.set(command, handler);
+        return EventBus.registerCommand(command, handler);
     }
 
     /**
-     * Execute a command
+     * Execute a command.
+     * @deprecated Use `EventBus.executeCommand(command, payload)` directly.
      * @param {string} command - Command name
      * @param {object} payload - Command payload
      * @returns {Promise} Result of the command
      */
     async execute(command, payload = {}) {
-        const { requestId } = payload;
-        const handler = this.handlers.get(command);
-
-        if (!handler) {
-            console.warn(`[CommandBus] Unknown command: ${command}`);
-            if (requestId) {
-                this._sendResult(requestId, false, null, `Unknown command: ${command}`);
-            }
-            return { success: false, error: `Unknown command: ${command}` };
-        }
-
-        try {
-            const result = await handler(payload);
-            if (requestId) {
-                this._sendResult(requestId, true, result);
-            }
-            return { success: true, data: result };
-        } catch (error) {
-            console.error(`[CommandBus] Error executing ${command}:`, error);
-            if (requestId) {
-                this._sendResult(requestId, false, null, error.message);
-            }
-            return { success: false, error: error.message };
-        }
+        return EventBus.executeCommand(command, payload);
     }
 
     /**
@@ -221,20 +244,20 @@ class CommandBusClass {
     // ==========================================
     _registerFsCommands() {
         this.register('fs:read', async (payload) => {
-            const { path } = payload;
+            const path = validateCommandFsPath(payload.path, 'fs:read');
             const content = FileSystemManager.readFile(path);
             return { path, content };
         });
 
         this.register('fs:write', async (payload) => {
-            const { path, content } = payload;
-            FileSystemManager.writeFile(path, content);
+            const path = validateCommandFsPath(payload.path, 'fs:write');
+            FileSystemManager.writeFile(path, payload.content);
             // Note: FileSystemManager already emits FS_FILE_WRITE — no duplicate emit here
             return { path, written: true };
         });
 
         this.register('fs:delete', async (payload) => {
-            const { path } = payload;
+            const path = validateCommandFsPath(payload.path, 'fs:delete');
             const node = FileSystemManager.getNode(path);
             if (!node) {
                 throw new Error(`Path not found: ${path}`);
@@ -250,20 +273,24 @@ class CommandBusClass {
         });
 
         this.register('fs:mkdir', async (payload) => {
-            const { path } = payload;
+            const path = validateCommandFsPath(payload.path, 'fs:mkdir');
             FileSystemManager.createDirectory(path);
             // Note: FileSystemManager already emits FS_DIR_CREATE — no duplicate emit here
             return { path, created: true };
         });
 
         this.register('fs:copy', async (payload) => {
-            const { source, destination } = payload;
+            // Validate both endpoints so an attacker can't smuggle a write
+            // by validating one path and operating on another.
+            const source = validateCommandFsPath(payload.source, 'fs:copy(source)');
+            const destination = validateCommandFsPath(payload.destination, 'fs:copy(destination)');
             FileSystemManager.copyItem(source, destination);
             return { source, destination, copied: true };
         });
 
         this.register('fs:move', async (payload) => {
-            const { source, destination } = payload;
+            const source = validateCommandFsPath(payload.source, 'fs:move(source)');
+            const destination = validateCommandFsPath(payload.destination, 'fs:move(destination)');
             FileSystemManager.moveItem(source, destination);
             return { source, destination, moved: true };
         });

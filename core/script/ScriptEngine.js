@@ -66,6 +66,46 @@ class ScriptEngineClass {
     }
 
     /**
+     * Validate that the runtime context exposes the services script builtins
+     * rely on (W3.9). Builtins used to scatter `if (!context.X)` checks with
+     * inconsistent fallback behavior (some warned, some silently no-op'd,
+     * some threw) — making it impossible to tell at a glance which services
+     * a script execution needed. This fails fast at init time when something
+     * obvious is missing, returns a structured report otherwise.
+     *
+     * Returns `{ ok: boolean, missingRequired: string[], missingOptional: string[] }`.
+     *
+     * The required set is what NO builtin can usefully operate without
+     * (FileSystemManager, EventBus). The optional set lists services that
+     * specific namespaces need; builtins guarded by them should call
+     * `requireContext('Foo', name)` themselves.
+     */
+    validateContext(context = this.context) {
+        const required = ['FileSystemManager', 'EventBus'];
+        const optional = [
+            'StateManager', 'WindowManager', 'StorageManager',
+            'AppRegistry', 'FeatureRegistry', 'TelemetryCollector',
+            'ReplayEngine', 'NarrativeStateManager', 'MediaAssetManager'
+        ];
+
+        const missingRequired = required.filter(k => !context || !context[k]);
+        const missingOptional = optional.filter(k => !context || !context[k]);
+
+        if (missingRequired.length > 0) {
+            console.error(
+                `[ScriptEngine] validateContext FAILED — required services missing: ${missingRequired.join(', ')}. ` +
+                `Scripts using fs.* or event-emitting builtins will throw at runtime.`
+            );
+        }
+
+        return {
+            ok: missingRequired.length === 0,
+            missingRequired,
+            missingOptional
+        };
+    }
+
+    /**
      * Initialize the script engine
      * @param {Object} [context] - Optional system context
      */
@@ -77,6 +117,12 @@ class ScriptEngineClass {
 
         // Store context references
         this.context = context;
+
+        // W3.9 — surface missing services at init time rather than during
+        // script execution. The result is non-fatal (the engine still
+        // initializes so cosmetic builtins like math.* keep working), but
+        // the log makes the boot-health diagnosis obvious.
+        this.validateContext(context);
 
         // Create primary interpreter for getVariables(), defineFunction(), and reset()
         this.interpreter = new Interpreter({

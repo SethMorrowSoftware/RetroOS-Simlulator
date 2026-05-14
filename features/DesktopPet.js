@@ -248,7 +248,7 @@ class DesktopPet extends FeatureBase {
         });
 
         // Listen for pet type changes
-        this.subscribe('pet:change', ({ type }) => {
+        this.subscribe(Events.PET_CHANGE, ({ type }) => {
             this.setPetType(type);
         });
 
