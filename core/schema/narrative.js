@@ -271,6 +271,24 @@ export const narrativeEvents = {
         example: { sceneId: 'act2', sessionDurationMs: 180000, timestamp: 1709654400000 }
     },
 
+    'story:state:conflict': {
+        namespace: 'story',
+        action: 'state:conflict',
+        description: 'A remote narrative state update was dropped because the local copy is newer (LWW by timestamp). Emitted so the UI can surface silently-dropped concurrent edits.',
+        payload: {
+            source: 'string?',
+            localTimestamp: 'number',
+            remoteTimestamp: 'number',
+            resolution: 'string'
+        },
+        example: {
+            source: 'remote',
+            localTimestamp: 1709654400000,
+            remoteTimestamp: 1709654399000,
+            resolution: 'remote_dropped'
+        }
+    },
+
     // Campaign lifecycle events
     'story:campaign:install': {
         namespace: 'story',

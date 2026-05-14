@@ -675,5 +675,10 @@ class MultiplayerClientClass {
 // Singleton instance
 const MultiplayerClient = new MultiplayerClientClass();
 
+if (typeof window !== 'undefined') {
+    window.__RETROS_DEBUG = window.__RETROS_DEBUG || {};
+    window.__RETROS_DEBUG.multiplayerClient = MultiplayerClient;
+}
+
 export { MultiplayerClient, ConnectionState };
 export default MultiplayerClient;

@@ -31,6 +31,22 @@ export const featuresEvents = {
         }
     },
 
+    'feature:disable:error': {
+        namespace: 'feature',
+        action: 'disable:error',
+        description: 'Cascading disable of a dependent feature failed (isolated; other dependents continue)',
+        payload: {
+            featureId: 'string',
+            error: 'string',
+            cause: 'string?'
+        },
+        example: {
+            featureId: 'achievements',
+            error: 'cleanup threw',
+            cause: 'soundsystem'
+        }
+    },
+
     'feature:pet:toggle': {
         namespace: 'feature',
         action: 'pet:toggle',

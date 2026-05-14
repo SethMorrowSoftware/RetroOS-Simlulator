@@ -112,6 +112,17 @@ export const systemEvents = {
         example: { endpoint: '/api/v2/user/state' }
     },
 
+    'reauth:completed': {
+        namespace: 'reauth',
+        action: 'completed',
+        description: 'User successfully reauthenticated after an auth:expired prompt (fired by ReauthGate)',
+        payload: {
+            username: 'string',
+            reason: 'string?'
+        },
+        example: { username: 'alice', reason: 'session_expired' }
+    },
+
     // ==========================================
     // SCREENSAVER EVENTS (Settings & Control)
     // ==========================================
