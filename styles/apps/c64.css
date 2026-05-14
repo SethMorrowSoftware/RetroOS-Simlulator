@@ -1,0 +1,332 @@
+/* ============================================
+   Commodore 64 Emulator App
+   ============================================ */
+
+.c64-app {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: var(--win95-gray, #c0c0c0);
+    font-family: 'MS Sans Serif', 'Microsoft Sans Serif', Arial, sans-serif;
+    font-size: 12px;
+}
+
+/* ── Toolbar ─────────────────────────────── */
+
+.c64-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 4px 6px;
+    background: var(--win95-gray, #c0c0c0);
+    border-bottom: 1px solid #808080;
+    align-items: center;
+}
+
+.c64-toolbar-sub {
+    border-top: 1px solid #ffffff;
+}
+
+.c64-bar {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex: 1;
+    min-width: 200px;
+}
+
+.c64-label {
+    white-space: nowrap;
+    font-weight: bold;
+    font-size: 11px;
+}
+
+.c64-input {
+    flex: 1;
+    padding: 2px 4px;
+    border: 2px solid;
+    border-color: #808080 #ffffff #ffffff #808080;
+    background: #fff;
+    font-family: inherit;
+    font-size: 12px;
+    min-width: 120px;
+}
+
+.c64-input:focus {
+    outline: none;
+}
+
+.c64-select {
+    flex: 1;
+    min-width: 200px;
+    padding: 2px 4px;
+    border: 2px solid;
+    border-color: #808080 #ffffff #ffffff #808080;
+    background: #fff;
+    color: #000;
+    font-family: inherit;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.c64-select:focus {
+    outline: none;
+}
+
+.c64-select optgroup {
+    font-weight: bold;
+    font-style: normal;
+    color: #000080;
+}
+
+.c64-buttons {
+    display: flex;
+    gap: 3px;
+}
+
+.c64-btn {
+    padding: 3px 10px;
+    background: var(--win95-gray, #c0c0c0);
+    border-top: 2px solid #ffffff;
+    border-left: 2px solid #ffffff;
+    border-right: 2px solid #000000;
+    border-bottom: 2px solid #000000;
+    font-family: inherit;
+    font-size: 11px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.c64-btn:hover {
+    background: #d4d0c8;
+}
+
+.c64-btn:active {
+    border-top: 2px solid #000000;
+    border-left: 2px solid #000000;
+    border-right: 2px solid #ffffff;
+    border-bottom: 2px solid #ffffff;
+    padding: 4px 9px 2px 11px;
+}
+
+.c64-btn:disabled {
+    color: #808080;
+    cursor: default;
+    text-shadow: 1px 1px 0 #ffffff;
+}
+
+.c64-btn:disabled:active {
+    border-top: 2px solid #ffffff;
+    border-left: 2px solid #ffffff;
+    border-right: 2px solid #000000;
+    border-bottom: 2px solid #000000;
+    padding: 3px 10px;
+}
+
+/* ── Emulator Area ───────────────────────── */
+
+.c64-emulator-area {
+    flex: 1;
+    position: relative;        /* positioning context for absolute children */
+    background: #000;
+    min-height: 200px;
+    overflow: hidden;
+}
+
+/* Absolute-positioned children take their dimensions from the parent's
+   actual box. Same defensive pattern as DOSBox — a percentage-height flex
+   chain can briefly compute to 0 inside a Win95 window, which would let
+   EmulatorJS measure its canvas parent as 0x0 and never grow back. */
+.c64-splash,
+.c64-stage,
+.c64-loading {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+}
+
+/* ── Splash Screen (authentic C64 boot look) ── */
+
+/* The unmistakable C64 palette: navy border, light-blue background,
+   pale-blue ASCII text. We don't try to imitate exact CRT scanlines —
+   the project has a global CRT effect for that. */
+.c64-splash {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: #3535a2;       /* C64 border */
+    color: #fff;
+    text-align: center;
+    gap: 18px;
+    padding: 24px;
+}
+
+.c64-splash-screen {
+    background: #7878d8;       /* C64 screen background */
+    color: #c8c8ff;            /* C64 light blue text */
+    padding: 24px 28px;
+    border-radius: 4px;
+    box-shadow:
+        inset 0 0 0 2px #3535a2,
+        0 4px 12px rgba(0, 0, 0, 0.45);
+    font-family: 'C64', 'VT323', 'Courier New', monospace;
+    font-size: 18px;
+    line-height: 1.4;
+    text-align: left;
+    letter-spacing: 1px;
+    max-width: 480px;
+}
+
+.c64-splash-banner {
+    white-space: nowrap;
+}
+
+@keyframes c64-blink {
+    0%, 49% { opacity: 1; }
+    50%, 100% { opacity: 0; }
+}
+
+.c64-cursor {
+    display: inline-block;
+    animation: c64-blink 1s steps(1) infinite;
+    color: #c8c8ff;
+}
+
+.c64-splash-hint {
+    font-size: 12px;
+    color: #c0c0c0;
+    max-width: 520px;
+    line-height: 1.5;
+    font-family: 'MS Sans Serif', 'Microsoft Sans Serif', Arial, sans-serif;
+    letter-spacing: 0;
+}
+
+.c64-splash-hint code {
+    background: rgba(0, 0, 0, 0.35);
+    padding: 0 4px;
+    border-radius: 2px;
+    font-family: 'VT323', 'Courier New', monospace;
+}
+
+.c64-splash-hint b {
+    color: #fff;
+}
+
+.c64-splash-credit {
+    display: inline-block;
+    margin-top: 8px;
+    opacity: 0.7;
+}
+
+/* ── EmulatorJS Stage / Root ─────────────── */
+
+/* A fresh `.c64-root` is mounted into the stage per emulator session
+   so EmulatorJS's internal state is fully discarded on stop. */
+.c64-stage {
+    overflow: hidden;
+}
+
+.c64-root {
+    width: 100%;
+    height: 100%;
+    min-width: 320px;
+    min-height: 200px;
+    position: relative;
+    overflow: hidden;
+}
+
+.c64-root canvas {
+    display: block;
+    image-rendering: pixelated;
+    min-width: 1px;
+    min-height: 1px;
+}
+
+/* ── EmulatorJS class-name collision resets ──
+ *
+ * EmulatorJS injects its own chrome into the player div using class
+ * names that may collide with IlluminatOS's component CSS (the same
+ * issue we hit with js-dos's `.window`). Scope defensive resets so
+ * IlluminatOS rules can't perturb EmulatorJS's layout.
+ *
+ * Update this rule if you spot a collision under the .c64-root subtree.
+ */
+.c64-root .window {
+    display: block !important;
+    position: relative !important;
+    top: auto !important;
+    left: auto !important;
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    z-index: auto !important;
+    transition: none !important;
+    animation: none !important;
+}
+
+.c64-root .title-bar,
+.c64-root .background-image {
+    all: revert;
+}
+
+/* ── Loading Overlay ─────────────────────── */
+
+.c64-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.85);
+    z-index: 10;
+    gap: 12px;
+}
+
+.c64-loading-spinner {
+    width: 36px;
+    height: 36px;
+    border: 4px solid #3535a2;
+    border-top: 4px solid #c8c8ff;
+    border-radius: 50%;
+    animation: c64-spin 0.8s linear infinite;
+}
+
+@keyframes c64-spin {
+    to { transform: rotate(360deg); }
+}
+
+.c64-loading-text {
+    color: #c8c8ff;
+    font-size: 14px;
+    font-family: 'VT323', 'Courier New', monospace;
+}
+
+/* ── Status Bar ──────────────────────────── */
+
+.c64-status {
+    padding: 2px 6px;
+    background: var(--win95-gray, #c0c0c0);
+    border-top: 1px solid #808080;
+    font-size: 11px;
+    color: #000;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex-shrink: 0;
+}
+
+/* ── Fullscreen Tweaks ───────────────────── */
+
+.c64-emulator-area:fullscreen {
+    background: #000;
+}
+
+.c64-emulator-area:fullscreen .c64-stage,
+.c64-emulator-area:fullscreen .c64-root {
+    width: 100vw;
+    height: 100vh;
+}
