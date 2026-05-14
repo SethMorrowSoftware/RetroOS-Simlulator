@@ -309,7 +309,7 @@ const GAME_LIBRARY = [
     { name: 'Oh No! More Lemmings', icon: '🟡', genre: 'Puzzle',     year: 1991,
       desc: '100 brand-new Lemmings levels',
       url: 'https://cdn.dos.zone/custom/dos/oh-no-more-lemmings.jsdos' },
-    { name: 'Best of ZZT',         icon: '🅩', genre: 'Puzzle',      year: 1992,
+    { name: 'Best of ZZT',         icon: '🎮', genre: 'Puzzle',      year: 1992,
       desc: 'Tim Sweeney\'s ZZT + classic Epic shareware worlds',
       url: 'https://cdn.dos.zone/custom/dos/best-of-zzt.jsdos' },
     { name: 'Paganitzu',           icon: '🐍', genre: 'Puzzle',      year: 1991,
@@ -828,16 +828,18 @@ class DOSBox extends AppBase {
 
         if (!filtered.length) {
             grid.innerHTML = '';
+            grid.hidden = true;
             if (empty) empty.hidden = false;
             return;
         }
+        grid.hidden = false;
         if (empty) empty.hidden = true;
 
         grid.innerHTML = filtered.map((g, i) => `
             <button class="arcade-tile" data-action="open-detail" data-url="${escapeHtml(g.url)}"
                     style="--tile-delay:${(i % 24) * 18}ms" title="${escapeHtml(g.desc)}">
                 <div class="arcade-tile-screen">
-                    <div class="arcade-tile-glyph">${g.icon}</div>
+                    <div class="arcade-tile-glyph">${escapeHtml(g.icon)}</div>
                     <div class="arcade-tile-scanlines"></div>
                 </div>
                 <div class="arcade-tile-plate">

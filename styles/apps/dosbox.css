@@ -97,14 +97,16 @@
     align-items: center;
     gap: 12px;
     font-family: 'VT323', 'Courier New', monospace;
-    font-size: 30px;
+    font-size: clamp(20px, 4.2vw, 30px);
     font-weight: 700;
     line-height: 1;
-    letter-spacing: 4px;
+    letter-spacing: clamp(2px, 0.5vw, 4px);
     text-shadow:
         0 0 8px var(--arc-magenta),
         0 0 18px rgba(255, 45, 184, 0.6),
         2px 2px 0 #000;
+    white-space: nowrap;
+    max-width: 100%;
 }
 
 .arcade-marquee-title {
@@ -146,15 +148,27 @@
 
 /* ── Sidebar ────────────────────────────────── */
 .arcade-sidebar {
-    width: 175px;
+    width: 210px;
     flex-shrink: 0;
     background: linear-gradient(180deg, var(--arc-cabinet-2) 0%, var(--arc-panel) 100%);
     border-right: 2px solid #000;
     box-shadow: inset -2px 0 0 var(--arc-bezel);
     overflow-y: auto;
+    overflow-x: hidden;
     padding: 6px 0 8px;
     display: flex;
     flex-direction: column;
+}
+
+/* Sidebar scrollbar — match the grid */
+.arcade-sidebar::-webkit-scrollbar { width: 10px; }
+.arcade-sidebar::-webkit-scrollbar-track {
+    background: var(--arc-panel);
+    border-left: 1px solid #000;
+}
+.arcade-sidebar::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, var(--arc-bezel-hi), var(--arc-bezel));
+    border: 1px solid #000;
 }
 
 .arcade-sidebar-title {
@@ -175,7 +189,7 @@
 
 .arcade-cat {
     display: grid;
-    grid-template-columns: 22px 1fr auto;
+    grid-template-columns: 20px minmax(0, 1fr) auto;
     align-items: center;
     gap: 6px;
     width: calc(100% - 8px);
@@ -185,8 +199,8 @@
     border: 0;
     color: var(--arc-text-dim);
     font-family: 'VT323', 'Courier New', monospace;
-    font-size: 14px;
-    letter-spacing: 1.5px;
+    font-size: 13px;
+    letter-spacing: 0.5px;
     text-align: left;
     cursor: pointer;
     border-left: 3px solid transparent;
@@ -218,6 +232,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    min-width: 0;
 }
 .arcade-cat-tally {
     font-size: 10px;
@@ -273,6 +288,7 @@
     border-bottom: 2px solid #000;
     box-shadow: inset 0 -1px 0 var(--arc-bezel-hi);
     flex-shrink: 0;
+    flex-wrap: wrap;       /* let the search fall to its own row on narrow widths */
 }
 
 .arcade-toolbar-section {
@@ -286,12 +302,13 @@
 .arcade-cat-label {
     font-family: 'VT323', 'Courier New', monospace;
     font-size: 18px;
-    letter-spacing: 3px;
+    letter-spacing: 2px;
     color: var(--arc-yellow);
     text-shadow: 0 0 6px rgba(255, 227, 74, 0.45);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    min-width: 0;
 }
 .arcade-cat-count {
     font-family: 'VT323', 'Courier New', monospace;
@@ -307,7 +324,8 @@
     padding: 3px 6px;
     border: 2px inset var(--arc-bezel);
     box-shadow: inset 0 1px 3px rgba(0,0,0,0.6);
-    min-width: 200px;
+    flex: 0 1 220px;
+    min-width: 160px;
 }
 .arcade-search-icon {
     font-size: 12px;
@@ -331,6 +349,7 @@
 /* ── Tile grid ──────────────────────────────── */
 .arcade-grid {
     flex: 1;
+    min-height: 0;
     overflow-y: auto;
     overflow-x: hidden;
     padding: 14px;
@@ -343,6 +362,8 @@
         var(--arc-cabinet);
     background-size: 100% 4px;
 }
+/* When empty, hide the grid so the empty state can center in main */
+.arcade-grid[hidden] { display: none; }
 
 /* Custom scrollbar for the grid (WebKit) */
 .arcade-grid::-webkit-scrollbar { width: 14px; }
@@ -379,6 +400,9 @@
     animation: arcade-tile-in 0.36s ease-out backwards;
     animation-delay: var(--tile-delay, 0ms);
     overflow: hidden;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
 }
 .arcade-tile:hover {
     transform: translate(-2px, -2px);
@@ -406,7 +430,10 @@
     background: radial-gradient(ellipse at 50% 40%, var(--arc-screen-glow), var(--arc-screen) 70%);
     border: 2px solid #000;
     border-radius: 8px;
-    padding: 18px 8px;
+    aspect-ratio: 4 / 3;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     overflow: hidden;
     box-shadow:
         inset 0 0 8px rgba(0,0,0,0.8),
@@ -442,6 +469,12 @@
 
 .arcade-tile-plate {
     padding: 6px 4px 8px;
+    flex: 1;
+    min-height: 56px;     /* keeps tiles uniform height across 1-line/2-line names */
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 3px;
 }
 .arcade-tile-name {
     font-family: 'VT323', 'Courier New', monospace;
@@ -450,12 +483,16 @@
     color: var(--arc-yellow);
     text-shadow: 1px 1px 0 #000;
     line-height: 1.1;
+    /* Allow up to 2 lines so titles like "Dangerous Dave's Risky Rescue"
+       remain legible. Clamps via line-clamp for graceful overflow. */
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
     overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    word-break: break-word;
+    hyphens: auto;
 }
 .arcade-tile-meta {
-    margin-top: 2px;
     display: flex;
     justify-content: center;
     gap: 6px;
@@ -466,15 +503,25 @@
 }
 .arcade-tile-genre {
     color: var(--arc-cyan);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
 }
 
 /* ── Empty state ────────────────────────────── */
 .arcade-empty {
-    margin: auto;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
     text-align: center;
     color: var(--arc-text-muted);
     padding: 40px 20px;
+    gap: 4px;
 }
+.arcade-empty[hidden] { display: none; }
 .arcade-empty-icon {
     font-size: 48px;
     margin-bottom: 8px;
@@ -511,7 +558,7 @@
 
 .arcade-detail-card {
     display: grid;
-    grid-template-columns: 220px 1fr;
+    grid-template-columns: 220px minmax(0, 1fr);
     gap: 22px;
     align-items: stretch;
     background: linear-gradient(180deg, var(--arc-bezel) 0%, var(--arc-cabinet-2) 100%);
@@ -521,10 +568,25 @@
         inset 0 1px 0 var(--arc-bezel-hi),
         inset 0 -1px 0 var(--arc-bezel-lo),
         4px 4px 0 #000;
+    max-width: 820px;
+    width: 100%;
+    margin: 0 auto;
 }
 
-@media (max-width: 620px) {
-    .arcade-detail-card { grid-template-columns: 1fr; }
+/* Collapse to a single column when the window is narrow. The 720px
+   threshold matches our minWidth (640) plus sidebar gone in detail
+   mode — the detail view sits in the full app width, so it doesn't
+   need to track the sidebar. */
+@media (max-width: 720px) {
+    .arcade-detail-card {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+    .arcade-detail-cabinet {
+        max-width: 220px;
+        margin: 0 auto;
+        width: 100%;
+    }
 }
 
 .arcade-detail-cabinet {
@@ -591,6 +653,9 @@
     text-shadow:
         2px 2px 0 #000,
         0 0 12px rgba(255, 227, 74, 0.4);
+    word-break: break-word;
+    overflow-wrap: break-word;
+    hyphens: auto;
 }
 .arcade-detail-year {
     font-family: 'VT323', 'Courier New', monospace;
@@ -755,6 +820,7 @@
 }
 .arcade-play-title {
     flex: 1;
+    min-width: 0;
     text-align: center;
     font-family: 'VT323', 'Courier New', monospace;
     font-size: 18px;
@@ -764,6 +830,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    padding: 0 6px;
 }
 .arcade-play-actions {
     display: flex;
