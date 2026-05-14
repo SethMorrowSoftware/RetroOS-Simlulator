@@ -94,12 +94,12 @@ on mediaplayer:ended {
     play achievement
 }
 
-on mediaplayer:play {
+on mediaplayer:playing {
     print "Video started playing"
 }
 
-on mediaplayer:pause {
-    print "Video paused"
+on mediaplayer:stop {
+    print "Video stopped"
 }
 
 # Handle playlist end
@@ -115,16 +115,12 @@ The MediaPlayer emits these events for script integration:
 
 | Event | Description | Payload |
 |-------|-------------|---------|
-| `mediaplayer:play` | Video started playing | `{ video, currentTime }` |
-| `mediaplayer:pause` | Video paused | `{ currentTime }` |
+| `mediaplayer:playing` | Video actively playing | `{ video, index }` |
 | `mediaplayer:stop` | Video stopped | `{ }` |
 | `mediaplayer:ended` | Video finished | `{ video, index }` |
 | `mediaplayer:loaded` | Video metadata loaded | `{ duration }` |
 | `mediaplayer:error` | Playback error | `{ error }` |
-| `mediaplayer:seek` | Seek position changed | `{ position }` |
 | `mediaplayer:timeupdate` | Time updated | `{ currentTime, duration }` |
-| `mediaplayer:fullscreen` | Fullscreen toggled | `{ fullscreen }` |
-| `mediaplayer:playing` | Video actively playing | `{ video, index }` |
 | `mediaplayer:playlist:add` | Video added to playlist | `{ video }` |
 | `mediaplayer:playlist:ended` | Playlist finished | `{ }` |
 
@@ -141,15 +137,18 @@ exec mediaplayer.stop
 # Navigate playlist
 exec mediaplayer.next
 exec mediaplayer.previous
-exec mediaplayer.playVideo(0)
 
 # Volume and seeking
 exec mediaplayer.setVolume(80)
 exec mediaplayer.seek(30)
 
-# Fullscreen
+# Fullscreen / mute
 exec mediaplayer.fullscreen
 exec mediaplayer.mute
+
+# Shuffle / repeat
+exec mediaplayer.shuffle
+exec mediaplayer.repeat
 
 # Load a new video
 exec mediaplayer.load("assets/videos/new.mp4", "My Video")
@@ -170,8 +169,8 @@ print $state.duration
 set $playlist = query mediaplayer.getPlaylist
 print $playlist
 
-# Get current video info
-set $current = query mediaplayer.getCurrentVideo
+# Get current media info
+set $current = query mediaplayer.getCurrentMedia
 print $current.video.name
 ```
 

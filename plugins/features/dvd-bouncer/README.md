@@ -153,7 +153,7 @@ You can subscribe to the plugin's events to create integrations:
 
 ```javascript
 // Example: Achievement system integration
-EventBus.subscribe('dvd-bouncer:corner-hit', (data) => {
+EventBus.on('dvd-bouncer:corner-hit', (data) => {
     if (data.count === 10) {
         // Unlock "Corner Master" achievement
         AchievementManager.unlock('corner-master');
