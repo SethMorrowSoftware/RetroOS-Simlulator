@@ -570,16 +570,36 @@ class AppBase {
     }
 
     /**
-     * Update window content
+     * Update window content.
+     *
+     * Releases any DOM listeners registered via `addHandler()` whose target
+     * lives inside (or is) the `.window-content` subtree before swapping the
+     * HTML. Window-level / document-level / window-object listeners are kept
+     * — they outlive content swaps by design.
+     *
      * @param {string} html - New HTML content
      */
     setContent(html) {
         const windowEl = this.getWindow();
         const content = windowEl?.querySelector('.window-content');
-        if (content) {
-            content.innerHTML = html;
-            this.onMount(); // Re-run mount for new content
+        if (!content) return;
+
+        const instanceData = this.openWindows.get(this._currentWindowId);
+        if (instanceData?.boundHandlers) {
+            for (const [target, handlers] of instanceData.boundHandlers) {
+                const inSubtree =
+                    target === content ||
+                    (content.contains && target instanceof Node && content.contains(target));
+                if (!inSubtree) continue;
+                for (const { event, handler, options } of handlers) {
+                    try { target.removeEventListener(event, handler, options); } catch (_) { /* detached */ }
+                }
+                instanceData.boundHandlers.delete(target);
+            }
         }
+
+        content.innerHTML = html;
+        this.onMount(); // Re-run mount for new content
     }
 
     /**

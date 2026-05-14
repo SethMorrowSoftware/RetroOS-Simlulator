@@ -181,11 +181,9 @@ What's left before deletion:
 
 `ScriptEngine.initialize(context)` no longer accepts `CommandBus` — the field was dropped from the call in `index.js`, and every script-engine call site (`context.CommandBus.execute(...)`) was rewritten to use `context.EventBus.executeCommand(...)`. The autoexec loader's context object is also slimmed down. Net effect: nothing inside `core/script/` depends on the `CommandBus` import any more, even though the file itself still exists.
 
-### P2.3 — Reauth UI for `auth:expired`
+### P2.3 — Reauth UI for `auth:expired` ✅
 
-When `fetchWithAuth` fires `auth:expired`, no UI subscriber listens yet. Add a feature (or extend `SystemDialogs`) that shows a modal "Your session expired — please log in again" → routes to `LoginScreen`.
-
-**Estimated effort:** 1 small PR.
+New `features/ReauthGate.js` subscribes to `auth:expired`. On the first emission it routes through SystemDialogs' `dialog:alert` (if listening) or falls back to `window.confirm`, then re-runs `LoginScreen.show()`. Single-flight guard prevents a flurry of 401s from queueing multiple prompts. Registered alongside `Notifications`/`OnlineUsers` in `index.js` and `features/config.json`.
 
 ### P2.4 — Bidirectional desktop-icon sync
 
@@ -205,11 +203,9 @@ W3.2 currently does FS → state at boot only. For full bidirectional sync at ru
 
 `StateManager.ui.activeWindow` is now the single writer. `WindowManager.initialize()` subscribes to that path and the new `_renderActiveWindow(activeId)` mirrors it onto the DOM `.active` class. `WindowManager.focus()` no longer touches the class list at all — it just updates z-index and calls `StateManager.focusWindow(id)`. `minimize()` clears `ui.activeWindow` when the minimized window was active, so the DOM class follows naturally. The class-list `.remove('active')` calls inside `focus()` and `minimize()` are gone; the only writer is the state subscription.
 
-### P2.8 — `AppBase.setContent()` replaces innerHTML without unregistering DOM listeners
+### P2.8 — `AppBase.setContent()` replaces innerHTML without unregistering DOM listeners ✅
 
-Wave 1 noted this as still-open. The DOM event handlers stored in `instanceData.boundHandlers` aren't released when `setContent()` swaps the HTML, so old listeners point at detached DOM nodes (no harm, but no value either). Either clean up in `setContent` or document that `setContent` callers must re-bind their handlers.
-
-**Estimated effort:** 1 small PR.
+`AppBase.setContent()` now releases any `addHandler()`-registered listener whose target sits inside (or is) the `.window-content` subtree before swapping the HTML. Window-level / document-level / window-object listeners are kept — they outlive content swaps by design. Net effect: no leaked listeners pointing at detached DOM nodes after a `setContent()` call.
 
 ### P2.9 — Pre-login storage drift
 

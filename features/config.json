@@ -256,5 +256,17 @@
         "type": "checkbox"
       }
     ]
+  },
+
+  "reauthgate": {
+    "id": "reauthgate",
+    "name": "Reauth Gate",
+    "description": "Prompts the user to sign in again when the backend reports session expiry",
+    "icon": "🔒",
+    "category": "core",
+    "enabled": true,
+    "dependencies": [],
+    "config": {},
+    "settings": []
   }
 }

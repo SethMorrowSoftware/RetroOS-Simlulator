@@ -604,4 +604,9 @@ class FeatureRegistryClass {
 // Singleton instance
 const FeatureRegistry = new FeatureRegistryClass();
 
+if (typeof window !== 'undefined') {
+    window.__RETROS_DEBUG = window.__RETROS_DEBUG || {};
+    window.__RETROS_DEBUG.featureRegistry = FeatureRegistry;
+}
+
 export default FeatureRegistry;

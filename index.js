@@ -32,6 +32,7 @@ import AppRegistry from './apps/AppRegistry.js';
 
 // === FEATURES ===
 import FeatureRegistry from './core/FeatureRegistry.js';
+import HealthMonitor from './core/HealthMonitor.js';
 import SoundSystem from './features/SoundSystem.js';
 import AchievementSystem from './features/AchievementSystem.js';
 import EasterEggs from './features/EasterEggs.js';
@@ -61,6 +62,7 @@ import MultiplayerClient from './core/MultiplayerClient.js';
 import PresenceManager from './core/PresenceManager.js';
 import OnlineUsers from './features/OnlineUsers.js';
 import Notifications from './features/Notifications.js';
+import ReauthGate from './features/ReauthGate.js';
 
 // === PLUGIN SYSTEM ===
 import PluginLoader from './core/PluginLoader.js';
@@ -421,7 +423,8 @@ async function initializeOS(onProgress = () => {}) {
             MoodOrchestrator,
             ContentTemplateManager,
             OnlineUsers,
-            Notifications
+            Notifications,
+            ReauthGate
         ];
 
         console.log('[IlluminatOS!] Features to register:', featuresToRegister.map(f => f?.id || 'UNDEFINED'));
@@ -522,6 +525,13 @@ async function initializeOS(onProgress = () => {}) {
         degradedCount,
         components: healthReport
     };
+
+    // Install the live HealthMonitor — `window.__OS_HEALTH` aggregates boot
+    // health, subscription accounting, storage telemetry, bus stats, feature
+    // posture, realtime/multiplayer state, and recent faults.
+    try { HealthMonitor.install(); } catch (err) {
+        console.warn('[IlluminatOS!] HealthMonitor install failed:', err);
+    }
 
     if (degradedCount > 0) {
         console.warn(`[IlluminatOS!] Boot completed with ${degradedCount} degraded non-critical component(s) in ${bootDurationMs}ms`);

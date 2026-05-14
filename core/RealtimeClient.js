@@ -263,4 +263,11 @@ export function isRealtimeConnected() {
     return _connected;
 }
 
-export default { initRealtime, closeRealtime, isRealtimeConnected };
+const _RealtimeClient = { initRealtime, closeRealtime, isRealtimeConnected, isConnected: isRealtimeConnected };
+
+if (typeof window !== 'undefined') {
+    window.__RETROS_DEBUG = window.__RETROS_DEBUG || {};
+    window.__RETROS_DEBUG.realtimeClient = _RealtimeClient;
+}
+
+export default _RealtimeClient;

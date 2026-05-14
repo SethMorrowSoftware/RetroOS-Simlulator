@@ -39,6 +39,17 @@ class GameSession {
         this.currentTurn = null;
         this.gameState = {}; // Game-specific state
 
+        // Conflict-detection metadata (replaces blind LWW). The original
+        // `Object.assign(this.gameState, data.delta)` path stays the default
+        // resolution, but each delta now carries a sequence number and base
+        // version. When an incoming delta was authored on top of a version
+        // we've already moved past, we emit `mp:state:conflict` so apps can
+        // react (request resync, surface UI, etc.) instead of silently
+        // clobbering each other. `start()` resets these to 0.
+        this._stateVersion = 0;         // Highest sequence applied locally.
+        this._stateBaseVersion = 0;     // Version this peer believes was the latest before sendState().
+        this._lastStateWriter = null;   // userId of the most recent writer.
+
         // Handlers
         this._handlers = [];
         this._eventUnsubscribers = [];
@@ -137,6 +148,9 @@ class GameSession {
 
         this.state = 'playing';
         this.gameState = initialState;
+        this._stateVersion = 0;
+        this._stateBaseVersion = 0;
+        this._lastStateWriter = this.localUserId;
 
         // Set turn order (all players)
         this.turnOrder = [...this.players.keys()];
@@ -145,7 +159,8 @@ class GameSession {
         MultiplayerClient.sendGameAction(this.gameId, this.sessionId, 'start', {
             initialState,
             turnOrder: this.turnOrder,
-            currentTurn: this.currentTurn
+            currentTurn: this.currentTurn,
+            __seq: 0
         });
 
         EventBus.emit('mp:game:started', {
@@ -172,14 +187,32 @@ class GameSession {
     }
 
     /**
-     * Send a state update to all players
+     * Send a state update to all players. Each delta is tagged with
+     *   __seq:  the new version this delta produces.
+     *   __base: the version the writer thinks is the latest before this delta.
+     *   __writer: the local userId.
+     * Peers compare `__base` to their own `_stateVersion` and emit
+     * `mp:state:conflict` if the base is stale.
+     *
      * @param {Object} delta - State changes
      */
     sendState(delta) {
         if (!this.sessionId) return;
 
+        this._stateBaseVersion = this._stateVersion;
+        this._stateVersion = this._stateVersion + 1;
+        this._lastStateWriter = this.localUserId;
+
+        // Optimistically apply locally so subsequent local sends see the new state.
+        if (delta && typeof delta === 'object') {
+            Object.assign(this.gameState, delta);
+        }
+
         MultiplayerClient.sendGameAction(this.gameId, this.sessionId, 'state', {
-            delta
+            delta,
+            __seq: this._stateVersion,
+            __base: this._stateBaseVersion,
+            __writer: this.localUserId
         });
     }
 
@@ -326,6 +359,9 @@ class GameSession {
                     if (data?.initialState) this.gameState = data.initialState;
                     if (data?.turnOrder) this.turnOrder = data.turnOrder;
                     if (data?.currentTurn) this.currentTurn = data.currentTurn;
+                    this._stateVersion = Number.isFinite(data?.__seq) ? data.__seq : 0;
+                    this._stateBaseVersion = this._stateVersion;
+                    this._lastStateWriter = null;
                     EventBus.emit('mp:game:started', {
                         sessionId: this.sessionId,
                         gameId: this.gameId,
@@ -345,7 +381,37 @@ class GameSession {
 
                 case 'state':
                     if (data?.delta) {
+                        const remoteSeq = Number.isFinite(data.__seq) ? data.__seq : null;
+                        const remoteBase = Number.isFinite(data.__base) ? data.__base : null;
+                        const remoteWriter = data.__writer ?? userId ?? null;
+
+                        // Same writer can never conflict with themselves.
+                        const ownEcho = remoteWriter !== null && remoteWriter === this.localUserId;
+
+                        // Conflict: writer built on a base we've already moved past.
+                        const conflict =
+                            !ownEcho &&
+                            remoteBase !== null &&
+                            remoteBase < this._stateVersion;
+
+                        if (conflict) {
+                            EventBus.emit('mp:state:conflict', {
+                                sessionId: this.sessionId,
+                                gameId: this.gameId,
+                                localVersion: this._stateVersion,
+                                remoteVersion: remoteSeq ?? 0,
+                                remoteWriter: remoteWriter == null ? null : String(remoteWriter),
+                                resolution: 'merged' // We still apply (LWW fallback) — apps may resync.
+                            });
+                        }
+
                         Object.assign(this.gameState, data.delta);
+                        if (remoteSeq !== null && remoteSeq > this._stateVersion) {
+                            this._stateVersion = remoteSeq;
+                        }
+                        if (remoteWriter !== null) {
+                            this._lastStateWriter = remoteWriter;
+                        }
                     }
                     this._dispatchHandler('state', data);
                     break;
@@ -399,6 +465,9 @@ class GameSession {
         this.turnOrder = [];
         this.currentTurn = null;
         this.gameState = {};
+        this._stateVersion = 0;
+        this._stateBaseVersion = 0;
+        this._lastStateWriter = null;
     }
 
     _generateId() {

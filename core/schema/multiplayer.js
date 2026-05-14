@@ -289,4 +289,44 @@ export const multiplayerEvents = {
             displayName: 'Player2'
         }
     },
+
+    'mp:game:accept_invite': {
+        namespace: 'mp',
+        action: 'game:accept_invite',
+        description: 'User accepted a game invite notification',
+        payload: {
+            sessionId: 'string?',
+            gameId: 'string?',
+            fromUserId: 'number?',
+            fromName: 'string?'
+        },
+        example: {
+            sessionId: 'sess-abc123',
+            gameId: 'minesweeper',
+            fromUserId: 42,
+            fromName: 'Player1'
+        }
+    },
+
+    'mp:state:conflict': {
+        namespace: 'mp',
+        action: 'state:conflict',
+        description: 'A remote state delta was rejected because its version vector is stale relative to local state',
+        payload: {
+            sessionId: 'string',
+            gameId: 'string?',
+            localVersion: 'number',
+            remoteVersion: 'number',
+            remoteWriter: 'string?',
+            resolution: 'string' // 'rejected' | 'merged'
+        },
+        example: {
+            sessionId: 'sess-abc123',
+            gameId: 'minesweeper',
+            localVersion: 17,
+            remoteVersion: 15,
+            remoteWriter: 'alice',
+            resolution: 'rejected'
+        }
+    },
 };

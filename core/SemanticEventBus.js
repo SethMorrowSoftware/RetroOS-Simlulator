@@ -826,6 +826,42 @@ class SemanticEventBusClass {
         };
     }
 
+    /**
+     * Schema coverage diagnostic. Returns the ratio of emitted-so-far events
+     * that had a registered schema entry, plus the list of names that didn't.
+     * App-scoped names (`command:<appId>:*`, `app:<appId>:*`, `query:<appId>:*`)
+     * are excluded — they're created dynamically and have no static schema.
+     *
+     * Pair with the static `scripts/check-event-schema-coverage.mjs` gate to
+     * catch regressions both pre-commit and at runtime.
+     */
+    getSchemaCoverage() {
+        const seen = new Set();
+        let total = 0;
+        let covered = 0;
+        const missing = new Set();
+        for (const event of this.eventLog) {
+            const name = event.name;
+            if (seen.has(name)) continue;
+            seen.add(name);
+
+            const parts = name.split(':');
+            const appScoped = parts.length >= 3 && ['command', 'app', 'query'].includes(parts[0])
+                && !['fs', 'window', 'terminal', 'system', 'media', 'sound', 'desktop'].includes(parts[1]);
+            if (appScoped) continue;
+
+            total++;
+            if (EventSchema[name]) covered++;
+            else missing.add(name);
+        }
+        return {
+            total,
+            covered,
+            ratio: total === 0 ? 1 : covered / total,
+            missing: [...missing].sort()
+        };
+    }
+
     // ==========================================
     // CHANNEL METHODS (Scoped Communication)
     // ==========================================

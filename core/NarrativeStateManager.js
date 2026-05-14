@@ -808,7 +808,11 @@ class NarrativeStateManagerClass {
     }
 
     /**
-     * Handle a full state update from a remote player (last-write-wins)
+     * Handle a full state update from a remote player (last-write-wins by
+     * timestamp). When a remote update is dropped because the local state
+     * is newer, we emit `story:state:conflict` so the UI/app can surface the
+     * silent drop instead of users wondering why their teammate's change
+     * never landed.
      * @private
      */
     _handleRemoteStateUpdate(message) {
@@ -831,6 +835,14 @@ class NarrativeStateManagerClass {
             } finally {
                 this._isProcessingRemoteUpdate = false;
             }
+        } else if (remoteTimestamp > 0 && remoteTimestamp <= localTimestamp) {
+            // Concurrent / stale remote edit was silently dropped — surface it.
+            this._emit('story:state:conflict', {
+                source: 'remote',
+                localTimestamp,
+                remoteTimestamp,
+                resolution: 'remote_dropped'
+            });
         }
     }
 
