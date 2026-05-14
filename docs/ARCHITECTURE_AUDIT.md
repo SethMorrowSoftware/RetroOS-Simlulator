@@ -67,7 +67,7 @@ Several pieces of state live in two or more places that drift independently.
 
 | Truth conflict | Files | Status |
 |---|---|---|
-| `StateManager.state.icons` vs `Desktop/*.lnk` files in the virtual FS | `StateManager.js:138`, `FileSystemManager.js:1710,2040` | ⏳ open — moved to Wave 4 (touches boot order; PR #2 added `setStateAndPersist` and FS-sync events as prerequisites) |
+| `StateManager.state.icons` vs `Desktop/*.lnk` files in the virtual FS | `StateManager.js:138`, `FileSystemManager.js:1710,2040` | 🟡 partial — fixed at boot in PR #2 via `StateManager.reconcileIconsFromFileSystem(FileSystemManager)` which merges FS shortcuts into `state.icons` after FS init. Runtime bidirectional sync (subscribing to FS changes) is a `MIGRATION_ROADMAP` P2.4 item. |
 | `StateManager` cache vs `StorageManager` cache vs module-level caches (e.g. `AchievementSystem._achievementsCache`) | `StateManager.js`, `StorageManager.js`, `AchievementSystem.js:62` | 🟡 partial — `setStateAndPersist` (PR #2) closes the state-vs-storage half; module-level caches still drift. |
 | Realtime event mapping in `RealtimeClient.bridgedEvents`, `index.js` SSE handlers, `MultiplayerClient` WS bridge | `RealtimeClient.js:29-65`, `index.js:694-799`, `MultiplayerClient.js:544-554` | ✅ fixed in PR #2 — `core/EventTopology.js` is the single source; `RealtimeClient` derives `bridgedEvents` from it. `index.js` `sse:*` handlers stay subscribed for back-compat until Wave 4 retires the alias. |
 | Active window: `StateManager.ui.activeWindow` vs DOM `.active` class | `WindowManager.js:357,1131` | ⏳ open — Wave 4 |
@@ -88,11 +88,11 @@ The system trusts callers to follow conventions that are documented but not enfo
 
 | Contract | Enforcement gap |
 |---|---|
-| Apps must `escapeHtml()` content before returning from `onOpen()` | `WindowManager.js:156` injects raw; lint script (`scripts/lint-innerhtml.sh`) is the only check; `AnalyticsDashboard.js` fails it |
-| All events should be in `EventSchema` | App-scoped events (`command:appId:*`) dynamically created; ~30-40% of runtime events unvalidated |
-| `LEGACY_EVENT_MAPPING` rewrites old event names in `.on()`/`.emit()` invisibly | `SemanticEventBus.js:22` |
-| Multi-instance apps must use `setInstanceState()` | `Terminal.js:31-57` (verified) violates this — class-level `commandHistory`, `currentPath`, `aliases`, `envVars` shared across windows |
-| Builtins must throw `RuntimeError` (with line/column) | Some throw bare `Error` |
+| Apps must `escapeHtml()` content before returning from `onOpen()` | `WindowManager.js:156` injects raw; lint script (`scripts/lint-innerhtml.sh`) is the only check; `AnalyticsDashboard.js` fails it — still open, tracked in `MIGRATION_ROADMAP.md` |
+| All events should be in `EventSchema` | App-scoped events (`command:appId:*`) dynamically created; ~30-40% of runtime events unvalidated — still open |
+| `LEGACY_EVENT_MAPPING` rewrites old event names in `.on()`/`.emit()` invisibly | `SemanticEventBus.js:22` — ✅ removed in PR #2 (Wave 4). The bus no longer rewrites event names; all call sites migrated. |
+| Multi-instance apps must use `setInstanceState()` | `Terminal.js:31-57` (verified) violates this — class-level `commandHistory`, `currentPath`, `aliases`, `envVars` shared across windows — ✅ fixed in PR #2 (Wave 4). All 11 fields are now backed by property accessors that proxy to per-window state; `singleton: true` removed. Other apps not yet audited — tracked in `MIGRATION_ROADMAP.md` Phase 1. |
+| Builtins must throw `RuntimeError` (with line/column) | Some throw bare `Error` — ✅ fixed in PR #2 (Wave 3) for the sampled builtins (`TelemetryBuiltins`, `DebugBuiltins`). Other builtins not audited. |
 
 ### CC-5: Security Gaps
 
@@ -321,10 +321,10 @@ The following high-impact claims were independently verified by reading the sour
 
 | Claim | File:Line | Verification | Resolution |
 |---|---|---|---|
-| WebSocket token in URL query param | `MultiplayerClient.js:101` | `new WebSocket(\`${wsUrl}?token=${encodeURIComponent(this.token)}\`)` | ✅ Moved to `Sec-WebSocket-Protocol: token.<hex>` |
+| WebSocket token in URL query param | `MultiplayerClient.js:101` | `new WebSocket(\`${wsUrl}?token=${encodeURIComponent(this.token)}\`)` | ✅ Moved to `Sec-WebSocket-Protocol: token.<hex>` (PR #1); server-side legacy paths removed in PR #2 (W4.3) |
 | `FeatureBase.disable()` resets `initialized` | `FeatureBase.js:137` | `this.initialized = false;` | ✅ Line removed; lifecycle queue added |
-| Terminal uses class-level state for multi-instance fields | `Terminal.js:31-57` | `commandHistory`, `currentPath`, `aliases`, `envVars` on `this` | 🟡 `singleton: true` enforced; per-window state migration deferred to its own PR |
+| Terminal uses class-level state for multi-instance fields | `Terminal.js:31-57` | `commandHistory`, `currentPath`, `aliases`, `envVars` on `this` | ✅ Fixed in PR #2 (W4.4) — property accessors on `Terminal.prototype` proxy 13 fields to per-window state; `singleton: true` removed. |
 | Modal cleanup via one-shot listener | `WindowManager.js:1199-1207` | `closeHandler` on `EventBus.on(Events.WINDOW_CLOSE)` | ✅ Replaced with `_modalCleanups` map invoked synchronously in `close()` |
-| RetroScript file ops without path validation | `Interpreter.js:578,588,606` | `FileSystem.writeFile(path, ...)` etc., no validation | ✅ All four file visitors call `validateScriptPath()`; allowlist shared with SSE handler |
+| RetroScript file ops without path validation | `Interpreter.js:578,588,606` | `FileSystem.writeFile(path, ...)` etc., no validation | ✅ All four file visitors call `validateScriptPath()`; allowlist shared with SSE handler + CommandBus `fs:*` (PR #2, W3.10) |
 
 All other findings are sourced from agent reports with file:line citations; the agents read the relevant source files but their summaries were not independently re-verified line by line. Open items have moved to `UNIFIED_ROADMAP.md`; confirm specifics before refactoring.

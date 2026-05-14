@@ -18,20 +18,28 @@
 import EventSchema from './EventSchema.js';
 import SubscriptionManager from './SubscriptionManager.js';
 
-// Legacy event name mapping - maps old event names to semantic ones
-// This is integrated directly into the bus so ALL consumers get mapping automatically
-const LEGACY_EVENT_MAPPING = {
-    'startmenu:toggle': 'ui:menu:start:toggle',
-    'contextmenu:show': 'ui:menu:context:show',
-    'contextmenu:hide': 'ui:menu:context:hide',
-    'taskbar:update': 'ui:taskbar:update',
-    'menu:action': 'ui:menu:action',
-    'boot:complete': 'system:ready',
-    'screensaver:end': 'system:screensaver:end',
-    'pet:toggle': 'feature:pet:toggle',
-    'pet:change': 'feature:pet:change',
-    // Note: 'setting:changed' and 'desktop:render' were self-mapping (no-ops) and removed
-};
+// W4.1 — `LEGACY_EVENT_MAPPING` removed.
+//
+// Until Wave 4, the bus secretly rewrote old event names into their semantic
+// equivalents inside `on()` and `emit()`. Calling
+// `EventBus.emit('pet:toggle')` would dispatch as `feature:pet:toggle`,
+// invisible to grep. That made debugging awful — a developer searching for
+// `'pet:toggle'` saw call sites that "should work" but actually fired a
+// different event than the name suggested.
+//
+// All call sites have been migrated to the semantic names:
+//   pet:toggle        → feature:pet:toggle
+//   pet:change        → feature:pet:change
+//   taskbar:update    → ui:taskbar:update
+//   boot:complete     → system:ready
+//   startmenu:toggle  → ui:menu:start:toggle
+//   contextmenu:show  → ui:menu:context:show
+//   contextmenu:hide  → ui:menu:context:hide
+//   menu:action       → ui:menu:action
+//   screensaver:end   → system:screensaver:end
+//
+// The schema entries in `core/schema/*.js` retain a `legacyAction` field for
+// reference, but the bus no longer rewrites — what you write is what fires.
 
 class SemanticEventBusClass {
     constructor() {
@@ -144,9 +152,6 @@ class SemanticEventBusClass {
     on(eventName, callback, options = {}) {
         const { priority = this.PRIORITY.NORMAL, once = false } = options;
 
-        // Map legacy event names
-        eventName = LEGACY_EVENT_MAPPING[eventName] || eventName;
-
         // Guard against prototype-pollution event names
         if (!this._isValidEventName(eventName.replace(/\*/g, '_'))) {
             console.error(`[SemanticEventBus] Rejected invalid event name in on(): "${eventName}"`);
@@ -194,8 +199,6 @@ class SemanticEventBusClass {
      * @param {Function} callback - Handler to remove
      */
     off(eventName, callback) {
-        // Map legacy event names
-        eventName = LEGACY_EVENT_MAPPING[eventName] || eventName;
         if (this.listeners.has(eventName)) {
             const listeners = this.listeners.get(eventName);
             const index = listeners.findIndex(l => l.callback === callback);
@@ -223,9 +226,6 @@ class SemanticEventBusClass {
      */
     emit(eventName, payload = {}, options = {}) {
         this.stats.emitted++;
-
-        // Map legacy event names
-        eventName = LEGACY_EVENT_MAPPING[eventName] || eventName;
 
         // Guard against prototype-pollution event names
         if (!this._isValidEventName(eventName)) {

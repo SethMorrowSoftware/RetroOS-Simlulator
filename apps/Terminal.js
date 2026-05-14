@@ -14,6 +14,77 @@ import { getConfig } from '../core/ConfigLoader.js';
 import { escapeHtml } from '../core/Sanitize.js';
 import MultiplayerClient from '../core/MultiplayerClient.js';
 
+/**
+ * W4.4 — Per-window state for Terminal.
+ *
+ * Each terminal window keeps its own `commandHistory`, `currentPath`,
+ * `aliases`, `envVars`, etc. Opening two terminals previously made them
+ * share that state (cd in one moved the other's prompt). The fix uses
+ * `setInstanceState` / `getInstanceState` from AppBase, but the existing
+ * 160+ references throughout this file are written as plain
+ * `this.commandHistory` / `this.currentPath` etc. Rewriting every
+ * reference is invasive; instead, we define accessor properties on the
+ * prototype that proxy to instance state, so existing code reads/writes
+ * `this.<field>` and gets per-window storage for free.
+ *
+ * Defaults are seeded in `onOpen()` for each new window so the first read
+ * returns the right shape (mutating `this.commandHistory.push(...)` would
+ * otherwise hit a fresh default array that's immediately discarded).
+ *
+ * The field list:
+ *   commandHistory  []
+ *   historyIndex    -1
+ *   godMode         false
+ *   activeProcess   null
+ *   currentPath     [...PATHS.USER_HOME]
+ *   lastOutput      ''
+ *   aliases         {}
+ *   batchCommands   []
+ *   batchIndex      0
+ *   pipeEnabled     true
+ *   _mpSession      null
+ *   _mpUnsubscribers []
+ *   envVars         { PATH, PROMPT, COMSPEC, ... }
+ */
+const PER_WINDOW_FIELDS = [
+    'commandHistory', 'historyIndex', 'godMode', 'activeProcess',
+    'currentPath', 'lastOutput', 'aliases', 'batchCommands',
+    'batchIndex', 'pipeEnabled', '_mpSession', '_mpUnsubscribers',
+    'envVars'
+];
+
+function defaultEnvVars() {
+    return {
+        'PATH': 'C:\\WINDOWS;C:\\WINDOWS\\SYSTEM32;C:\\TOOLS',
+        'PROMPT': '$P$G',
+        'COMSPEC': 'C:\\WINDOWS\\SYSTEM32\\CMD.EXE',
+        'TEMP': 'C:\\TEMP',
+        'TMP': 'C:\\TEMP',
+        'USERNAME': 'User',
+        'COMPUTERNAME': getConfig('branding.computerName', 'ILLUMINATOS-PC'),
+        'OS': getConfig('branding.osName', 'IlluminatOS!'),
+        'WINDIR': 'C:\\WINDOWS'
+    };
+}
+
+function defaultInstanceState() {
+    return {
+        commandHistory: [],
+        historyIndex: -1,
+        godMode: false,
+        activeProcess: null,
+        currentPath: [...PATHS.USER_HOME],
+        lastOutput: '',
+        aliases: {},
+        batchCommands: [],
+        batchIndex: 0,
+        pipeEnabled: true,
+        _mpSession: null,
+        _mpUnsubscribers: [],
+        envVars: defaultEnvVars()
+    };
+}
+
 class Terminal extends AppBase {
     constructor() {
         super({
@@ -25,43 +96,10 @@ class Terminal extends AppBase {
             minWidth: 480,
             minHeight: 320,
             resizable: true,
-            category: 'systemtools',
-            // Terminal keeps commandHistory, currentPath, aliases, envVars, and the
-            // active multiplayer session on `this` rather than via setInstanceState.
-            // Opening two terminals would share that state (cd in one would move
-            // the other's prompt; command history would bleed). Until those fields
-            // are migrated to per-window instance state, force singleton so only
-            // one terminal window can exist at a time.
-            singleton: true
+            category: 'systemtools'
+            // No `singleton: true` anymore — each window owns its own state
+            // via the per-window accessors defined below.
         });
-
-        this.commandHistory = [];
-        this.historyIndex = -1;
-        this.godMode = false;
-        this.activeProcess = null;
-        this.currentPath = [...PATHS.USER_HOME];
-        this.lastOutput = '';
-        this.aliases = {}; // Command aliases
-        this.batchCommands = []; // For batch file execution
-        this.batchIndex = 0;
-        this.pipeEnabled = true; // Enable pipe operators
-
-        // Multiplayer shared terminal session
-        this._mpSession = null;
-        this._mpUnsubscribers = [];
-
-        // Legacy-style environment variables
-        this.envVars = {
-            'PATH': 'C:\\WINDOWS;C:\\WINDOWS\\SYSTEM32;C:\\TOOLS',
-            'PROMPT': '$P$G',
-            'COMSPEC': 'C:\\WINDOWS\\SYSTEM32\\CMD.EXE',
-            'TEMP': 'C:\\TEMP',
-            'TMP': 'C:\\TEMP',
-            'USERNAME': 'User',
-            'COMPUTERNAME': getConfig('branding.computerName', 'ILLUMINATOS-PC'),
-            'OS': getConfig('branding.osName', 'IlluminatOS!'),
-            'WINDIR': 'C:\\WINDOWS'
-        };
 
         // Register semantic event commands for scriptability
         this.registerCommands();
@@ -457,6 +495,15 @@ class Terminal extends AppBase {
     }
 
     onOpen() {
+        // W4.4 — seed this window's per-instance state with the defaults.
+        // Subsequent reads of `this.commandHistory` etc. flow through the
+        // accessors at the bottom of this file, which proxy to the
+        // instance state map keyed by the current window id.
+        const defaults = defaultInstanceState();
+        for (const [key, value] of Object.entries(defaults)) {
+            this.setInstanceState(key, value, false);
+        }
+
         return `
             <div class="terminal-app" id="terminalApp">
                 <canvas id="matrixCanvas"></canvas>
@@ -3679,6 +3726,28 @@ ECHO Batch script completed!
         this._mpUnsubscribers = [];
         this._mpSession = null;
     }
+}
+
+// W4.4 — define per-window accessor properties on Terminal.prototype.
+//
+// `setInstanceState` and `getInstanceState` from AppBase route to a Map
+// keyed by `this._currentWindowId`, which AppBase sets before every
+// lifecycle callback. The accessors below let the existing ~160
+// references throughout this file (`this.commandHistory.push(...)`,
+// `this.currentPath = [...]`, etc.) keep working unchanged while
+// reading and writing per-window storage.
+//
+// If the current context has no instance data yet (e.g. someone reads
+// a field before `onOpen` runs), the getter returns `undefined` and
+// callers fall through to their default-handling code paths. The
+// defaults seeded in `onOpen` cover the steady-state.
+for (const field of PER_WINDOW_FIELDS) {
+    Object.defineProperty(Terminal.prototype, field, {
+        get() { return this.getInstanceState(field); },
+        set(value) { this.setInstanceState(field, value, false); },
+        configurable: true,
+        enumerable: false
+    });
 }
 
 export default Terminal;

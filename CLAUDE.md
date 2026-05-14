@@ -92,7 +92,7 @@ bash scripts/lint-innerhtml.sh        # Detect unsafe innerHTML usage
 
 ### Frontend
 
-- **Event-driven**: Central `EventBus` (pub/sub) with `SemanticEventBus` for schema-validated events. `SemanticEventBus` also owns the unified command registry — call `EventBus.registerCommand(name, handler)` and `EventBus.executeCommand(name, payload)`. `CommandBus.js` is a deprecated facade slated for Wave 4 removal.
+- **Event-driven**: Central `EventBus` (pub/sub) with `SemanticEventBus` for schema-validated events. `SemanticEventBus` also owns the unified command registry — call `EventBus.registerCommand(name, handler)` and `EventBus.executeCommand(name, payload)`. `CommandBus.js` is a thin facade kept for backwards compatibility (the parallel-registration concern was resolved in Wave 2 — both APIs share the same registry). Full file removal is tracked in `docs/MIGRATION_ROADMAP.md` Phase 2 once the 15 script-engine call sites that use `CommandBus.execute` migrate to `EventBus.executeCommand`.
 - **State management**: `StateManager` with reactive subscriptions and `resetVolatile()` for clean user-switch. For persisted paths (`icons`, `settings.sound`, etc.) use `setStateAndPersist(path, value)` to avoid state↔storage drift — it writes storage first and only commits the in-memory change if the write succeeds.
 - **Storage hardening**: `StorageManager.set/get/setGlobal/getGlobal` reject any payload containing `__proto__` / `constructor` / `prototype` keys at any depth (rejections tallied in `telemetry.unsafeKeyRejections`). During a remote snapshot hydration, UI-driven `.set()` calls are dropped (tallied in `telemetry.hydrationDrops`); the hydrator uses `beginHydration()` / `hydrationSet(key, value)` / `endHydration()` to write the incoming payload without tripping the guard.
 - **Singletons**: Core systems exported as `export default new ClassName()`
@@ -244,11 +244,11 @@ Never tear down `MultiplayerClient`, `RealtimeClient`, or `PresenceManager` dire
 
 ## Event System
 
-Events use namespaced format: `window:open`, `app:close`, `ui:menu:start:toggle`, etc. Schemas live in `core/schema/` with validation. `SemanticEventBus` provides middleware, logging, request/response, channels, and legacy name mapping. There is no separate `EventBus` implementation — `core/EventBus.js` is a re-export so old imports keep working.
+Events use namespaced format: `window:open`, `app:close`, `ui:menu:start:toggle`, etc. Schemas live in `core/schema/` with validation. `SemanticEventBus` provides middleware, logging, request/response, channels, and the unified command registry. There is no separate `EventBus` implementation — `core/EventBus.js` is a re-export so old imports keep working (the re-export is kept indefinitely — see `docs/MIGRATION_ROADMAP.md` for the rationale).
 
 The canonical user-session events are `user:login`, `user:logout`, `user:switch`, `auth:expired` (see `core/schema/system.js`).
 
-> ⚠️ Avoid relying on `LEGACY_EVENT_MAPPING` in new code. Use the new names directly (`ui:menu:start:toggle`, `system:ready`, `feature:pet:toggle`, etc.). The mapping table in `SemanticEventBus.js` is for compatibility with already-written code and is on the roadmap for removal.
+> Old aliases like `pet:toggle`, `taskbar:update`, `boot:complete` are no longer auto-rewritten. Use the semantic names directly: `feature:pet:toggle`, `ui:taskbar:update`, `system:ready`. The legacy mapping table was removed in Wave 4 — grep is now reliable.
 
 ## RetroScript
 
@@ -261,10 +261,11 @@ Script file ops (`write` / `read` / `delete` / `mkdir`) validate paths against t
 - `README.md` — Project overview, run instructions, app/feature catalog
 - `DEVELOPER_GUIDE.md` — Extension development guide (apps, features, plugins, RetroScript)
 - `SCRIPTING_GUIDE.md` — Complete RetroScript language reference
-- `docs/UNIFIED_ROADMAP.md` — Plan for converging on the unified API (sequenced waves, deferred items, success criteria)
+- `docs/UNIFIED_ROADMAP.md` — Plan for converging on the unified API (Waves 1–4 landed in PRs #1–#2; final status table)
+- `docs/MIGRATION_ROADMAP.md` — Next-stage plan for switching every app and feature to the new APIs the platform now exposes
 - `docs/ARCHITECTURE_AUDIT.md` — Original architecture audit + which findings are resolved
 - `docs/RETROSCRIPT_SCRIPTABLE_EVENTS.md` — Exhaustive event/command/query reference for scripts
 - `docs/TERMINAL_SCRIPTING.md` — Terminal-specific RetroScript built-ins and workflows
 - `docs/GREENGEEKS_RESELLER_VPS_WEBSOCKET_SETUP.md` — Production WebSocket sidecar deployment guide
 
-This file, `README.md`, `DEVELOPER_GUIDE.md`, and `docs/UNIFIED_ROADMAP.md` are the source of truth for architecture and conventions. Historical planning docs have been folded into the roadmap or removed.
+This file, `README.md`, `DEVELOPER_GUIDE.md`, `docs/UNIFIED_ROADMAP.md`, and `docs/MIGRATION_ROADMAP.md` are the source of truth for architecture and conventions. Historical planning docs have been folded into the roadmap or removed.

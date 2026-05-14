@@ -49,11 +49,11 @@ class ControlPanel extends AppBase {
                 },
                 petEnabled: () => {
                     StateManager.setState('settings.pet.enabled', payload.value, true);
-                    EventBus.emit('pet:toggle', { enabled: payload.value });
+                    EventBus.emit('feature:pet:toggle', { enabled: payload.value });
                 },
                 petType: () => {
                     StateManager.setState('settings.pet.type', payload.value, true);
-                    EventBus.emit('pet:change', { type: payload.value });
+                    EventBus.emit('feature:pet:change', { type: payload.value });
                 },
                 screensaverDelay: () => {
                     StateManager.setState('settings.screensaverDelay', payload.value, true);
@@ -523,7 +523,7 @@ class ControlPanel extends AppBase {
             this.addHandler(petToggle, 'change', (e) => {
                 const enabled = e.target.checked;
                 StateManager.setState('settings.pet.enabled', enabled, true);
-                EventBus.emit('pet:toggle', { enabled });
+                EventBus.emit('feature:pet:toggle', { enabled });
                 e.target.nextElementSibling.textContent = enabled ? 'On' : 'Off';
             });
         }
@@ -534,7 +534,7 @@ class ControlPanel extends AppBase {
             this.addHandler(petTypeSelect, 'change', (e) => {
                 const petType = e.target.value;
                 StateManager.setState('settings.pet.type', petType, true);
-                EventBus.emit('pet:change', { type: petType });
+                EventBus.emit('feature:pet:change', { type: petType });
                 this.updatePetPreview(petType);
             });
             // Initialize preview

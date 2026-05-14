@@ -13,6 +13,7 @@ import StorageManager from './StorageManager.js';
 import { getConfig } from './ConfigLoader.js';
 import { getNextDesktopSlot, findNearestFreeSlot, getAllOccupiedPositions } from './DesktopLayout.js';
 import SubscriptionManager from './SubscriptionManager.js';
+import { PATHS } from './Constants.js';
 
 // Default desktop icons (used when localStorage is empty)
 // Positions are placeholders; they get auto-arranged on first load
@@ -516,6 +517,79 @@ class StateManagerClass {
         // Remove from desktop
         const icons = this.state.icons.filter(i => i.id !== iconId);
         this.setState('icons', icons, true);
+    }
+
+    /**
+     * Reconcile in-memory icons with the .lnk files in the virtual FS
+     * Desktop folder (W3.2 — FS as truth at boot).
+     *
+     * Before this existed, `state.icons` and `Desktop/*.lnk` were two
+     * independent stores. A user could:
+     *   1. Drop a custom .lnk in Desktop via Terminal in one session
+     *   2. Close the OS
+     *   3. Reopen — `state.icons` (loaded from `desktopIcons` storage)
+     *      has no record of the .lnk, so the icon doesn't appear, even
+     *      though the file is right there in `getDesktopShortcuts()`.
+     *
+     * This method, called once at boot after FileSystemManager.initialize(),
+     * walks the .lnk files and adds icons for any that aren't already
+     * represented in `state.icons` (matched by label). Existing icons keep
+     * their persisted position; new icons get auto-positioned by addIcon.
+     *
+     * Note: this is one-way (FS → state) at boot only. Runtime mutations
+     * still flow state → FS via `FileSystemManager.syncDesktopIcons`. A
+     * full bidirectional reconcile (subscribing to FS events to re-merge)
+     * is a future improvement; this addresses the most painful case
+     * (cross-session new shortcuts).
+     *
+     * @param {object} FileSystemManager - The FS singleton (passed to avoid
+     *                                      a circular import).
+     * @returns {number} Number of icons added from the FS.
+     */
+    reconcileIconsFromFileSystem(FileSystemManager) {
+        if (!FileSystemManager || typeof FileSystemManager.getDesktopShortcuts !== 'function') {
+            return 0;
+        }
+        const shortcuts = FileSystemManager.getDesktopShortcuts();
+        if (!Array.isArray(shortcuts) || shortcuts.length === 0) return 0;
+
+        const existingLabels = new Set(this.state.icons.map(i => i.label));
+        let added = 0;
+
+        for (const shortcut of shortcuts) {
+            const labelFromFile = String(shortcut.name || '').replace(/\.lnk$/i, '');
+            if (!labelFromFile || existingLabels.has(labelFromFile)) continue;
+
+            // Try to parse the .lnk content to recover the original target/icon.
+            // If parsing fails we still surface the shortcut, just with a generic
+            // icon — better than leaving it invisible.
+            let parsed = {};
+            try {
+                const content = FileSystemManager.readFile([...PATHS.DESKTOP, shortcut.name]);
+                if (typeof content === 'string') {
+                    parsed = JSON.parse(content);
+                }
+            } catch {
+                /* fall back to defaults below */
+            }
+
+            const inferredId = parsed.target
+                || labelFromFile.toLowerCase().replace(/[^a-z0-9]+/g, '-');
+
+            this.addIcon({
+                id: inferredId,
+                label: parsed.label || labelFromFile,
+                emoji: parsed.icon || '📄',
+                type: parsed.type || 'app',
+                ...(parsed.type === 'link' && parsed.target ? { url: parsed.target } : {})
+            });
+            added += 1;
+        }
+
+        if (added > 0) {
+            console.log(`[StateManager] Reconciled ${added} icon(s) from filesystem.`);
+        }
+        return added;
     }
 
     /**

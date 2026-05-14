@@ -367,6 +367,12 @@ async function initializeOS(onProgress = () => {}) {
     console.log('[IlluminatOS!] Phase 1.5: Filesystem Sync');
     onProgress(25, 'Syncing filesystem...');
     await trackInit('FilesystemSync', () => {
+        // W3.2 — pull in any .lnk files that exist in the FS but aren't yet
+        // in state.icons (e.g. shortcuts the user created in Terminal in a
+        // previous session). This runs BEFORE syncDesktopIcons so the reverse
+        // sync below picks the merged set as its source of truth.
+        StateManager.reconcileIconsFromFileSystem(FileSystemManager);
+
         // Sync desktop icons into filesystem as .lnk files
         // This allows Terminal and MyComputer to see all desktop items
         const icons = StateManager.getState('icons');
