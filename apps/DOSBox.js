@@ -1,12 +1,15 @@
 /**
- * Arcade — IlluminatOS! Game Gallery
+ * Game Library — IlluminatOS! PC Software Gallery
  *
- * A curated 90s-styled game launcher that browses and plays a hand-picked
- * library of classic shareware and retro titles. Games are streamed from
- * trusted CDNs and run inside an in-browser emulator.
+ * A curated 90s-styled software launcher that browses and runs a hand-picked
+ * library of classic PC shareware and retail titles. Games are streamed
+ * from trusted CDNs and run inside an in-browser emulator.
+ *
+ * Visual theme: 90s multimedia CD-ROM compilation — Win95 chrome, DOS
+ * textmode accents, CD jewel-case tile art.
  *
  * The internal app id stays `dosbox` so existing `.retro` scripts keep
- * working — the visible name, icon, and chrome are all rebranded.
+ * working — the visible name, icon, and chrome are rebranded.
  *
  * SCRIPTING SUPPORT (unchanged for back-compat):
  *   Commands: run, runFile, stop, reset, fullscreen, setVolume, pause, resume, save
@@ -499,8 +502,8 @@ class DOSBox extends AppBase {
     constructor() {
         super({
             id: 'dosbox',
-            name: 'Arcade',
-            icon: '🕹️',
+            name: 'Game Library',
+            icon: '📀',
             width: 860,
             height: 620,
             minWidth: 640,
@@ -620,31 +623,35 @@ class DOSBox extends AppBase {
 
         return `
             <div class="arcade-app" data-view="browse">
-                <!-- ── Marquee header ─────────────────── -->
-                <div class="arcade-marquee">
-                    <div class="arcade-marquee-bulbs"></div>
-                    <div class="arcade-marquee-inner">
-                        <div class="arcade-marquee-logo">
-                            <span class="arcade-marquee-glyph">▼</span>
-                            <span class="arcade-marquee-title">RETRO ARCADE</span>
-                            <span class="arcade-marquee-glyph">▼</span>
+                <!-- ── Title bar header ───────────────── -->
+                <div class="arcade-titlebar">
+                    <div class="arcade-titlebar-row">
+                        <div class="arcade-titlebar-disc" aria-hidden="true">
+                            <div class="arcade-titlebar-disc-inner"></div>
                         </div>
-                        <div class="arcade-marquee-sub">CLASSIC GAMES &nbsp;✦&nbsp; INSERT COIN TO PLAY</div>
+                        <div class="arcade-titlebar-text">
+                            <div class="arcade-titlebar-title">Game Library</div>
+                            <div class="arcade-titlebar-version">v1.0 &nbsp;·&nbsp; CD-ROM Edition</div>
+                        </div>
+                        <div class="arcade-titlebar-stamp">
+                            <div class="arcade-stamp-line">INTERACTIVE</div>
+                            <div class="arcade-stamp-line arcade-stamp-line--accent">MULTIMEDIA</div>
+                        </div>
                     </div>
-                    <div class="arcade-marquee-bulbs"></div>
+                    <div class="arcade-titlebar-stripes" aria-hidden="true"></div>
                 </div>
 
                 <!-- ── Browse view (sidebar + grid) ─── -->
                 <div class="arcade-browse">
                     <aside class="arcade-sidebar">
-                        <div class="arcade-sidebar-title">CATEGORIES</div>
+                        <div class="arcade-sidebar-title">📁 Categories</div>
                         ${sidebar}
                         <div class="arcade-sidebar-foot">
                             <div class="arcade-sidebar-stat">
-                                <span>TOTAL</span><b>${stats.total}</b>
+                                <span>Titles</span><b>${stats.total}</b>
                             </div>
                             <div class="arcade-sidebar-stat">
-                                <span>YEARS</span><b>${stats.minYear}–${stats.maxYear}</b>
+                                <span>Years</span><b>${stats.minYear}–${stats.maxYear}</b>
                             </div>
                         </div>
                     </aside>
@@ -652,19 +659,19 @@ class DOSBox extends AppBase {
                     <main class="arcade-main">
                         <div class="arcade-toolbar">
                             <div class="arcade-toolbar-section">
-                                <span class="arcade-cat-label" id="arcadeCatLabel">★ HOT PICKS</span>
+                                <span class="arcade-cat-label" id="arcadeCatLabel">★ Top Titles</span>
                                 <span class="arcade-cat-count" id="arcadeCatCount"></span>
                             </div>
                             <div class="arcade-toolbar-search">
                                 <span class="arcade-search-icon">🔎</span>
                                 <input type="text" class="arcade-search-input" id="arcadeSearch"
-                                       placeholder="Search the arcade…" spellcheck="false" />
+                                       placeholder="Search titles…" spellcheck="false" />
                             </div>
                         </div>
                         <div class="arcade-grid" id="arcadeGrid"></div>
                         <div class="arcade-empty" id="arcadeEmpty" hidden>
-                            <div class="arcade-empty-icon">🕹️</div>
-                            <div class="arcade-empty-title">NO GAMES FOUND</div>
+                            <div class="arcade-empty-icon">💾</div>
+                            <div class="arcade-empty-title">NO TITLES FOUND</div>
                             <div class="arcade-empty-sub">Try a different search or category.</div>
                         </div>
                     </main>
@@ -676,23 +683,21 @@ class DOSBox extends AppBase {
                 <!-- ── Play view (emulator) ──────────── -->
                 <div class="arcade-play" id="arcadePlay" hidden>
                     <div class="arcade-play-bar">
-                        <button class="arcade-pixel-btn" id="arcadeBackToBrowse" title="Back to gallery">◀ EJECT</button>
+                        <button class="arcade-pixel-btn" id="arcadeBackToBrowse" title="Close program">◀ Close</button>
                         <div class="arcade-play-title" id="arcadePlayTitle">—</div>
                         <div class="arcade-play-actions">
-                            <button class="arcade-pixel-btn" id="arcadeResetBtn"  title="Restart this game">↻ RESTART</button>
-                            <button class="arcade-pixel-btn" id="arcadeFsBtn"     title="Toggle fullscreen">⛶ FULLSCREEN</button>
+                            <button class="arcade-pixel-btn" id="arcadeResetBtn"  title="Restart program">↻ Restart</button>
+                            <button class="arcade-pixel-btn" id="arcadeFsBtn"     title="Toggle fullscreen">⛶ Fullscreen</button>
                         </div>
                     </div>
                     <div class="arcade-stage-area" id="arcadeStageArea">
                         <div class="arcade-stage" id="arcadeStage"></div>
                         <div class="arcade-loading" id="arcadeLoading" hidden>
-                            <div class="arcade-loading-screen">
-                                <div class="arcade-loading-pixel"></div>
-                                <div class="arcade-loading-pixel"></div>
-                                <div class="arcade-loading-pixel"></div>
-                                <div class="arcade-loading-pixel"></div>
+                            <div class="arcade-loading-disc" aria-hidden="true">
+                                <div class="arcade-loading-disc-inner"></div>
+                                <div class="arcade-loading-disc-hole"></div>
                             </div>
-                            <div class="arcade-loading-text" id="arcadeLoadingText">NOW LOADING…</div>
+                            <div class="arcade-loading-text" id="arcadeLoadingText">Initializing…</div>
                             <div class="arcade-loading-tip" id="arcadeLoadingTip"></div>
                         </div>
                     </div>
@@ -701,9 +706,9 @@ class DOSBox extends AppBase {
                 <!-- ── Status bar ────────────────────── -->
                 <div class="arcade-statusbar">
                     <span class="arcade-status-led" id="arcadeStatusLed"></span>
-                    <span class="arcade-status-text" id="arcadeStatus">READY ▌</span>
+                    <span class="arcade-status-text" id="arcadeStatus">Ready</span>
                     <span class="arcade-status-spacer"></span>
-                    <span class="arcade-status-credit">CREDITS &nbsp;∞</span>
+                    <span class="arcade-status-credit">C:\\GAMES&gt; READY</span>
                 </div>
             </div>
         `;
@@ -838,9 +843,10 @@ class DOSBox extends AppBase {
         grid.innerHTML = filtered.map((g, i) => `
             <button class="arcade-tile" data-action="open-detail" data-url="${escapeHtml(g.url)}"
                     style="--tile-delay:${(i % 24) * 18}ms" title="${escapeHtml(g.desc)}">
-                <div class="arcade-tile-screen">
+                <div class="arcade-tile-cover">
+                    <div class="arcade-tile-banner">${escapeHtml(g.genre)}</div>
                     <div class="arcade-tile-glyph">${escapeHtml(g.icon)}</div>
-                    <div class="arcade-tile-scanlines"></div>
+                    <div class="arcade-tile-spine" aria-hidden="true"></div>
                 </div>
                 <div class="arcade-tile-plate">
                     <div class="arcade-tile-name">${escapeHtml(g.name)}</div>
@@ -856,31 +862,34 @@ class DOSBox extends AppBase {
     /** Render the big detail/launch panel for a single game. */
     _buildDetailHtml(game) {
         return `
-            <button class="arcade-pixel-btn arcade-detail-back" data-action="back-to-browse">◀ BACK</button>
+            <button class="arcade-pixel-btn arcade-detail-back" data-action="back-to-browse">◀ Back</button>
             <div class="arcade-detail-card">
-                <div class="arcade-detail-cabinet">
-                    <div class="arcade-detail-screen">
-                        <div class="arcade-detail-glyph">${game.icon}</div>
-                        <div class="arcade-tile-scanlines"></div>
+                <div class="arcade-detail-box">
+                    <div class="arcade-detail-box-cover">
+                        <div class="arcade-detail-box-banner">${escapeHtml(game.genre)}</div>
+                        <div class="arcade-detail-glyph">${escapeHtml(game.icon)}</div>
+                        <div class="arcade-detail-box-strip">
+                            <span>${escapeHtml(game.name)}</span>
+                        </div>
                     </div>
-                    <div class="arcade-detail-cabinet-base"></div>
+                    <div class="arcade-detail-box-spine" aria-hidden="true"></div>
                 </div>
                 <div class="arcade-detail-info">
-                    <div class="arcade-detail-genre-tag">${escapeHtml(game.genre)}</div>
+                    <div class="arcade-detail-genre-tag">${escapeHtml(game.genre.toUpperCase())}</div>
                     <h2 class="arcade-detail-title">${escapeHtml(game.name)}</h2>
-                    <div class="arcade-detail-year">© ${game.year}</div>
+                    <div class="arcade-detail-year">© ${game.year} &nbsp;·&nbsp; PC SOFTWARE</div>
                     <p class="arcade-detail-desc">${escapeHtml(game.desc)}</p>
                     <div class="arcade-detail-actions">
                         <button class="arcade-coin-btn" data-action="play" data-url="${escapeHtml(game.url)}">
-                            <span class="arcade-coin-glyph">▶</span>
-                            <span class="arcade-coin-text">INSERT COIN</span>
-                            <span class="arcade-coin-sub">PRESS TO PLAY</span>
+                            <span class="arcade-coin-glyph" aria-hidden="true">▶</span>
+                            <span class="arcade-coin-text">RUN PROGRAM</span>
+                            <span class="arcade-coin-sub">CLICK TO LAUNCH</span>
                         </button>
                     </div>
                     <div class="arcade-detail-meta-row">
-                        <div><span>YEAR</span><b>${game.year}</b></div>
-                        <div><span>GENRE</span><b>${escapeHtml(game.genre)}</b></div>
-                        <div><span>FORMAT</span><b>RETRO</b></div>
+                        <div><span>Year</span><b>${game.year}</b></div>
+                        <div><span>Genre</span><b>${escapeHtml(game.genre)}</b></div>
+                        <div><span>Format</span><b>CD-ROM</b></div>
                     </div>
                 </div>
             </div>
@@ -918,14 +927,14 @@ class DOSBox extends AppBase {
         ];
 
         const headers = `
-            <button class="arcade-cat arcade-cat--featured arcade-cat--active" data-cat="__hot__">
+            <button class="arcade-cat arcade-cat--active" data-cat="__hot__">
                 <span class="arcade-cat-icon">★</span>
-                <span class="arcade-cat-name">HOT PICKS</span>
+                <span class="arcade-cat-name">Top Titles</span>
                 <span class="arcade-cat-tally">${HOT_PICKS.length}</span>
             </button>
             <button class="arcade-cat" data-cat="__all__">
-                <span class="arcade-cat-icon">▦</span>
-                <span class="arcade-cat-name">ALL GAMES</span>
+                <span class="arcade-cat-icon">📂</span>
+                <span class="arcade-cat-name">All Titles</span>
                 <span class="arcade-cat-tally">${GAME_LIBRARY.length}</span>
             </button>
             <div class="arcade-sidebar-divider"></div>
@@ -934,7 +943,7 @@ class DOSBox extends AppBase {
         const rows = orderedGenres.map(genre => `
             <button class="arcade-cat" data-cat="${escapeHtml(genre)}">
                 <span class="arcade-cat-icon">${GENRE_ICONS[genre] || '🎮'}</span>
-                <span class="arcade-cat-name">${escapeHtml(genre.toUpperCase())}</span>
+                <span class="arcade-cat-name">${escapeHtml(genre)}</span>
                 <span class="arcade-cat-tally">${counts.get(genre)}</span>
             </button>
         `).join('');
@@ -943,9 +952,9 @@ class DOSBox extends AppBase {
     }
 
     _categoryLabel(cat) {
-        if (cat === '__hot__') return '★ HOT PICKS';
-        if (cat === '__all__') return '▦ ALL GAMES';
-        return `${GENRE_ICONS[cat] || '🎮'} ${cat.toUpperCase()}`;
+        if (cat === '__hot__') return '★ Top Titles';
+        if (cat === '__all__') return '📂 All Titles';
+        return `${GENRE_ICONS[cat] || '🎮'} ${cat}`;
     }
 
     _libraryStats() {
@@ -1058,16 +1067,16 @@ class DOSBox extends AppBase {
         if (detail) detail.hidden = true;
         if (play)   play.hidden = false;
         if (loading) loading.hidden = false;
-        if (loadTxt) loadTxt.textContent = 'NOW LOADING…';
+        if (loadTxt) loadTxt.textContent = 'Initializing…';
         if (loadTip) loadTip.textContent = this._randomTip();
-        if (titleEl) titleEl.textContent = displayName.toUpperCase();
+        if (titleEl) titleEl.textContent = displayName;
         this.setView('play');
         this.setStatusLed('booting');
 
         try {
             await this.ensureJsDosLoaded();
 
-            if (loadTxt) loadTxt.textContent = 'PRESSING START…';
+            if (loadTxt) loadTxt.textContent = 'Loading program…';
 
             stage.innerHTML = '';
             const root = document.createElement('div');
@@ -1082,7 +1091,7 @@ class DOSBox extends AppBase {
             this.currentBundleName = displayName;
             this.isRunning = true;
             this.isReady = false;
-            this.setStatus('STARTING ▸ ' + displayName.toUpperCase());
+            this.setStatus('Starting · ' + displayName);
 
             const fetchUrl = this.getLoadUrl(url);
             if (fetchUrl !== url) {
@@ -1110,7 +1119,7 @@ class DOSBox extends AppBase {
             this._readyWatchdog = setTimeout(() => {
                 if (this.isRunning && !this.isReady) {
                     console.warn('[Arcade] Engine did not reach ready state in 45s.');
-                    this.setStatus('STUCK ▸ CHECK CONSOLE');
+                    this.setStatus('Stuck loading — check console');
                     this.setStatusLed('error');
                 }
             }, 45000);
@@ -1179,7 +1188,7 @@ class DOSBox extends AppBase {
             this.emitAppEvent('started', { url, name: displayName, workerThread: canUseWorker });
         } catch (err) {
             console.error('[Arcade] Failed to load bundle:', err);
-            this.setStatus('ERROR ▸ ' + (err?.message || err));
+            this.setStatus('Error · ' + (err?.message || err));
             this.setStatusLed('error');
             if (loading) loading.hidden = true;
             this.isRunning = false;
@@ -1195,7 +1204,7 @@ class DOSBox extends AppBase {
     _handleJsDosEvent(event, arg) {
         switch (event) {
             case 'emu-ready':
-                this.setStatus('BOOTING ▸ ' + this.currentBundleName.toUpperCase());
+                this.setStatus('Loading · ' + this.currentBundleName);
                 this.setStatusLed('booting');
                 this.emitAppEvent('booting', { name: this.currentBundleName });
                 break;
@@ -1205,7 +1214,7 @@ class DOSBox extends AppBase {
                     clearTimeout(this._readyWatchdog);
                     this._readyWatchdog = null;
                 }
-                this.setStatus('PLAYING ▸ ' + this.currentBundleName.toUpperCase());
+                this.setStatus('Running · ' + this.currentBundleName);
                 this.setStatusLed('playing');
                 this.emitAppEvent('ready', { name: this.currentBundleName });
                 break;
@@ -1268,7 +1277,7 @@ class DOSBox extends AppBase {
             const play = this.getElement('#arcadePlay');
             if (play) play.hidden = true;
             this.setView('browse');
-            this.setStatus('READY ▌');
+            this.setStatus('Ready');
             this.setStatusLed('ready');
         }
 
@@ -1322,12 +1331,14 @@ class DOSBox extends AppBase {
 
     _randomTip() {
         const tips = [
-            'TIP: PRESS F11 IN-GAME FOR FULLSCREEN',
-            'TIP: USE ARROW KEYS TO MOVE',
-            'TIP: SAVE OFTEN!',
-            'TIP: RIGHT-CLICK FOR ENGINE OPTIONS',
-            'TIP: KEEP MULTIPLE GAMES IN ROTATION',
-            'TIP: HIGH SCORE OR HIGH SCORE? YOU PICK',
+            'TIP: Press F11 in-game for fullscreen',
+            'TIP: Arrow keys move in most titles',
+            'TIP: Save your game often',
+            'TIP: Right-click the viewport for runtime options',
+            'TIP: Check the manual before launching',
+            'TIP: Original DOS keyboard layouts are preserved',
+            'TIP: Some games need 5–10 seconds to start',
+            'TIP: Adjust audio with the volume command',
         ];
         return tips[Math.floor(Math.random() * tips.length)];
     }
