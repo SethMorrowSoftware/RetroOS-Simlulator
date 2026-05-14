@@ -363,14 +363,26 @@ class DesktopPet extends FeatureBase {
         // an unset StateManager value, which is why the pet never appeared.)
         this.show();
 
+        // Mirror state into the legacy StateManager path so the Control Panel
+        // checkbox in the Pet section displays the correct value. Older users
+        // may have settings.pet.enabled=false saved from before this fix; once
+        // the feature is actually enabled we make sure the UI agrees.
+        try {
+            StateManager.setState('settings.pet.enabled', true, true);
+            StateManager.setState('settings.pet.type', this.petType, true);
+        } catch (e) { /* StateManager not ready or path missing — non-fatal */ }
+
         // Listen for runtime toggles + type changes
         this.subscribe(Events.PET_TOGGLE, ({ enabled }) => {
             this.toggle(enabled);
+            // Keep legacy state in sync
+            try { StateManager.setState('settings.pet.enabled', !!enabled, true); } catch (e) {}
         });
         this.subscribe(Events.PET_CHANGE, ({ type }) => {
             this.setPetType(type);
             this.spawnParticle('SPARKLE');
             this.say(`I'm a ${this.petConfig.name} now!`);
+            try { StateManager.setState('settings.pet.type', this.petType, true); } catch (e) {}
         });
 
         this.log(`Initialized: ${this.petConfig.name} named "${this.name}" :3`);
