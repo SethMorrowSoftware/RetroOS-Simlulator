@@ -49,6 +49,13 @@ $router->use(Middleware::parseJsonBody());
 // every mutating request (POST/PUT/DELETE). GET/HEAD/OPTIONS are exempt.
 $router->use(Middleware::requireCsrf());
 
+// Shared middleware stacks. Defined once so every admin route gets the
+// same auth + role + rate-limit treatment.
+$authedUser  = [Middleware::auth(true)];
+$adminAuth   = [Middleware::auth(true), Middleware::requireRole('admin', 'superadmin')];
+$adminLimit  = Middleware::rateLimit(120, 60); // 120 admin requests per minute per IP
+$adminGuard  = array_merge($adminAuth, [$adminLimit]);
+
 // ─── Auth Routes ────────────────────────────────────────────
 $router->post('/auth/session',      [AuthController::class, 'createSession']);
 $router->post('/auth/register',     [AuthController::class, 'register']);
@@ -70,49 +77,64 @@ $router->put('/config/:section',    [ConfigController::class, 'updateSection']);
 $router->delete('/config/:section', [ConfigController::class, 'resetSection']);
 
 // ─── User Management Routes (Admin) ────────────────────────
-$router->get('/users',              [UserController::class, 'list']);
-$router->get('/users/:id',         [UserController::class, 'get']);
-$router->put('/users/:id',         [UserController::class, 'update']);
-$router->delete('/users/:id',      [UserController::class, 'delete']);
+$router->group($adminGuard, function ($r) {
+    $r->get('/users',         [UserController::class, 'list']);
+    $r->get('/users/:id',     [UserController::class, 'get']);
+    $r->put('/users/:id',     [UserController::class, 'update']);
+    $r->delete('/users/:id',  [UserController::class, 'delete']);
+});
 
 // ─── Webhook Routes (Admin) ────────────────────────────────
-$router->get('/webhooks',           [WebhookController::class, 'list']);
-$router->post('/webhooks',          [WebhookController::class, 'create']);
-$router->get('/webhooks/:id',      [WebhookController::class, 'get']);
-$router->put('/webhooks/:id',      [WebhookController::class, 'update']);
-$router->delete('/webhooks/:id',   [WebhookController::class, 'delete']);
-$router->post('/webhooks/:id/test', [WebhookController::class, 'test']);
-$router->get('/webhooks/:id/deliveries', [WebhookController::class, 'deliveries']);
+$router->group($adminGuard, function ($r) {
+    $r->get('/webhooks',                     [WebhookController::class, 'list']);
+    $r->post('/webhooks',                    [WebhookController::class, 'create']);
+    $r->get('/webhooks/:id',                 [WebhookController::class, 'get']);
+    $r->put('/webhooks/:id',                 [WebhookController::class, 'update']);
+    $r->delete('/webhooks/:id',              [WebhookController::class, 'delete']);
+    $r->post('/webhooks/:id/test',           [WebhookController::class, 'test']);
+    $r->get('/webhooks/:id/deliveries',      [WebhookController::class, 'deliveries']);
+});
 
 // ─── Theme Routes ───────────────────────────────────────────
-$router->get('/themes',             [ThemeController::class, 'list']);
-$router->post('/themes',            [ThemeController::class, 'create']);
-$router->get('/themes/:id',        [ThemeController::class, 'get']);
-$router->put('/themes/:id',        [ThemeController::class, 'update']);
-$router->delete('/themes/:id',     [ThemeController::class, 'delete']);
+// Reads are open to any authenticated user (clients need to apply themes).
+// Mutations require admin and are rate-limited.
+$router->get('/themes',           [ThemeController::class, 'list'], $authedUser);
+$router->get('/themes/:id',       [ThemeController::class, 'get'],  $authedUser);
+$router->group($adminGuard, function ($r) {
+    $r->post('/themes',           [ThemeController::class, 'create']);
+    $r->put('/themes/:id',        [ThemeController::class, 'update']);
+    $r->delete('/themes/:id',     [ThemeController::class, 'delete']);
+});
 
-// ─── Campaign Routes (Admin) ────────────────────────────────
-// Note: /campaigns/active must come BEFORE /campaigns/:id so the literal
-// path isn't captured by the :id wildcard.
-$router->get('/campaigns/active',           [CampaignController::class, 'active']);
-$router->get('/campaigns',                  [CampaignController::class, 'list']);
-$router->post('/campaigns',                 [CampaignController::class, 'create']);
-$router->get('/campaigns/:id',              [CampaignController::class, 'get']);
-$router->put('/campaigns/:id',              [CampaignController::class, 'update']);
-$router->delete('/campaigns/:id',           [CampaignController::class, 'delete']);
-$router->post('/campaigns/:id/activate',    [CampaignController::class, 'activate']);
-$router->post('/campaigns/:id/deactivate',  [CampaignController::class, 'deactivate']);
-$router->post('/campaigns/:id/publish',     [CampaignController::class, 'publish']);
+// ─── Campaign Routes ────────────────────────────────────────
+// /campaigns/active is intentionally open (auth optional) so unauthenticated
+// boot clients can fetch the active campaign. The handler still calls
+// Middleware::auth(false) internally to populate currentUser when a token
+// IS present. Must come BEFORE /campaigns/:id so the literal path isn't
+// captured by the :id wildcard.
+$router->get('/campaigns/active',  [CampaignController::class, 'active']);
+$router->group($adminGuard, function ($r) {
+    $r->get('/campaigns',                       [CampaignController::class, 'list']);
+    $r->post('/campaigns',                      [CampaignController::class, 'create']);
+    $r->get('/campaigns/:id',                   [CampaignController::class, 'get']);
+    $r->put('/campaigns/:id',                   [CampaignController::class, 'update']);
+    $r->delete('/campaigns/:id',                [CampaignController::class, 'delete']);
+    $r->post('/campaigns/:id/activate',         [CampaignController::class, 'activate']);
+    $r->post('/campaigns/:id/deactivate',       [CampaignController::class, 'deactivate']);
+    $r->post('/campaigns/:id/publish',          [CampaignController::class, 'publish']);
+});
 
 // ─── Timeline Routes (Admin) ────────────────────────────────
 // Same ordering rule: literal sub-paths before :id.
-$router->post('/timeline/run-due',          [TimelineController::class, 'runDue']);
-$router->get('/timeline',                   [TimelineController::class, 'list']);
-$router->post('/timeline',                  [TimelineController::class, 'create']);
-$router->get('/timeline/:id',               [TimelineController::class, 'get']);
-$router->put('/timeline/:id',               [TimelineController::class, 'update']);
-$router->delete('/timeline/:id',            [TimelineController::class, 'delete']);
-$router->post('/timeline/:id/fire',         [TimelineController::class, 'fire']);
+$router->group($adminGuard, function ($r) {
+    $r->post('/timeline/run-due',  [TimelineController::class, 'runDue']);
+    $r->get('/timeline',           [TimelineController::class, 'list']);
+    $r->post('/timeline',          [TimelineController::class, 'create']);
+    $r->get('/timeline/:id',       [TimelineController::class, 'get']);
+    $r->put('/timeline/:id',       [TimelineController::class, 'update']);
+    $r->delete('/timeline/:id',    [TimelineController::class, 'delete']);
+    $r->post('/timeline/:id/fire', [TimelineController::class, 'fire']);
+});
 
 // ─── Event / SSE Routes ────────────────────────────────────
 $router->get('/events/stream',      [EventController::class, 'stream']);
@@ -137,8 +159,8 @@ $router->put('/files/:id',           [FileController::class, 'update']);
 $router->delete('/files/:id',        [FileController::class, 'delete']);
 
 // ─── User State Snapshot Routes ─────────────────────────
-$router->get('/user-state',            [UserStateController::class, 'get']);
-$router->put('/user-state',            [UserStateController::class, 'update']);
+$router->get('/user-state',            [UserStateController::class, 'get'],    $authedUser);
+$router->put('/user-state',            [UserStateController::class, 'update'], $authedUser);
 
 // ─── Multiplayer / Game Routes ─────────────────────────────
 $router->get('/multiplayer/rooms',              [MultiplayerController::class, 'list']);

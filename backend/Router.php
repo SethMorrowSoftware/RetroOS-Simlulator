@@ -26,37 +26,67 @@ class Router
     /** @var callable[] */
     private array $middleware = [];
 
-    public function get(string $path, $handler): self
+    /**
+     * Per-route middleware stacks set by group(); reset after the registrar
+     * runs. Stack form keeps nested groups composable in future, even though
+     * the current API only registers a single layer at a time.
+     * @var callable[][]
+     */
+    private array $groupStack = [];
+
+    public function get(string $path, $handler, array $middleware = []): self
     {
-        return $this->addRoute('GET', $path, $handler);
+        return $this->addRoute('GET', $path, $handler, $middleware);
     }
 
-    public function post(string $path, $handler): self
+    public function post(string $path, $handler, array $middleware = []): self
     {
-        return $this->addRoute('POST', $path, $handler);
+        return $this->addRoute('POST', $path, $handler, $middleware);
     }
 
-    public function put(string $path, $handler): self
+    public function put(string $path, $handler, array $middleware = []): self
     {
-        return $this->addRoute('PUT', $path, $handler);
+        return $this->addRoute('PUT', $path, $handler, $middleware);
     }
 
-    public function patch(string $path, $handler): self
+    public function patch(string $path, $handler, array $middleware = []): self
     {
-        return $this->addRoute('PATCH', $path, $handler);
+        return $this->addRoute('PATCH', $path, $handler, $middleware);
     }
 
-    public function delete(string $path, $handler): self
+    public function delete(string $path, $handler, array $middleware = []): self
     {
-        return $this->addRoute('DELETE', $path, $handler);
+        return $this->addRoute('DELETE', $path, $handler, $middleware);
     }
 
     /**
-     * Register a middleware that runs before each route's handler.
+     * Register a middleware that runs before each route's handler (global).
      */
     public function use(callable $middleware): self
     {
         $this->middleware[] = $middleware;
+        return $this;
+    }
+
+    /**
+     * Run $registrar with $middleware automatically attached to every route
+     * it registers. Lets callers express "all /webhooks/* routes require
+     * admin auth + the admin rate limit" without repeating the stack on
+     * every line.
+     *
+     *   $router->group([$adminAuth, $adminRateLimit], function ($r) {
+     *       $r->get('/webhooks', [WebhookController::class, 'list']);
+     *       ...
+     *   });
+     */
+    public function group(array $middleware, callable $registrar): self
+    {
+        $this->groupStack[] = $middleware;
+        try {
+            $registrar($this);
+        } finally {
+            array_pop($this->groupStack);
+        }
         return $this;
     }
 
@@ -101,8 +131,14 @@ class Router
             jsonError('Not found: ' . $path, 404);
         }
 
-        // Run middleware (each can short-circuit by calling jsonError/jsonResponse)
+        // Run global middleware first, then any route-scoped middleware
+        // attached via group() or the optional middleware array on the
+        // route registration. Each layer can short-circuit by calling
+        // jsonError/jsonResponse.
         foreach ($this->middleware as $mw) {
+            $mw($matchedParams);
+        }
+        foreach (($matchedRoute['middleware'] ?? []) as $mw) {
             $mw($matchedParams);
         }
 
@@ -123,7 +159,7 @@ class Router
     /**
      * Register a route with method + path.
      */
-    private function addRoute(string $method, string $path, $handler): self
+    private function addRoute(string $method, string $path, $handler, array $middleware = []): self
     {
         $path = '/' . trim($path, '/');
         $params = [];
@@ -140,11 +176,20 @@ class Router
 
         $regex = '#^' . $regex . '$#';
 
+        // Compose group-attached middleware (in outer-to-inner order) with
+        // any per-route middleware passed at registration.
+        $stacked = [];
+        foreach ($this->groupStack as $layer) {
+            foreach ($layer as $mw) $stacked[] = $mw;
+        }
+        foreach ($middleware as $mw) $stacked[] = $mw;
+
         $this->routes[$method][] = [
-            'pattern' => $path,
-            'regex'   => $regex,
-            'params'  => $params,
-            'handler' => $handler,
+            'pattern'    => $path,
+            'regex'      => $regex,
+            'params'     => $params,
+            'handler'    => $handler,
+            'middleware' => $stacked,
         ];
 
         return $this;

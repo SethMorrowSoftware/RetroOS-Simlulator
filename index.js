@@ -20,6 +20,8 @@ import FileSystemManager from './core/FileSystemManager.js';
 import MediaScanner from './core/MediaScanner.js';
 import CommandRegistry from './core/CommandRegistry.js';
 import ScriptEngine from './core/script/ScriptEngine.js';
+import { validateScriptPath } from './core/script/utils/PathValidation.js';
+import SessionManager from './core/SessionManager.js';
 
 // === UI RENDERERS ===
 import TaskbarRenderer from './ui/TaskbarRenderer.js';
@@ -715,26 +717,14 @@ function setupGlobalHandlers() {
     EventBus.on('sse:system.filesystem.command', ({ operation, path, content = '', recursive = false } = {}) => {
         if (!operation || !path) return;
 
-        // Restrict remote filesystem commands to known-safe roots.
-        // Support both legacy path style (/C/server/...) and current Win95-style
-        // paths used across the OS (C:/Users/User/...).
-        const allowedPrefixes = [
-            '/C/server/', '/C/shared/', '/C/public/',
-            'C:/server/', 'C:/shared/', 'C:/public/',
-            'C:/Users/User/Desktop/',
-            'C:/Users/User/Documents/',
-            'C:/Users/User/Pictures/',
-            'C:/Users/User/Music/',
-            'C:/Users/User/Projects/',
-            'C:/Users/User/Secret/',
-            'C:/Windows/',
-            'C:/Windows/System32/'
-        ];
-
-        const normalizedPath = String(path).replace(/\\/g, '/');
-        const ensuredTrailingSlash = normalizedPath.endsWith('/') ? normalizedPath : `${normalizedPath}/`;
-        if (!allowedPrefixes.some(prefix => ensuredTrailingSlash.startsWith(prefix))) {
-            console.warn('[IlluminatOS!] Remote filesystem command blocked — path outside allowed prefixes:', path);
+        // Single source of truth: PathValidation.validateScriptPath is the
+        // same allowlist enforced by the script engine and the command:fs:*
+        // handlers. Throws on traversal or unauthorized roots; we treat that
+        // as "drop the command" with a warn, matching prior behavior.
+        try {
+            validateScriptPath(path);
+        } catch (err) {
+            console.warn('[IlluminatOS!] Remote filesystem command blocked:', err?.message || err);
             return;
         }
 
@@ -887,6 +877,58 @@ function setupGlobalHandlers() {
     EventBus.on('sse:narrative.puzzle.solve', (p = {}) => EventBus.emit('narrative:event', { type: 'puzzle.solve', ...p }));
     EventBus.on('sse:narrative.puzzle.new', (p = {}) => EventBus.emit('narrative:event', { type: 'puzzle.new', ...p }));
     EventBus.on('sse:narrative.custom', (p = {}) => EventBus.emit('narrative:event', { type: 'custom', ...p }));
+
+    // ── Campaign lifecycle (admin → live OS) ────────────────
+    // Surface a toast for activation/publication and re-emit a semantic event
+    // so features/CampaignManager.js can refresh its registry view.
+    EventBus.on('sse:campaign.activated', (p = {}) => {
+        EventBus.emit('campaign:registry:refresh', { reason: 'activated', ...p });
+        if (p?.name || p?.slug) {
+            EventBus.emit('notification:show', {
+                title: 'Campaign Activated',
+                message: p.name || p.slug,
+                type: 'info',
+                icon: '🎬',
+                duration: 6000,
+            });
+        }
+    });
+    EventBus.on('sse:campaign.deactivated', (p = {}) => {
+        EventBus.emit('campaign:registry:refresh', { reason: 'deactivated', ...p });
+    });
+    EventBus.on('sse:campaign.published', (p = {}) => {
+        EventBus.emit('campaign:registry:refresh', { reason: 'published', ...p });
+    });
+
+    // ── Timeline.fired (admin → live OS) ────────────────────
+    // The inner event_type already dispatches independently (and gets bridged
+    // if it's in the topology). This wrapper just lets activity monitors and
+    // future timeline UIs subscribe once.
+    EventBus.on('sse:timeline.fired', (p = {}) => {
+        EventBus.emit('timeline:activity', p);
+    });
+
+    // ── Session revocation (server → owning client) ─────────
+    // Triggered when the user's session is revoked or evicted server-side
+    // (admin "force logout", account delete, etc.). The `token` field is
+    // already stripped by EventService::sanitizeForExternal — clients see
+    // only the truncated fingerprint. Match it to our local fingerprint;
+    // mismatched events refer to a different device's session.
+    const handleRemoteRevocation = async (payload = {}, kind = 'revoked') => {
+        const incoming = String(payload.token_fingerprint || '').toLowerCase();
+        if (!incoming) return;
+        const { getSessionTokenFingerprint } = await import('./core/ConfigLoader.js');
+        const mine = await getSessionTokenFingerprint();
+        if (!mine || mine !== incoming) return;
+        const reason = kind === 'evicted' ? 'session_evicted' : 'session_revoked';
+        try {
+            await SessionManager.logout({ reason });
+        } catch (err) {
+            console.error('[IlluminatOS!] Remote revocation logout failed:', err);
+        }
+    };
+    EventBus.on('sse:session.revoked', (p = {}) => { void handleRemoteRevocation(p, 'revoked'); });
+    EventBus.on('sse:session.evicted', (p = {}) => { void handleRemoteRevocation(p, 'evicted'); });
 
     // Keyboard shortcuts
     document.addEventListener('keydown', (e) => {
@@ -1329,9 +1371,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.log(`[IlluminatOS!] User logged in as: ${loginResult.username} (${loginResult.mode})`);
 
         // === Per-user storage isolation ===
-        // Scope all storage by the logged-in user so each user gets their own
-        // filesystem, desktop icons, settings, etc.
-        StorageManager.setUserScope(loginResult.userUuid || loginResult.username);
+        // Route the storage rescope through SessionManager so subscribers see
+        // the canonical `user:switch` event with { previous: null, next: id }
+        // at first login — same as a mid-session user-switch would emit.
+        // attachInitialUser skips the teardown step (no token to clear, no
+        // realtime to close), keeping the freshly-issued session token intact.
+        SessionManager.attachInitialUser(loginResult.userUuid || loginResult.username);
 
         // For registered users on v2 backend, hydrate/sync scoped storage
         // with database snapshots for resilient cross-device persistence.

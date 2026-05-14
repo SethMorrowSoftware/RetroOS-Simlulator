@@ -14,8 +14,6 @@ class UserStateController
      */
     public function get(array $params): void
     {
-        Middleware::auth(true)($params);
-
         $user = currentUser();
         $state = UserState::get((int) $user['id']);
 
@@ -30,8 +28,6 @@ class UserStateController
      */
     public function update(array $params): void
     {
-        Middleware::auth(true)($params);
-
         $user = currentUser();
         $data = input('data');
 

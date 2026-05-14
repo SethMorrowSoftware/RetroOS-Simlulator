@@ -73,9 +73,10 @@ class EventController
 
             if (!empty($events)) {
                 foreach ($events as $event) {
+                    $sanitized = EventService::sanitizeEventRow($event);
                     SSEBroadcaster::sendEvent(
-                        $event['event_type'],
-                        $event['payload'] ?? [],
+                        $sanitized['event_type'],
+                        $sanitized['payload'] ?? [],
                         (string) $event['id']
                     );
                     $lastId = (int) $event['id'];

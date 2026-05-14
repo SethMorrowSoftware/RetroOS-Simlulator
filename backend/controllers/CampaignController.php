@@ -23,9 +23,6 @@ class CampaignController
      */
     public function list(array $params): void
     {
-        Middleware::auth(true)($params);
-        Middleware::requireRole('admin', 'superadmin')($params);
-
         $limit  = max(1, min(200, (int) ($_GET['limit'] ?? 50)));
         $offset = max(0, (int) ($_GET['offset'] ?? 0));
         $status = $_GET['status'] ?? null;
@@ -62,9 +59,6 @@ class CampaignController
      */
     public function get(array $params): void
     {
-        Middleware::auth(true)($params);
-        Middleware::requireRole('admin', 'superadmin')($params);
-
         $campaign = $this->findTarget($params['id'] ?? '');
         jsonResponse(['campaign' => $campaign]);
     }
@@ -76,9 +70,6 @@ class CampaignController
      */
     public function create(array $params): void
     {
-        Middleware::auth(true)($params);
-        Middleware::requireRole('admin', 'superadmin')($params);
-
         $slug = trim((string) input('slug', ''));
         $name = trim((string) input('name', ''));
         $version = trim((string) input('version', '1.0.0'));
@@ -137,9 +128,6 @@ class CampaignController
      */
     public function update(array $params): void
     {
-        Middleware::auth(true)($params);
-        Middleware::requireRole('admin', 'superadmin')($params);
-
         $campaign = $this->findTarget($params['id'] ?? '');
         $updates = [];
 
@@ -202,9 +190,6 @@ class CampaignController
      */
     public function delete(array $params): void
     {
-        Middleware::auth(true)($params);
-        Middleware::requireRole('admin', 'superadmin')($params);
-
         $campaign = $this->findTarget($params['id'] ?? '');
         Campaign::delete((int) $campaign['id']);
 
@@ -227,9 +212,6 @@ class CampaignController
      */
     public function activate(array $params): void
     {
-        Middleware::auth(true)($params);
-        Middleware::requireRole('admin', 'superadmin')($params);
-
         $campaign = $this->findTarget($params['id'] ?? '');
         $ok = Campaign::setActive((int) $campaign['id']);
         if (!$ok) jsonError('Failed to activate campaign', 500);
@@ -251,9 +233,6 @@ class CampaignController
      */
     public function deactivate(array $params): void
     {
-        Middleware::auth(true)($params);
-        Middleware::requireRole('admin', 'superadmin')($params);
-
         $campaign = $this->findTarget($params['id'] ?? '');
         Campaign::update((int) $campaign['id'], ['is_active' => false]);
 
@@ -274,9 +253,6 @@ class CampaignController
      */
     public function publish(array $params): void
     {
-        Middleware::auth(true)($params);
-        Middleware::requireRole('admin', 'superadmin')($params);
-
         $campaign = $this->findTarget($params['id'] ?? '');
         Campaign::update((int) $campaign['id'], ['status' => Campaign::STATUS_PUBLISHED]);
 

@@ -57,9 +57,9 @@ python -m http.server 8000
 ```bash
 cp backend/env.example.php backend/env.php
 # Edit backend/env.php with MySQL credentials
-php backend/migrate.php
-php backend/seed.php          # optional: seed default admin
+php backend/migrate.php       # CLI runner; web equivalent: api/v2/migrate.php
 php -S localhost:8000
+# Then visit http://localhost:8000/setup.php to create the default admin
 ```
 
 ### WebSocket server
@@ -111,7 +111,7 @@ bash scripts/ci-gate.sh                # Runs all 5 gates: JS syntax, PHP lint,
 - **AppBase**: All apps extend `AppBase` with lifecycle methods (`onOpen`, `onClose`, `onFocus`, `onBlur`, `onMount`). Multi-instance apps **must** use `setInstanceState()` / `getInstanceState()` — every app in the tree has been audited and either uses per-instance state or is `singleton: true` deliberately. `AppBase.setContent()` releases any `addHandler()`-registered listener whose target sits inside the replaced subtree before swapping HTML, so re-rendered content can't leak handlers pointing at detached nodes.
 - **FeatureBase**: Background features extend `FeatureBase` with `initialize()`, `enable()`, `disable()`, `cleanup()`. `disable()` does **not** reset `initialized` — re-enable will not re-run `initialize()`; subclasses that genuinely need re-init must override `disable()` to clear it explicitly. Concurrent enable/disable calls are serialized by an internal lifecycle queue, so two clicks can't double-run `initialize()`.
 - **CommandRegistry**: `core/CommandRegistry.js` is the wiring layer that registers every platform-level command handler (`command:fs:*`, `command:window:*`, `command:terminal:*`, `command:dialog:*`, `command:app:*`, `command:setting:*`, `command:sound:play`, etc.), the `query:*` listeners, and the `timer:*` / `macro:*` lifecycle handlers. It owns the runtime timer/macro state (`timers` Map, `macros` Map, recording flags). The public API is `EventBus.registerCommand()` / `EventBus.executeCommand()` — `CommandRegistry` is not an alternative API, it's where the boot-time platform handlers live. The script engine takes `EventBus`, `FileSystemManager`, etc. in its context (`ScriptEngine.initialize({ EventBus, FileSystemManager, ... })`); every visitor and media/system builtin goes through `EventBus.executeCommand`.
-- **SessionManager**: Single owner of the logout / user-switch cascade. Always call `SessionManager.logout()` or `SessionManager.switchUser(newUser)` instead of tearing down realtime/presence/state by hand. Cascade order is: `MultiplayerClient.disconnect` → `closeRealtime` → `PresenceManager.destroy` → `setSessionToken(null)` → `SubscriptionManager.unsubscribeAll('session')` → `StateManager.resetVolatile`, then `user:logout` / `user:switch` emitted for subscribers.
+- **SessionManager**: Single owner of the logout / user-switch cascade. Always call `SessionManager.logout()` or `SessionManager.switchUser(newUser)` instead of tearing down realtime/presence/state by hand. Cascade order is: `MultiplayerClient.disconnect` → `closeRealtime` → `PresenceManager.destroy` → `setSessionToken(null)` → `SubscriptionManager.unsubscribeAll('session')` → `StateManager.resetVolatile`, then `user:logout` / `user:switch` emitted for subscribers. At first-login the boot flow calls `SessionManager.attachInitialUser(name)` — sets the scope + emits `user:switch` *without* running the teardown (no token to clear, no realtime to close), keeping the freshly-issued session token intact.
 - **Authenticated HTTP**: `fetchWithAuth(input, init)` from `ConfigLoader.js` is the single way to call the v2 API. Adds `Authorization: Bearer <token>` and `X-Requested-With: XMLHttpRequest` automatically, and on 401 routes through `SessionManager.logout({ reason: 'auth_expired' })` so the frontend stops looping with a stale token. Pass `skipAuth: true` in the init object for endpoints that intentionally don't carry the session (login, register).
 - **Cross-process event topology**: `core/EventTopology.js` is the single registry of every backend event bridged to the frontend (`{ backend, frontend?, transports, description? }`). `RealtimeClient` derives its allowlist from this list — adding a new SSE event means adding one topology entry, not editing three files. When a topology entry sets `frontend`, RealtimeClient emits both `sse:<backend>` (legacy alias for existing handlers in `index.js`) and the semantic frontend name (subscribe to this in new code).
 - **Virtual filesystem**: `FileSystemManager` with permissions, locking, events.
@@ -244,11 +244,20 @@ Never tear down `MultiplayerClient`, `RealtimeClient`, or `PresenceManager` dire
 | `apps/AppBase.js` | Base class for all applications |
 | `core/FeatureBase.js` | Base class for all features (lifecycle queue, no init reset on disable) |
 | `core/FeatureRegistry.js` | Feature registration, isolated-failure dependent disable |
-| `api/v2/index.php` | API v2 router (all backend routes) |
+| `api/v2/index.php` | API v2 router. Uses `Router::group($middleware, fn)` to attach `auth + requireRole('admin','superadmin') + rateLimit` once per admin block; controllers don't repeat per-method middleware. |
 | `backend/bootstrap.php` | Backend initialization + helpers |
-| `backend/Router.php` | Lightweight REST router |
+| `backend/Router.php` | Lightweight REST router. Supports global middleware via `use()` and per-route or per-group middleware via the optional 3rd arg / `group()`. |
 | `backend/Middleware.php` | Auth, rate limiting, CORS |
 | `backend/Database.php` | PDO singleton wrapper |
+| `backend/migrate.php` | CLI migration runner (`php backend/migrate.php` / `--status`). Web-based equivalent is `api/v2/migrate.php`. |
+| `backend/services/EventService.php` | Records event in event_log + fires webhooks. `sanitizeForExternal()` strips fields like the raw session `token` before SSE/webhook delivery; `sanitizeEventRow()` is the SSE-side helper. The internal `/auth/revocations` endpoint reads from event_log directly so the WS server still sees the full token (protected by `X-Internal-Auth` shared secret). |
+| `backend/services/WebhookDispatcher.php` | SSRF-safe webhook delivery. `resolveSafe($host)` rejects any private/loopback/link-local IP; the safe IP is then pinned via `CURLOPT_RESOLVE` to defeat DNS rebinding. `WebhookController::validateUrl` calls the same check at admin-create time so a bad URL is rejected up front. |
+| `backend/controllers/CampaignController.php` | Campaign registry + lifecycle. Dispatches `campaign.created/.updated/.deleted/.activated/.deactivated/.published`; the activate/deactivate/publish trio is bridged through `EventTopology` to the frontend. |
+| `backend/controllers/TimelineController.php` | Scheduled narrative events. `fireEntry()` dispatches the operator-chosen `event_type` AND a stable `timeline.fired` wrapper carrying the inner type — frontend modules subscribe to `timeline.fired` instead of enumerating every possible inner event. |
+| `backend/models/Session.php` | Session storage + revocation. Revocation events embed `token` (used by internal /auth/revocations) and `token_fingerprint` (12-char SHA-256 truncation; safe to expose). The frontend matches `token_fingerprint` via `getSessionTokenFingerprint()` in ConfigLoader. |
+| `backend/models/Webhook.php` | Webhook subscription model. `hydrate()` masks the secret by default (returns `secret_set` + `secret_preview`). `findByIdWithSecret()` is the gated path used by the dispatcher and the one-time create response. |
+| `admin/assets/components/CampaignManager.js` | Admin UI for campaigns (upload, edit, publish, activate). |
+| `admin/assets/components/TimelineManager.js` | Admin UI for scheduled timeline events. |
 | `websocket/server.php` | WebSocket server entry point (subprotocol auth) |
 | `websocket/WebSocketFrame.php` | RFC 6455 framing + auth header parsing |
 | `setup.php` | First-time setup wizard |

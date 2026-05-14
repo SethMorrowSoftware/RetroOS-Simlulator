@@ -12,8 +12,6 @@ class ThemeController
      */
     public function list(array $params): void
     {
-        Middleware::auth(true)($params);
-
         $limit  = max(1, min(200, (int) ($_GET['limit'] ?? 50)));
         $offset = max(0, (int) ($_GET['offset'] ?? 0));
 
@@ -31,8 +29,6 @@ class ThemeController
      */
     public function get(array $params): void
     {
-        Middleware::auth(true)($params);
-
         $theme = $this->findTarget($params['id'] ?? '');
         jsonResponse(['theme' => $theme]);
     }
@@ -43,9 +39,6 @@ class ThemeController
      */
     public function create(array $params): void
     {
-        Middleware::auth(true)($params);
-        Middleware::requireRole('admin', 'superadmin')($params);
-
         $slug = trim((string) input('slug', ''));
         $name = trim((string) input('name', ''));
         $description = trim((string) input('description', ''));
@@ -87,9 +80,6 @@ class ThemeController
      */
     public function update(array $params): void
     {
-        Middleware::auth(true)($params);
-        Middleware::requireRole('admin', 'superadmin')($params);
-
         $theme = $this->findTarget($params['id'] ?? '');
 
         $updates = [];
@@ -135,9 +125,6 @@ class ThemeController
      */
     public function delete(array $params): void
     {
-        Middleware::auth(true)($params);
-        Middleware::requireRole('admin', 'superadmin')($params);
-
         $theme = $this->findTarget($params['id'] ?? '');
         Theme::delete((int) $theme['id']);
 
@@ -194,6 +181,14 @@ class ThemeController
             $lc = strtolower($flat);
             if (str_contains($lc, 'javascript:') || str_contains($lc, 'expression(')) {
                 jsonError('definition contains disallowed CSS');
+            }
+            // Block CSS url() that points off-origin. Themes can still ship
+            // relative paths and data: URIs (used for inline thumbnails);
+            // an absolute http(s)/ftp scheme or a protocol-relative // path
+            // would let a malicious theme exfiltrate to an arbitrary host
+            // every time a user applies the theme.
+            if (preg_match('/url\s*\(\s*[\'"]?\s*(?:[a-z][a-z0-9+.-]*:(?!\s*data\b)|\/\/)/i', $lc)) {
+                jsonError('definition contains a CSS url() with an off-origin scheme (only relative paths and data: URIs are allowed)');
             }
         }
     }

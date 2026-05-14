@@ -25,7 +25,21 @@ class Webhook
     }
 
     /**
+     * Like findById but includes the raw secret. Only safe for callers
+     * that own the dispatch trust boundary (currently: just create/update
+     * controller responses returning a freshly-set secret, and a future
+     * admin reveal endpoint). Never use this from list / browse paths.
+     */
+    public static function findByIdWithSecret(int $id): ?array
+    {
+        $row = Database::fetchOne('SELECT * FROM webhooks WHERE id = ?', [$id]);
+        return $row ? self::hydrate($row, true) : null;
+    }
+
+    /**
      * List webhooks subscribed to a specific event type.
+     * Used only by WebhookDispatcher; returns the raw secret because the
+     * dispatcher needs it to sign the outgoing payload.
      */
     public static function findForEventType(string $eventType): array
     {
@@ -35,7 +49,7 @@ class Webhook
 
         $matching = [];
         foreach ($rows as $row) {
-            $row = self::hydrate($row);
+            $row = self::hydrate($row, true);
             if (self::eventMatches($row['events'], $eventType)) {
                 $matching[] = $row;
             }
@@ -146,23 +160,35 @@ class Webhook
 
     /**
      * Convert raw row to canonical shape.
+     *
+     * By default the `secret` is replaced with `secret_set` (bool) + a
+     * 4-char tail preview. Callers that genuinely need the raw secret
+     * (WebhookDispatcher, the one-time create response) must pass
+     * $includeSecret = true; that path is gated to a single internal
+     * helper so the secret can't leak through routine list/get traffic.
      */
-    private static function hydrate(array $row): array
+    private static function hydrate(array $row, bool $includeSecret = false): array
     {
         $events = $row['events'] ?? '[]';
         if (is_string($events)) {
             $decoded = json_decode($events, true);
             $events = is_array($decoded) ? $decoded : [];
         }
-        return [
-            'id'           => (int) $row['id'],
-            'url'          => $row['url'],
-            'secret'       => $row['secret'] ?? '',
-            'events'       => $events,
-            'active'       => (bool) ($row['active'] ?? false),
-            'description'  => $row['description'] ?? '',
-            'created_by'   => $row['created_by'] !== null ? (int) $row['created_by'] : null,
-            'created_at'   => $row['created_at'] ?? null,
+        $secret = (string) ($row['secret'] ?? '');
+        $hydrated = [
+            'id'             => (int) $row['id'],
+            'url'            => $row['url'],
+            'events'         => $events,
+            'active'         => (bool) ($row['active'] ?? false),
+            'description'    => $row['description'] ?? '',
+            'created_by'     => $row['created_by'] !== null ? (int) $row['created_by'] : null,
+            'created_at'     => $row['created_at'] ?? null,
+            'secret_set'     => $secret !== '',
+            'secret_preview' => $secret !== '' ? '…' . substr($secret, -4) : '',
         ];
+        if ($includeSecret) {
+            $hydrated['secret'] = $secret;
+        }
+        return $hydrated;
     }
 }

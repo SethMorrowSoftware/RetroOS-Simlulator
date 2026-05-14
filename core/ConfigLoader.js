@@ -234,13 +234,57 @@ export function getAuthHeaders() {
 /**
  * Update the session token (e.g. after login returns a new token).
  * Also persists to localStorage so subsequent page loads resume the session.
+ * Recomputes the SHA-256 fingerprint used by the session.revoked / .evicted
+ * SSE handlers to tell their own session apart from a sibling session on
+ * another device.
  * @param {string} token - The new session token
  */
 export function setSessionToken(token) {
     _sessionToken = token;
+    _sessionTokenFingerprint = null;
     if (token) {
         try { localStorage.setItem('illuminatos_session_token', token); } catch (e) { /* storage unavailable */ }
+        // crypto.subtle is async; kick off the hash and stash the result.
+        // Callers that need a sync answer should await getSessionTokenFingerprint().
+        _computeFingerprint(token);
+    } else {
+        try { localStorage.removeItem('illuminatos_session_token'); } catch (e) { /* ignore */ }
     }
+}
+
+let _sessionTokenFingerprint = null;
+let _sessionTokenFingerprintPromise = null;
+
+async function _computeFingerprint(token) {
+    try {
+        const buf = new TextEncoder().encode(token);
+        const digest = await crypto.subtle.digest('SHA-256', buf);
+        const hex = Array.from(new Uint8Array(digest))
+            .map(b => b.toString(16).padStart(2, '0'))
+            .join('');
+        // Match Session::fingerprint() in backend/models/Session.php: first 12
+        // chars of lowercase sha256 hex.
+        _sessionTokenFingerprint = hex.slice(0, 12);
+    } catch (e) {
+        _sessionTokenFingerprint = null;
+    }
+    return _sessionTokenFingerprint;
+}
+
+/**
+ * Get the truncated SHA-256 fingerprint of the current session token, the
+ * same form the backend emits in session.revoked / session.evicted events.
+ * Returns a Promise that resolves to the 12-char hex string, or null if
+ * there is no current token.
+ */
+export async function getSessionTokenFingerprint() {
+    if (!_sessionToken) return null;
+    if (_sessionTokenFingerprint) return _sessionTokenFingerprint;
+    if (!_sessionTokenFingerprintPromise) {
+        _sessionTokenFingerprintPromise = _computeFingerprint(_sessionToken)
+            .finally(() => { _sessionTokenFingerprintPromise = null; });
+    }
+    return _sessionTokenFingerprintPromise;
 }
 
 /**
@@ -335,5 +379,5 @@ export { getApiBasePath };
 export default {
     loadConfig, getConfig, hasServerConfig, isBackendAvailable,
     getApiBasePath, getApiVersion, getSessionToken, getAuthHeaders, setSessionToken,
-    initSession, fetchWithAuth
+    getSessionTokenFingerprint, initSession, fetchWithAuth
 };

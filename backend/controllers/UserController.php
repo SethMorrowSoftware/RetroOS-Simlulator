@@ -12,9 +12,6 @@ class UserController
      */
     public function list(array $params): void
     {
-        Middleware::auth(true)($params);
-        Middleware::requireRole('admin', 'superadmin')($params);
-
         $limit  = max(1, min(200, (int) ($_GET['limit'] ?? 50)));
         $offset = max(0, (int) ($_GET['offset'] ?? 0));
         $role   = $_GET['role'] ?? null;
@@ -41,9 +38,6 @@ class UserController
      */
     public function get(array $params): void
     {
-        Middleware::auth(true)($params);
-        Middleware::requireRole('admin', 'superadmin')($params);
-
         $target = $this->findTarget($params['id'] ?? '');
         jsonResponse(['user' => User::toPublic($target)]);
     }
@@ -54,9 +48,6 @@ class UserController
      */
     public function update(array $params): void
     {
-        Middleware::auth(true)($params);
-        Middleware::requireRole('admin', 'superadmin')($params);
-
         $actor = currentUser();
         $target = $this->findTarget($params['id'] ?? '');
         $updates = [];
@@ -129,9 +120,6 @@ class UserController
      */
     public function delete(array $params): void
     {
-        Middleware::auth(true)($params);
-        Middleware::requireRole('admin', 'superadmin')($params);
-
         $actor = currentUser();
         $target = $this->findTarget($params['id'] ?? '');
 
