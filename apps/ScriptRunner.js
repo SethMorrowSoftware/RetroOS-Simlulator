@@ -11,7 +11,6 @@
 import AppBase from './AppBase.js';
 import EventBus from '../core/EventBus.js';
 import ScriptEngine from '../core/script/ScriptEngine.js';
-import CommandBus from '../core/CommandBus.js';
 import FileSystemManager from '../core/FileSystemManager.js';
 import WindowManager from '../core/WindowManager.js';
 import { escapeHtml } from '../core/Sanitize.js';
@@ -3018,7 +3017,9 @@ Type your script or click Help for full reference.
         });
 
         // ===== EVENT MONITOR =====
-        this.eventSubscription = EventBus.on('*', (payload, meta, event) => {
+        // this.subscribe(...) auto-cleans on window close — no manual
+        // unsubscribe needed (the wildcard listener used to leak).
+        this.subscribe('*', (payload, meta, event) => {
             if (event.name.startsWith('script:') || event.name.startsWith('macro:')) return;
             if (this.eventLog.length > this.maxLogEntries) this.eventLog.shift();
             this.eventLog.push({
@@ -4161,7 +4162,7 @@ TYPE FUNCTIONS:
 SYSTEM FUNCTIONS:
   call getWindows           List open windows
   call getApps              List available apps
-  call exec cmd payload     Execute CommandBus command
+  call exec cmd payload     Execute a registered command
 
 QUICK EXAMPLES:
 
@@ -4248,7 +4249,7 @@ QUICK EXAMPLES:
                 setTimeout(() => this.setupRecordedTabButtons(), 0);
                 break;
             case 'commands':
-                const commands = CommandBus.getCommands();
+                const commands = EventBus.getCommands();
                 outputText.innerHTML = 'Available Commands:\n\n' + commands.map(c =>
                     `  command:${c}`
                 ).join('\n');
@@ -4664,9 +4665,7 @@ into the editor to modify and run it!
             clearInterval(this.executionTimer);
             this.executionTimer = null;
         }
-        if (this.eventSubscription) {
-            this.eventSubscription();
-        }
+        // Event subscriptions auto-clean via this.subscribe(...) tracking.
         if (this.isRecording) {
             EventBus.emit('macro:record:stop');
         }

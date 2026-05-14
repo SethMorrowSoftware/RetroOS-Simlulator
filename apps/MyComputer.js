@@ -525,30 +525,29 @@ class MyComputer extends AppBase {
         // Setup keyboard shortcuts
         this.setupKeyboardShortcuts();
 
-        // Subscribe to filesystem changes for real-time updates
-        this.fsChangeHandler = () => this.refreshView();
-        EventBus.on('filesystem:changed', this.fsChangeHandler);
-        EventBus.on('filesystem:file:changed', this.fsChangeHandler);
+        // Subscribe to filesystem changes for real-time updates.
+        // `this.subscribe(...)` (AppBase) registers via SubscriptionManager
+        // under this window's owner ID, so cleanup is automatic on close.
+        const refresh = () => this.refreshView();
+        this.subscribe('filesystem:changed', refresh);
+        this.subscribe('filesystem:file:changed', refresh);
+        this.subscribe('filesystem:directory:changed', refresh);
 
         // Listen for context menu upload trigger
-        this.uploadHandler = () => this.triggerFileUpload();
-        EventBus.on('explorer:upload', this.uploadHandler);
-        EventBus.on('filesystem:directory:changed', this.fsChangeHandler);
+        this.subscribe('explorer:upload', () => this.triggerFileUpload());
 
         // Listen for navigation events from context menu
-        this.navigationHandler = ({ path }) => {
+        this.subscribe('mycomputer:navigate', ({ path }) => {
             if (path && Array.isArray(path)) {
                 this.navigateToPath(path);
             }
-        };
-        EventBus.on('mycomputer:navigate', this.navigationHandler);
+        });
 
         // Listen for clipboard cut state changes
-        this.cutStateHandler = ({ cutPaths }) => {
+        this.subscribe('clipboard:cut-state', ({ cutPaths }) => {
             this.setInstanceState('cutItemPaths', cutPaths || []);
             this.updateCutVisualState();
-        };
-        EventBus.on('clipboard:cut-state', this.cutStateHandler);
+        });
 
         // If we have an initial path, navigate to it after mount
         if (initialPath.length > 0) {
@@ -1325,24 +1324,9 @@ class MyComputer extends AppBase {
     }
 
     onClose() {
-        // Clean up filesystem event listeners
-        if (this.fsChangeHandler) {
-            EventBus.off('filesystem:changed', this.fsChangeHandler);
-            EventBus.off('filesystem:file:changed', this.fsChangeHandler);
-            EventBus.off('filesystem:directory:changed', this.fsChangeHandler);
-        }
-        // Clean up navigation event listener
-        if (this.navigationHandler) {
-            EventBus.off('mycomputer:navigate', this.navigationHandler);
-        }
-        // Clean up cut state listener
-        if (this.cutStateHandler) {
-            EventBus.off('clipboard:cut-state', this.cutStateHandler);
-        }
-        // Clean up upload listener
-        if (this.uploadHandler) {
-            EventBus.off('explorer:upload', this.uploadHandler);
-        }
+        // EventBus subscriptions registered via this.subscribe() auto-clean
+        // on close — no manual EventBus.off() calls needed.
+
         // Clean up keyboard listener
         if (this.keyboardHandler) {
             document.removeEventListener('keydown', this.keyboardHandler);

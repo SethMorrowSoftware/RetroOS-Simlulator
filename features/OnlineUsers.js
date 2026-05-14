@@ -27,33 +27,26 @@ class OnlineUsersFeature extends FeatureBase {
     }
 
     async initialize() {
-        this._eventUnsubscribers = [];
-
-        // Listen for presence updates
-        this._eventUnsubscribers.push(EventBus.on('mp:presence:changed', (data) => {
+        // Listen for presence updates — this.subscribe(...) auto-cleans on disable
+        this.subscribe('mp:presence:changed', (data) => {
             this._updateTray(data.onlineCount);
-        }));
+        });
 
-        this._eventUnsubscribers.push(EventBus.on('mp:state', (data) => {
+        this.subscribe('mp:state', (data) => {
             if (data.state === 'connected') {
                 this._showTray();
             } else if (data.state === 'disconnected') {
                 this._updateTray(0);
             }
-        }));
+        });
 
         // Create tray element
         this._createTray();
     }
 
     cleanup() {
-        // Unsubscribe all event listeners
-        if (this._eventUnsubscribers) {
-            for (const unsub of this._eventUnsubscribers) {
-                if (typeof unsub === 'function') unsub();
-            }
-            this._eventUnsubscribers = [];
-        }
+        // Subscriptions registered via this.subscribe(...) are auto-released
+        // by FeatureBase via SubscriptionManager.unsubscribeAll(this.id).
         if (this.trayElement && this.trayElement.parentNode) {
             this.trayElement.parentNode.removeChild(this.trayElement);
         }

@@ -3074,7 +3074,7 @@ IlluminatOS emits system-level events that scripts can subscribe to. These are i
 
 ## 29) System Commands Reference
 
-These are system-level commands available through the CommandBus, usable from RetroScript.
+These are system-level commands registered with the unified command registry (via `EventBus.executeCommand`), usable from RetroScript.
 
 ### App & Window Commands
 

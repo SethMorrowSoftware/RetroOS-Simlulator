@@ -265,7 +265,6 @@ export function registerMultimediaBuiltins(interpreter) {
     interpreter.registerBuiltin('video.play', async (source, opts = {}) => {
         const bus = getEventBus();
         const mam = getMAM();
-        const CommandBus = interpreter.context.CommandBus;
         if (!bus || !source) return false;
 
         const { src, assetId } = resolveSource(source, 'video');
@@ -302,26 +301,24 @@ export function registerMultimediaBuiltins(interpreter) {
             timestamp: Date.now()
         });
 
-        // Launch video player via CommandBus
-        if (CommandBus) {
-            try {
-                const name = src.split('/').pop()?.replace(/\.[^/.]+$/, '') || 'Video';
-                await CommandBus.execute('app:launch', {
-                    appId: 'mediaplayer',
-                    params: {
-                        src,
-                        name,
-                        volume: opts.volume,
-                        loop: Boolean(opts.loop),
-                        fullscreen: Boolean(opts.fullscreen),
-                        _cueId: cueId
-                    }
-                });
-            } catch (e) {
-                console.warn('[MultimediaBuiltins] video.play launch error:', e);
-                if (mam) mam.unregisterActiveCue(cueId, 'error');
-                return false;
-            }
+        // Launch video player via the unified command registry
+        try {
+            const name = src.split('/').pop()?.replace(/\.[^/.]+$/, '') || 'Video';
+            await bus.executeCommand('app:launch', {
+                appId: 'mediaplayer',
+                params: {
+                    src,
+                    name,
+                    volume: opts.volume,
+                    loop: Boolean(opts.loop),
+                    fullscreen: Boolean(opts.fullscreen),
+                    _cueId: cueId
+                }
+            });
+        } catch (e) {
+            console.warn('[MultimediaBuiltins] video.play launch error:', e);
+            if (mam) mam.unregisterActiveCue(cueId, 'error');
+            return false;
         }
 
         return cueId;
@@ -334,7 +331,6 @@ export function registerMultimediaBuiltins(interpreter) {
     interpreter.registerBuiltin('video.stop', async (cueId) => {
         const bus = getEventBus();
         const mam = getMAM();
-        const CommandBus = interpreter.context.CommandBus;
         if (!bus) return false;
 
         bus.emit('media:video:stop', {
@@ -346,11 +342,9 @@ export function registerMultimediaBuiltins(interpreter) {
             mam.unregisterActiveCue(String(cueId), 'stopped');
         }
 
-        if (CommandBus) {
-            try {
-                await CommandBus.execute('mediaplayer:stop', {});
-            } catch { /* ignore */ }
-        }
+        try {
+            await bus.executeCommand('mediaplayer:stop', {});
+        } catch { /* ignore */ }
 
         return true;
     });

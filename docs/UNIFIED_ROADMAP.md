@@ -57,7 +57,7 @@ The platform-level unification is complete. The remaining surface to clean up is
 
 > Wave 3 landed in two halves: this PR (#2) bundled it with Wave 2 because the items overlapped — `fetchWithAuth` shares the hardening surface, and the plugin/script/storage guards are small enough that a separate PR would have been mostly diff noise. W3.2 (desktop-icon reconciliation, FS-as-truth) shipped with the Wave 4 batch on the same branch.
 >
-> **Wave 4 deferrals:** W4.2 (delete `CommandBus.js`) is partial — the parallel-registration problem is resolved (both APIs share `SemanticEventBus.commandHandlers`), but the file still hosts the timer/macro state and 15 script builtins call `CommandBus.execute`. Full deletion is tracked in the migration roadmap. W4.5 (remove `core/EventBus.js` re-export) is deferred indefinitely — the re-export is one line, costs nothing, and removing it would touch ~75 imports across the codebase. See "Skipped items" in `MIGRATION_ROADMAP.md`.
+> **Wave 4 deferrals:** W4.2 (delete `CommandBus.js`) is now closer to fully closing — every script-engine call site has been migrated (`context.CommandBus.execute` → `context.EventBus.executeCommand`) and `CommandBus` is no longer in the `ScriptEngine.initialize(...)` context. The file itself still exists because it owns the boot-time timer/macro state plus the `command:fs:*` / `command:window:*` / `command:terminal:*` handler registrations. Full deletion just needs those moved to a non-deprecated home — tracked as P2.1 in `MIGRATION_ROADMAP.md`. W4.5 (remove `core/EventBus.js` re-export) is deferred indefinitely — the re-export is one line, costs nothing, and removing it would touch ~75 imports across the codebase. See "Skipped items" in `MIGRATION_ROADMAP.md`.
 
 ---
 
@@ -192,12 +192,14 @@ Migrated the five real legacy call-sites (`TaskbarRenderer`, `DesktopPet`, `Cont
 
 ### W4.2 — Remove `core/CommandBus.js` facade 🟡 Partial
 
-The parallel-registration concern is fully resolved (PR #2): both `CommandBus.register` and `EventBus.registerCommand` write to `SemanticEventBus.commandHandlers`, so a developer can't accidentally register on the "wrong" registry. The file itself still exists, though, because:
+The parallel-registration concern is fully resolved (PR #2): both `CommandBus.register` and `EventBus.registerCommand` write to `SemanticEventBus.commandHandlers`, so a developer can't accidentally register on the "wrong" registry. Subsequent PR work then migrated all script-engine call sites: `Interpreter.js`'s 7 visitors and the 7 builtin call sites across `MediaBuiltins`, `MultimediaBuiltins`, and `SystemBuiltins` now go through `context.EventBus.executeCommand(...)` and `CommandBus` is no longer in the `ScriptEngine.initialize(...)` context. `apps/ScriptRunner.js` no longer imports CommandBus either.
+
+The file itself still exists because:
 
 - It owns timer + macro lifecycle state (`this.timers`, `this.macros`, `this.isRecording`) that hasn't been relocated.
-- 15 script builtins still call `CommandBus.execute(...)` directly. Migrating them to `EventBus.executeCommand(...)` is mechanical but voluminous.
+- It still hosts the boot-time registrations for `command:fs:*`, `command:window:*`, `command:terminal:*`, `command:app:*`, `command:dialog:*`, etc. Until those move (a non-trivial relocate that touches the command-bus equivalent surface), `CommandBus.initialize()` is still needed at boot.
 
-Tracked as a Phase 2 item in `MIGRATION_ROADMAP.md`. Deletion is cosmetic — every call site already lands on the unified registry — so the deferral is low-risk.
+Tracked as P2.1 in `MIGRATION_ROADMAP.md`. Deletion is cosmetic — every call site already lands on the unified registry — so the deferral is low-risk.
 
 ### W4.3 — Remove WebSocket legacy auth paths ✅
 

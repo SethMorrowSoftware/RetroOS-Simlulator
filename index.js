@@ -351,7 +351,6 @@ async function initializeOS(onProgress = () => {}) {
     await trackInit('ScriptEngine', () => ScriptEngine.initialize({
         FileSystemManager,
         EventBus,
-        CommandBus,
         WindowManager,
         AppRegistry,
         StateManager,
@@ -1398,7 +1397,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 await runAutoexec({
                     FileSystemManager,
                     EventBus,
-                    CommandBus,
                     StateManager,
                     WindowManager
                 });
