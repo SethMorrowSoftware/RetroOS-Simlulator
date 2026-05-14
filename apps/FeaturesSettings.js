@@ -105,7 +105,7 @@ class FeaturesSettings extends AppBase {
             <div class="features-settings">
                 <div class="features-header">
                     <h2>System Features</h2>
-                    <p>Enable or disable features and configure their settings.</p>
+                    <p>Enable, disable, and tune system capabilities with a consistent Control Panel-style layout.</p>
                 </div>
                 <div class="features-content">
                     <div class="features-sidebar">
@@ -139,9 +139,10 @@ class FeaturesSettings extends AppBase {
                     font-family: 'MS Sans Serif', Tahoma, sans-serif;
                 }
                 .features-header {
-                    padding: 10px 15px;
-                    border-bottom: 1px solid #808080;
-                    background: linear-gradient(180deg, #fff 0%, #f0f0f0 100%);
+                    padding: 12px;
+                    border: 2px groove #fff;
+                    margin: 10px 10px 0 10px;
+                    background: linear-gradient(180deg, #fff 0%, #f1f1f1 100%);
                 }
                 .features-header h2 {
                     margin: 0 0 5px 0;
@@ -154,13 +155,16 @@ class FeaturesSettings extends AppBase {
                     color: #666;
                 }
                 .features-content {
+                    margin: 10px;
+                    border: 2px solid;
+                    border-color: #fff #808080 #808080 #fff;
                     display: flex;
                     flex: 1;
                     overflow: hidden;
                 }
                 .features-sidebar {
                     width: 140px;
-                    background: #f0f0f0;
+                    background: #efefef;
                     border-right: 1px solid #808080;
                     padding: 10px 0;
                 }
@@ -174,6 +178,10 @@ class FeaturesSettings extends AppBase {
                 }
                 .feature-category:hover {
                     background: #e0e0e0;
+                }
+                 .feature-category:focus-visible {
+                    outline: 1px dotted #000080;
+                    outline-offset: -2px;
                 }
                 .feature-category.active {
                     background: #fff;
@@ -190,7 +198,7 @@ class FeaturesSettings extends AppBase {
                     background: #fff;
                 }
                 .feature-card {
-                    border: 1px solid #ccc;
+                    border: 2px groove #fff;
                     margin-bottom: 10px;
                     background: #fff;
                 }
@@ -198,6 +206,7 @@ class FeaturesSettings extends AppBase {
                     opacity: 0.6;
                 }
                 .feature-header {
+                    min-height: 56px;
                     display: flex;
                     align-items: center;
                     padding: 10px;

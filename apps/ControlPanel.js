@@ -97,16 +97,34 @@ class ControlPanel extends AppBase {
         return `
             <style>
                 .control-panel {
-                    padding: 10px;
+                    padding: 12px;
                     background: #c0c0c0;
                     height: 100%;
                     overflow-y: auto;
                 }
-                .control-section {
+                
+                .settings-app-header {
+                    background: linear-gradient(180deg, #ffffff 0%, #f1f1f1 100%);
+                    border: 2px groove #fff;
+                    padding: 10px 12px;
+                    margin-bottom: 12px;
+                }
+                .settings-app-header h2 {
+                    margin: 0 0 4px 0;
+                    font-size: 16px;
+                    color: #000080;
+                }
+                .settings-app-header p {
+                    margin: 0;
+                    font-size: 12px;
+                    color: #555;
+                }
+.control-section {
                     background: white;
                     border: 2px groove #fff;
                     padding: 15px;
-                    margin-bottom: 15px;
+                    margin-bottom: 12px;
+                    box-shadow: inset 0 0 0 1px #fff;
                 }
                 .control-section-title {
                     font-weight: bold;
@@ -117,6 +135,7 @@ class ControlPanel extends AppBase {
                     padding-bottom: 5px;
                 }
                 .control-item {
+                    min-height: 46px;
                     display: flex;
                     align-items: center;
                     gap: 10px;
@@ -146,6 +165,10 @@ class ControlPanel extends AppBase {
                     cursor: pointer;
                     transition: background 0.1s;
                 }
+                 .control-link:focus-within {
+                    outline: 1px dotted #000080;
+                    outline-offset: -3px;
+                }
                 .control-link:hover {
                     background: #e8e8ff;
                 }
@@ -174,6 +197,9 @@ class ControlPanel extends AppBase {
                     cursor: pointer;
                     font-size: 14px;
                     font-weight: bold;
+                }
+                 .control-button:hover {
+                    background: #d7d7d7;
                 }
                 .control-button:active {
                     border-style: inset;
@@ -243,6 +269,10 @@ class ControlPanel extends AppBase {
             </style>
 
             <div class="control-panel">
+                <div class="settings-app-header">
+                    <h2>Control Panel</h2>
+                    <p>Configure display, sound, multiplayer, and system behavior from one place.</p>
+                </div>
                 <div class="control-section">
                     <div class="control-section-title">🖥️ Display Settings</div>
 
