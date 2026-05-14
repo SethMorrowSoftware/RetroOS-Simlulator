@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-IlluminatOS! is a Windows 95-themed desktop OS emulator running in the browser. It features a full windowing system, 40+ apps, a virtual filesystem, multiplayer support via WebSocket, a custom scripting language (RetroScript), plugin system, campaign/narrative engine, and a PHP REST API backend with admin panel.
+IlluminatOS! is a Windows 95-themed desktop OS emulator running in the browser. It features a full windowing system, 42 apps, a virtual filesystem, multiplayer support via WebSocket, a custom scripting language (RetroScript), plugin system, campaign/narrative engine, and a PHP REST API backend with admin panel.
 
 ## Tech Stack
 
@@ -23,8 +23,8 @@ setup.php           # Setup wizard for first-time deployment
 core/               # Core systems (EventBus, StateManager, WindowManager, etc.)
   schema/           # Event schema definitions (18 files)
   script/           # RetroScript engine (lexer, parser, interpreter)
-apps/               # 44 application modules (extend AppBase)
-features/           # 12 feature modules (extend FeatureBase)
+apps/               # 42 application modules (extend AppBase)
+features/           # 13 feature modules (extend FeatureBase, incl. ReauthGate)
 ui/                 # 4 UI renderers (Desktop, Taskbar, StartMenu, ContextMenu)
 styles/             # 53 CSS files (modular, one per app/component)
 plugins/            # Plugin system with manifest-based loading
@@ -42,7 +42,7 @@ config/             # Runtime config (credentials, overrides — mostly gitignor
 data/               # Runtime data (rate limits, uploads)
 assets/             # Static media (sounds/, music/, videos/)
 scripts/            # Dev utility scripts
-docs/               # Internal design documents and audits
+docs/               # Reference docs (scripting, deployment, campaign content)
 backups/            # Auto-generated backups (gitignored)
 ```
 
@@ -80,6 +80,13 @@ php test-security.php [base-url]      # Security/authorization tests
 bash scripts/lint-innerhtml.sh        # Detect unsafe innerHTML usage
 ```
 
+### Aggregated CI gate
+```bash
+bash scripts/ci-gate.sh                # Runs all 5 gates: JS syntax, PHP lint,
+                                       # innerHTML safety, RetroScript harness,
+                                       # event-schema coverage
+```
+
 ### Manual validation checklist
 1. Start server and open in browser
 2. Check boot console logs for errors
@@ -87,19 +94,23 @@ bash scripts/lint-innerhtml.sh        # Detect unsafe innerHTML usage
 4. Verify no uncaught errors in browser console
 5. Test persistence by reload
 6. Check `window.__OS_BOOT_HEALTH` in console for per-component diagnostics
+7. Check `window.__OS_HEALTH` for the live HealthMonitor snapshot (subscription
+   accounting, storage telemetry, event-bus stats, feature posture, realtime
+   state, recent faults). `degraded` reasons (`boot` / `validationErrors` /
+   `failedFeatures` / `faults` / `subscriptionLeak`) make triage deterministic.
 
 ## Architecture Patterns
 
 ### Frontend
 
-- **Event-driven**: Central `EventBus` (pub/sub) with `SemanticEventBus` for schema-validated events. `SemanticEventBus` also owns the unified command registry — call `EventBus.registerCommand(name, handler)` and `EventBus.executeCommand(name, payload)`. `CommandBus.js` is a thin facade kept for backwards compatibility (the parallel-registration concern was resolved in Wave 2 — both APIs share the same registry). Full file removal is tracked in `docs/MIGRATION_ROADMAP.md` Phase 2 once the 15 script-engine call sites that use `CommandBus.execute` migrate to `EventBus.executeCommand`.
+- **Event-driven**: Central `EventBus` (pub/sub) with `SemanticEventBus` for schema-validated events. `SemanticEventBus` also owns the unified command registry — call `EventBus.registerCommand(name, handler)` and `EventBus.executeCommand(name, payload)`. `CommandBus.js` is a thin facade kept for backwards compatibility; both APIs share the same registry (`CommandBus.handlers` is a *reference* to `SemanticEventBus.commandHandlers`). Every script-engine call site routes through `EventBus.executeCommand`. Full file deletion is tracked as F1 in `docs/MIGRATION_ROADMAP.md`.
 - **State management**: `StateManager` with reactive subscriptions and `resetVolatile()` for clean user-switch. For persisted paths (`icons`, `settings.sound`, etc.) use `setStateAndPersist(path, value)` to avoid state↔storage drift — it writes storage first and only commits the in-memory change if the write succeeds.
 - **Storage hardening**: `StorageManager.set/get/setGlobal/getGlobal` reject any payload containing `__proto__` / `constructor` / `prototype` keys at any depth (rejections tallied in `telemetry.unsafeKeyRejections`). During a remote snapshot hydration, UI-driven `.set()` calls are dropped (tallied in `telemetry.hydrationDrops`); the hydrator uses `beginHydration()` / `hydrationSet(key, value)` / `endHydration()` to write the incoming payload without tripping the guard.
 - **Singletons**: Core systems exported as `export default new ClassName()`
 - **Subscription ownership**: `SubscriptionManager` (`core/SubscriptionManager.js`) tracks every `EventBus.on()` and `StateManager.subscribe()` return against the active owner. Set the owner via `SubscriptionManager.runAs(ownerId, fn)` — `AppBase` does this around `onOpen`/`onMount` (owner = windowId), `FeatureBase` around `initialize()` (owner = featureId), `PluginLoader` around `onLoad()` (owner = pluginId). On close/disable/unload/logout, `SubscriptionManager.unsubscribeAll(ownerId)` releases everything. The existing `this.subscribe()` / `this.onEvent()` helpers in AppBase/FeatureBase still work — SubscriptionManager is an additional safety net for raw `.on()` calls inside lifecycle code.
-- **AppBase**: All apps extend `AppBase` with lifecycle methods (`onOpen`, `onClose`, `onFocus`, `onBlur`, `onMount`). Multi-instance apps **must** use `setInstanceState()` / `getInstanceState()` — apps that still hold per-window data on `this` must declare `singleton: true` until migrated.
+- **AppBase**: All apps extend `AppBase` with lifecycle methods (`onOpen`, `onClose`, `onFocus`, `onBlur`, `onMount`). Multi-instance apps **must** use `setInstanceState()` / `getInstanceState()` — every app in the tree has been audited and either uses per-instance state or is `singleton: true` deliberately. `AppBase.setContent()` releases any `addHandler()`-registered listener whose target sits inside the replaced subtree before swapping HTML, so re-rendered content can't leak handlers pointing at detached nodes.
 - **FeatureBase**: Background features extend `FeatureBase` with `initialize()`, `enable()`, `disable()`, `cleanup()`. `disable()` does **not** reset `initialized` — re-enable will not re-run `initialize()`; subclasses that genuinely need re-init must override `disable()` to clear it explicitly. Concurrent enable/disable calls are serialized by an internal lifecycle queue, so two clicks can't double-run `initialize()`.
-- **CommandBus**: ⚠️ Deprecated. Existing imports keep working — the file is a thin facade whose `handlers` Map is a reference to `SemanticEventBus.commandHandlers`, and whose `register/execute` delegate to the unified API. New code should call `EventBus.registerCommand()` / `EventBus.executeCommand()` directly. As of the latest migration, the script engine no longer takes `CommandBus` in its context (`ScriptEngine.initialize({ EventBus, FileSystemManager, ... })` — no `CommandBus` field) — every interpreter visitor and media/system builtin goes through `EventBus.executeCommand`. The file itself still exists at boot because it registers `command:fs:*` / `command:window:*` / `command:terminal:*` handlers and owns timer/macro state; full removal is tracked as P2.1 in `docs/MIGRATION_ROADMAP.md`.
+- **CommandBus**: ⚠️ Deprecated. Existing imports keep working — the file is a thin facade whose `handlers` Map is a reference to `SemanticEventBus.commandHandlers`, and whose `register/execute` delegate to the unified API. New code should call `EventBus.registerCommand()` / `EventBus.executeCommand()` directly. The script engine no longer takes `CommandBus` in its context (`ScriptEngine.initialize({ EventBus, FileSystemManager, ... })` — no `CommandBus` field) — every interpreter visitor and media/system builtin goes through `EventBus.executeCommand`. The file itself still exists at boot because it registers `command:fs:*` / `command:window:*` / `command:terminal:*` handlers and owns timer/macro state; full deletion is tracked as F1 in `docs/MIGRATION_ROADMAP.md`.
 - **SessionManager**: Single owner of the logout / user-switch cascade. Always call `SessionManager.logout()` or `SessionManager.switchUser(newUser)` instead of tearing down realtime/presence/state by hand. Cascade order is: `MultiplayerClient.disconnect` → `closeRealtime` → `PresenceManager.destroy` → `setSessionToken(null)` → `SubscriptionManager.unsubscribeAll('session')` → `StateManager.resetVolatile`, then `user:logout` / `user:switch` emitted for subscribers.
 - **Authenticated HTTP**: `fetchWithAuth(input, init)` from `ConfigLoader.js` is the single way to call the v2 API. Adds `Authorization: Bearer <token>` and `X-Requested-With: XMLHttpRequest` automatically, and on 401 routes through `SessionManager.logout({ reason: 'auth_expired' })` so the frontend stops looping with a stale token. Pass `skipAuth: true` in the init object for endpoints that intentionally don't carry the session (login, register).
 - **Cross-process event topology**: `core/EventTopology.js` is the single registry of every backend event bridged to the frontend (`{ backend, frontend?, transports, description? }`). `RealtimeClient` derives its allowlist from this list — adding a new SSE event means adding one topology entry, not editing three files. When a topology entry sets `frontend`, RealtimeClient emits both `sse:<backend>` (legacy alias for existing handlers in `index.js`) and the semantic frontend name (subscribe to this in new code).
@@ -131,7 +142,7 @@ The session lifecycle is unified through `SessionManager` plus four canonical ev
 | `user:login` | After token set, storage rescoped, `StateManager.initialize()` complete | Subscribers can safely hit the network as the new user |
 | `user:logout` | After realtime/presence/token/state teardown | Late subscribers can drop session caches |
 | `user:switch` | After teardown but before new scope is hydrated | Subscribers can clear caches before rehydrate |
-| `auth:expired` | `fetchWithAuth` saw a 401; teardown ran; token cleared | Show reauth UI (subscriber not yet implemented; the event fires and breaks the reconnect loop) |
+| `auth:expired` | `fetchWithAuth` saw a 401; teardown ran; token cleared | `features/ReauthGate.js` surfaces a reauth prompt (with a single-flight guard) and re-runs `LoginScreen.show()` |
 
 Never tear down `MultiplayerClient`, `RealtimeClient`, or `PresenceManager` directly from a UI handler — go through `SessionManager`.
 
@@ -226,7 +237,8 @@ Never tear down `MultiplayerClient`, `RealtimeClient`, or `PresenceManager` dire
 | `core/MultiplayerClient.js` | WebSocket client (subprotocol auth, auto-reconnect) |
 | `core/RealtimeClient.js` | SSE bridge for backend v2 events (consumes `EventTopology`) |
 | `core/PresenceManager.js` | Online users + typing state |
-| `core/CommandBus.js` | ⚠️ Deprecated facade — delegates to `SemanticEventBus.commandHandlers`; removal in Wave 4 |
+| `core/HealthMonitor.js` | Live runtime health snapshot exposed at `window.__OS_HEALTH` |
+| `core/CommandBus.js` | ⚠️ Deprecated facade — delegates to `SemanticEventBus.commandHandlers`; deletion tracked as F1 in `docs/MIGRATION_ROADMAP.md` |
 | `core/script/ScriptEngine.js` | RetroScript engine coordinator |
 | `core/script/utils/PathValidation.js` | Single allowlist for script file-op paths |
 | `apps/AppBase.js` | Base class for all applications |
@@ -244,11 +256,13 @@ Never tear down `MultiplayerClient`, `RealtimeClient`, or `PresenceManager` dire
 
 ## Event System
 
-Events use namespaced format: `window:open`, `app:close`, `ui:menu:start:toggle`, etc. Schemas live in `core/schema/` with validation. `SemanticEventBus` provides middleware, logging, request/response, channels, and the unified command registry. There is no separate `EventBus` implementation — `core/EventBus.js` is a re-export so old imports keep working (the re-export is kept indefinitely — see `docs/MIGRATION_ROADMAP.md` for the rationale).
+Events use namespaced format: `window:open`, `app:close`, `ui:menu:start:toggle`, etc. Schemas live in `core/schema/` with validation. `SemanticEventBus` provides middleware, logging, request/response, channels, and the unified command registry. There is no separate `EventBus` implementation — `core/EventBus.js` is a one-line re-export so old imports keep working (the re-export is kept indefinitely — see `docs/MIGRATION_ROADMAP.md` for the rationale).
 
 The canonical user-session events are `user:login`, `user:logout`, `user:switch`, `auth:expired` (see `core/schema/system.js`).
 
-> Old aliases like `pet:toggle`, `taskbar:update`, `boot:complete` are no longer auto-rewritten. Use the semantic names directly: `feature:pet:toggle`, `ui:taskbar:update`, `system:ready`. The legacy mapping table was removed in Wave 4 — grep is now reliable.
+> Old aliases like `pet:toggle`, `taskbar:update`, `boot:complete` are no longer auto-rewritten. Use the semantic names directly: `feature:pet:toggle`, `ui:taskbar:update`, `system:ready`. The legacy mapping table is gone — grep is reliable.
+
+Event-schema coverage is enforced in CI: `node scripts/check-event-schema-coverage.mjs` fails if non-app-scoped emitted events drop below 95% schema coverage. The current run is 100%.
 
 ## RetroScript
 
@@ -261,11 +275,10 @@ Script file ops (`write` / `read` / `delete` / `mkdir`) validate paths against t
 - `README.md` — Project overview, run instructions, app/feature catalog
 - `DEVELOPER_GUIDE.md` — Extension development guide (apps, features, plugins, RetroScript)
 - `SCRIPTING_GUIDE.md` — Complete RetroScript language reference
-- `docs/UNIFIED_ROADMAP.md` — Plan for converging on the unified API (Waves 1–4 landed in PRs #1–#2; final status table)
-- `docs/MIGRATION_ROADMAP.md` — Next-stage plan for switching every app and feature to the new APIs the platform now exposes
-- `docs/ARCHITECTURE_AUDIT.md` — Original architecture audit + which findings are resolved
 - `docs/RETROSCRIPT_SCRIPTABLE_EVENTS.md` — Exhaustive event/command/query reference for scripts
 - `docs/TERMINAL_SCRIPTING.md` — Terminal-specific RetroScript built-ins and workflows
+- `docs/MIGRATION_ROADMAP.md` — Short list of deferred follow-ups (CommandBus deletion, icon sync, pre-login storage) and deliberate non-decisions
 - `docs/GREENGEEKS_RESELLER_VPS_WEBSOCKET_SETUP.md` — Production WebSocket sidecar deployment guide
+- `docs/walkthrough.md`, `docs/required_media.md` — In-world content for the EREBUS campaign in `autoexec.retro`
 
-This file, `README.md`, `DEVELOPER_GUIDE.md`, `docs/UNIFIED_ROADMAP.md`, and `docs/MIGRATION_ROADMAP.md` are the source of truth for architecture and conventions. Historical planning docs have been folded into the roadmap or removed.
+This file, `README.md`, and `DEVELOPER_GUIDE.md` are the source of truth for architecture and conventions. Historical planning docs (architecture audit, unified roadmap, point-in-time reliability review) have been removed now that the work they tracked is complete.
