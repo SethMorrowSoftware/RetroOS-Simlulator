@@ -16,6 +16,8 @@ import { renderLiveUsers, initLiveUsers, destroyLiveUsers } from './components/L
 import { renderAnalyticsDashboard, initAnalyticsDashboard, destroyAnalyticsDashboard } from './components/AnalyticsDashboard.js';
 import { renderAutoexecEditor, initAutoexecEditor, destroyAutoexecEditor } from './components/AutoexecEditor.js';
 import { renderTroubleshootingPanel, initTroubleshootingPanel } from './components/TroubleshootingPanel.js';
+import { renderCampaignManager, initCampaignManager } from './components/CampaignManager.js';
+import { renderTimelineManager, initTimelineManager } from './components/TimelineManager.js';
 import { escHtml } from './sanitize.js';
 
 /**
@@ -309,6 +311,8 @@ const v2Sections = {
     analytics: { render: renderAnalyticsDashboard, init: initAnalyticsDashboard, destroy: destroyAnalyticsDashboard },
     autoexecEditor: { render: renderAutoexecEditor, init: initAutoexecEditor, destroy: destroyAutoexecEditor },
     troubleshooting: { render: renderTroubleshootingPanel, init: initTroubleshootingPanel },
+    campaigns: { render: renderCampaignManager, init: initCampaignManager },
+    timeline: { render: renderTimelineManager, init: initTimelineManager },
 };
 
 function renderSection() {

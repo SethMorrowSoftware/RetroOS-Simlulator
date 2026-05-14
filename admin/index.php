@@ -85,6 +85,9 @@ if ($authenticated && isset($_SESSION['admin_login_time'])) {
                         <li data-section="webhooks">Webhooks</li>
                         <li data-section="announcements">Announcements</li>
                         <li data-section="audit">Audit Log</li>
+                        <li class="nav-divider">Narrative</li>
+                        <li data-section="campaigns">Campaigns</li>
+                        <li data-section="timeline">Timeline</li>
                         <li class="nav-divider">Control</li>
                         <li data-section="mediaLibrary">Media Library</li>
                         <li data-section="commandCenter">Command Center</li>
