@@ -575,19 +575,13 @@ const GAME_LIBRARY = [
 ];
 
 const CATEGORY_ORDER = [
+    'Local Library',  // host-uploaded ROMs from assets/c64/local/, surfaced first
     'Arcade',
     'Action',
     'Shooter',
     'Platformer',
     'Puzzle',
     'Adventure',
-    'Text Adventure',
-    'RPG',
-    'Strategy',
-    'Sports',
-    'Fighting',
-    'Racing',
-    'Demoscene',
     'Tools',
 ];
 
@@ -619,6 +613,15 @@ class C64 extends AppBase {
         this._configuredScript = null;  // Most recently injected loader script tag
         this._iaUrlCache = new Map();   // IA item ID → resolved file URL
         this._iaResolveInFlight = new Map(); // IA item ID → in-flight Promise (dedupes concurrent resolves)
+        this._localLibrary = [];        // host-uploaded ROMs from assets/c64/local/ (loaded on mount)
+        this._dropdownEntries = new Map(); // option value → library entry (rebuilt on local-library load)
+        this._paused = false;           // user-driven pause state
+        this._muted = false;            // user-driven mute state
+        this._volumeBeforeMute = 0.5;   // restored when un-muting
+        this._recents = [];             // last N played entries (persisted to localStorage)
+        this._pagehideHandler = null;   // bound listener so we can remove it on close
+        this._loadGeneration = 0;       // monotonically increasing — cancels stale resolves
+        this._lastSaveState = null;     // Uint8Array of the most-recent save state (per session)
 
         this.registerCommands();
         this.registerQueries();
@@ -694,29 +697,7 @@ class C64 extends AppBase {
     // ── Lifecycle ──────────────────────────────────────────────
 
     onOpen() {
-        // Index lookup so the change handler can map option `value` back to
-        // the library entry (which may carry an `iaItem` rather than a `url`).
-        const byCat = new Map();
-        GAME_LIBRARY.forEach((game, idx) => {
-            if (!byCat.has(game.category)) byCat.set(game.category, []);
-            byCat.get(game.category).push({ ...game, _idx: idx });
-        });
-        const orderedCats = [
-            ...CATEGORY_ORDER.filter(c => byCat.has(c)),
-            ...[...byCat.keys()].filter(c => !CATEGORY_ORDER.includes(c))
-        ];
-        const dropdownOptions = orderedCats.map(cat => {
-            const items = byCat.get(cat).map(game => {
-                const label = `${game.icon} ${game.name} (${game.year}) — ${game.desc}`;
-                // Encode the index into the library array as `lib:<i>`. The
-                // change handler decodes this and resolves the entry's URL
-                // (either directly from `url` or via the IA metadata API
-                // when only `iaItem` is set).
-                const value = `lib:${game._idx}`;
-                return `<option value="${escapeHtml(value)}">${escapeHtml(label)}</option>`;
-            }).join('');
-            return `<optgroup label="${escapeHtml(cat)}">${items}</optgroup>`;
-        }).join('');
+        const dropdownOptions = this._buildDropdownOptionsHTML();
 
         return `
             <div class="c64-app">
@@ -729,9 +710,13 @@ class C64 extends AppBase {
                         </select>
                     </div>
                     <div class="c64-buttons">
-                        <button class="c64-btn" id="c64StopBtn" title="Stop emulator" disabled>⏹ Stop</button>
-                        <button class="c64-btn" id="c64ResetBtn" title="Reload current disk" disabled>🔄 Reset</button>
-                        <button class="c64-btn" id="c64FsBtn" title="Toggle fullscreen">⛶ Fullscreen</button>
+                        <button class="c64-btn" id="c64PauseBtn" title="Pause / resume (P)" disabled>⏸ Pause</button>
+                        <button class="c64-btn" id="c64MuteBtn" title="Mute / unmute (M)">🔊</button>
+                        <button class="c64-btn" id="c64SaveStateBtn" title="Save state (Ctrl+S)" disabled>💾 Save</button>
+                        <button class="c64-btn" id="c64LoadStateBtn" title="Load state (Ctrl+L)" disabled>📂 Load</button>
+                        <button class="c64-btn" id="c64StopBtn" title="Stop emulator (Esc)" disabled>⏹ Stop</button>
+                        <button class="c64-btn" id="c64ResetBtn" title="Reload current disk (R)" disabled>🔄 Reset</button>
+                        <button class="c64-btn" id="c64FsBtn" title="Toggle fullscreen (F)">⛶ Fullscreen</button>
                     </div>
                 </div>
                 <div class="c64-toolbar c64-toolbar-sub">
@@ -747,6 +732,7 @@ class C64 extends AppBase {
                                style="display:none;" />
                     </div>
                 </div>
+                <div class="c64-recents" id="c64Recents" style="display:none;"></div>
                 <div class="c64-emulator-area" id="c64EmulatorArea">
                     <div class="c64-splash" id="c64Splash">
                         <div class="c64-splash-screen">
@@ -759,11 +745,12 @@ class C64 extends AppBase {
                             </div>
                         </div>
                         <div class="c64-splash-hint">
-                            <b>~120 titles bundled</b> — 48 freeware homebrew (load instantly
-                            from GitHub) plus dozens of classics resolved from Internet Archive
-                            on first launch. Pick one from the <b>Disk</b> dropdown, paste a
-                            <code>.d64</code> / <code>.prg</code> / <code>.crt</code> URL, or
-                            click <b>File…</b> to load from your computer.<br>
+                            <b>Disk</b> dropdown picks from 48 freeware homebrew (instant from
+                            GitHub), classic titles resolved on demand, and any ROMs the host
+                            has dropped into <code>assets/c64/local/</code>. Or paste a
+                            <code>.d64</code> / <code>.prg</code> / <code>.crt</code> URL,
+                            or click <b>File…</b> for a local file.<br>
+                            <span class="c64-splash-keys">Keys: <b>P</b>=pause &middot; <b>M</b>=mute &middot; <b>R</b>=reset &middot; <b>F</b>=fullscreen &middot; <b>Esc</b>=stop &middot; <b>Ctrl+S/L</b>=save&nbsp;state</span><br>
                             <a class="c64-splash-link"
                                href="https://github.com/retrobrews/c64-games" target="_blank"
                                rel="noopener">Browse the full retrobrews homebrew catalog →</a><br>
@@ -803,32 +790,34 @@ class C64 extends AppBase {
         const stopBtn = this.getElement('#c64StopBtn');
         const resetBtn = this.getElement('#c64ResetBtn');
         const fsBtn = this.getElement('#c64FsBtn');
+        const pauseBtn = this.getElement('#c64PauseBtn');
+        const muteBtn = this.getElement('#c64MuteBtn');
+        const saveStateBtn = this.getElement('#c64SaveStateBtn');
+        const loadStateBtn = this.getElement('#c64LoadStateBtn');
 
         this.addHandler(gameSelect, 'change', (e) => {
             const value = e.target.value;
             if (!value) return;
-            // Option values are `lib:<index>` — decode and run the entry.
-            const m = /^lib:(\d+)$/.exec(value);
-            if (!m) return;
-            const entry = GAME_LIBRARY[Number(m[1])];
+            // Option values are `opt:<n>` keys into `_dropdownEntries`,
+            // which is rebuilt whenever the dropdown is re-rendered (e.g.
+            // after the local-library fetch lands).
+            const entry = this._dropdownEntries.get(value);
             if (!entry) return;
-            // If the entry has an explicit URL (incl. empty for BASIC), put
-            // it in the URL field for transparency. iaItem entries leave
-            // the URL field unchanged until the resolver runs.
             if (urlInput && typeof entry.url === 'string') urlInput.value = entry.url;
             this.loadLibraryEntry(entry);
         });
 
-        this.addHandler(runBtn, 'click', () => {
+        const launchFromUrlBar = () => {
             const url = urlInput?.value?.trim() ?? '';
-            this.loadGame(url, this.lookupBundleName(url));
-        });
-
+            if (!url) return;
+            const name = this.lookupBundleName(url);
+            // URL-pasted entries go into recents too — easy re-launch.
+            this._pushRecent({ name, url, icon: '🔗', category: 'Recently pasted' });
+            this.loadGame(url, name);
+        };
+        this.addHandler(runBtn, 'click', launchFromUrlBar);
         this.addHandler(urlInput, 'keydown', (e) => {
-            if (e.key === 'Enter') {
-                const url = urlInput.value.trim();
-                this.loadGame(url, this.lookupBundleName(url));
-            }
+            if (e.key === 'Enter') launchFromUrlBar();
         });
 
         this.addHandler(fileBtn, 'click', () => fileInput?.click());
@@ -839,42 +828,173 @@ class C64 extends AppBase {
         });
 
         this.addHandler(stopBtn, 'click', () => this.stopEmulator());
-        this.addHandler(resetBtn, 'click', () => {
-            const url = this.currentRom;
-            const name = this.currentRomName;
-            this.stopEmulator().then(() => { if (url !== null) this.loadGame(url, name); });
-        });
+        this.addHandler(resetBtn, 'click', () => this.resetCurrent());
         this.addHandler(fsBtn, 'click', () => this.toggleFullscreen());
+        this.addHandler(pauseBtn, 'click', () => this.togglePause());
+        this.addHandler(muteBtn, 'click', () => this.toggleMute());
+        this.addHandler(saveStateBtn, 'click', () => this.saveState());
+        this.addHandler(loadStateBtn, 'click', () => this.loadState());
 
         const errorDismiss = this.getElement('#c64ErrorDismiss');
         this.addHandler(errorDismiss, 'click', () => {
-            // Drop back to the splash so the user can pick something else.
             const splash = this.getElement('#c64Splash');
             const errorOverlay = this.getElement('#c64Error');
             if (errorOverlay) errorOverlay.style.display = 'none';
             if (splash) splash.style.display = 'flex';
-            // Reset the dropdown so re-picking the same option still fires.
             if (gameSelect) gameSelect.value = '';
             this.setStatus('Ready');
         });
+
+        // Keyboard shortcuts. Gated on isFocused() so a Tetris piece (or
+        // any other app's listener) doesn't trigger when the user is
+        // typing in another window. AppBase tracks per-window focus.
+        this.addHandler(document, 'keydown', (e) => {
+            if (!this.isFocused()) return;
+            // Don't hijack typing in the URL input.
+            const tag = (e.target?.tagName || '').toLowerCase();
+            if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+            this._handleShortcut(e);
+        });
+
+        // Tab close / page navigate: kill audio cleanly. Without this,
+        // closing the browser tab while a game is playing leaves the
+        // SID worker running long enough to be audible into the next
+        // page load. `pagehide` fires on bfcache freezes too.
+        this._pagehideHandler = () => {
+            try { this.stopEmulator(); } catch { /* ignore */ }
+        };
+        window.addEventListener('pagehide', this._pagehideHandler);
+
+        // Render the recent-games chips (loaded from localStorage).
+        this._loadRecents();
+        this._renderRecents();
 
         // Preload the EmulatorJS loader script in the background so the
         // first user-initiated launch is faster.
         this.ensureLoaderPreloaded().catch((err) => {
             console.warn('[C64] Background loader preload failed:', err);
         });
+
+        // Pull in any host-uploaded ROMs from `assets/c64/local/` and
+        // splice them into the dropdown. Errors are non-fatal.
+        this._fetchLocalLibrary();
     }
 
     onClose() {
+        // Aggressive teardown — see stopEmulator() for the full audio-kill
+        // chain. We deliberately don't await it: the chain is largely
+        // synchronous (mute → close AudioContext → terminate Worker) and
+        // the WindowManager doesn't await onClose anyway.
         this.stopEmulator();
         if (this.activeBlobUrl) {
             URL.revokeObjectURL(this.activeBlobUrl);
             this.activeBlobUrl = null;
         }
+        // Detach the tab-close audio-kill listener.
+        if (this._pagehideHandler) {
+            try { window.removeEventListener('pagehide', this._pagehideHandler); } catch { /* ignore */ }
+            this._pagehideHandler = null;
+        }
     }
 
     onResize() {
         // EmulatorJS uses ResizeObserver internally — no action needed.
+    }
+
+    // ── Library / Dropdown Helpers ─────────────────────────────
+
+    /**
+     * Build the `<optgroup>`-grouped HTML for the disk-select dropdown.
+     * Combines the bundled GAME_LIBRARY with any host-uploaded ROMs that
+     * `_fetchLocalLibrary()` has discovered. Also (re)populates
+     * `this._dropdownEntries` so the change handler can look entries up
+     * by their option value without re-doing the merge.
+     *
+     * Local-library entries are surfaced first (they're the host's own
+     * picks — they should be discoverable, not buried).
+     *
+     * @returns {string} HTML for `<optgroup>` blocks
+     */
+    _buildDropdownOptionsHTML() {
+        this._dropdownEntries = new Map();
+        const byCat = new Map();
+
+        // Local entries first so they get the lowest indexes (and so
+        // CATEGORY_ORDER's "Local Library" slot is always populated when
+        // the host has dropped any files in).
+        const allEntries = [...this._localLibrary, ...GAME_LIBRARY];
+        allEntries.forEach((entry, idx) => {
+            const key = `opt:${idx}`;
+            this._dropdownEntries.set(key, entry);
+            const cat = entry.category || 'Misc';
+            if (!byCat.has(cat)) byCat.set(cat, []);
+            byCat.get(cat).push({ entry, key });
+        });
+
+        const orderedCats = [
+            ...CATEGORY_ORDER.filter(c => byCat.has(c)),
+            ...[...byCat.keys()].filter(c => !CATEGORY_ORDER.includes(c))
+        ];
+
+        return orderedCats.map(cat => {
+            const items = byCat.get(cat).map(({ entry, key }) => {
+                const yearTag = entry.year ? ` (${entry.year})` : '';
+                const descTag = entry.desc ? ` — ${entry.desc}` : '';
+                const label = `${entry.icon || '💾'} ${entry.name}${yearTag}${descTag}`;
+                return `<option value="${escapeHtml(key)}">${escapeHtml(label)}</option>`;
+            }).join('');
+            return `<optgroup label="${escapeHtml(cat)}">${items}</optgroup>`;
+        }).join('');
+    }
+
+    /**
+     * Fetch host-uploaded ROMs from `api/c64-local.php`. The endpoint
+     * scans `assets/c64/local/` and returns a JSON list. We add results
+     * to `this._localLibrary` and re-render the dropdown options.
+     *
+     * Errors are non-fatal — if the endpoint isn't deployed or the
+     * directory is empty, we just leave the local library empty and the
+     * dropdown carries on with the bundled retrobrews titles only.
+     */
+    async _fetchLocalLibrary() {
+        try {
+            const url = new URL('api/c64-local.php', document.baseURI).toString();
+            const res = await fetch(url, { credentials: 'omit' });
+            if (!res.ok) {
+                console.warn('[C64] Local library endpoint returned HTTP', res.status);
+                return;
+            }
+            const data = await res.json();
+            const entries = Array.isArray(data?.entries) ? data.entries : [];
+            if (entries.length === 0) return;
+
+            // Normalise into the GAME_LIBRARY entry shape so the rest of the
+            // app treats them identically to the bundled titles.
+            this._localLibrary = entries.map(e => ({
+                name:     typeof e.name === 'string' ? e.name : 'Untitled',
+                icon:     typeof e.icon === 'string' ? e.icon : '💾',
+                category: typeof e.category === 'string' ? e.category : 'Local Library',
+                year:     Number.isInteger(e.year) ? e.year : 0,
+                desc:     typeof e.desc === 'string' ? e.desc : '',
+                url:      typeof e.url === 'string' ? e.url : '',
+            })).filter(e => e.url);
+
+            // Re-render the dropdown options so the new entries appear.
+            const select = this.getElement('#c64GameSelect');
+            if (select) {
+                const previousValue = select.value;
+                // Preserve the placeholder option, replace the rest.
+                const placeholder = '<option value="">— Pick a program —</option>';
+                select.innerHTML = placeholder + this._buildDropdownOptionsHTML();
+                // Restore the previous selection if it still exists.
+                if (previousValue && [...select.options].some(o => o.value === previousValue)) {
+                    select.value = previousValue;
+                }
+            }
+            console.log(`[C64] Loaded ${this._localLibrary.length} local ROM(s) from assets/c64/local/`);
+        } catch (err) {
+            console.warn('[C64] Local library fetch failed (non-fatal):', err);
+        }
     }
 
     // ── CDN Loader ─────────────────────────────────────────────
@@ -950,6 +1070,12 @@ class C64 extends AppBase {
 
         // Explicit URL (incl. empty string for "boot to BASIC") wins.
         if (typeof entry.url === 'string') {
+            // Skip recents for the BASIC entry (it's "no media") and for
+            // blob URLs (they don't survive a session, so re-loading from
+            // recents next time would 404).
+            if (entry.url && !entry.url.startsWith('blob:')) {
+                this._pushRecent(entry);
+            }
             await this.loadGame(entry.url, displayName);
             return;
         }
@@ -979,6 +1105,9 @@ class C64 extends AppBase {
                 this._showLoading('Resolving "' + displayName + '" (' + itemId + ')…');
             }
             const url = await this._resolveIAItemToUrl(itemId);
+            // Push BEFORE the load — that way if the load itself fails the
+            // user still has the recent button as a quick re-try.
+            this._pushRecent(entry);
             await this.loadGame(url, displayName);
         } catch (err) {
             console.error('[C64] IA resolve failed for', entry.iaItem || entry.iaSearch, '→', err);
@@ -1431,6 +1560,22 @@ class C64 extends AppBase {
 
     /**
      * Stop the running emulator and fully tear down workers, audio, and DOM.
+     *
+     * EmulatorJS doesn't have a single "kill everything cleanly" call — its
+     * different versions expose different teardown hooks, the Emscripten
+     * worker keeps pumping audio frames after `EJS_terminate`, and the
+     * AudioContext lives on `gameManager.Module` rather than on the
+     * `EJS_emulator` root. So this routine is deliberately belt-and-braces:
+     *   1. Mute volume to 0 first so nothing is audible during teardown.
+     *   2. Try every plausible exit/terminate function in order.
+     *   3. Walk a list of known AudioContext locations and call .close().
+     *   4. Pause and detach any <audio> elements under the player root.
+     *   5. Terminate any Web Workers reachable from the emulator object.
+     *   6. Drop the entire DOM subtree so the canvas / WebGL ctx is GC'd.
+     *   7. Null all our refs so nothing keeps the worker alive.
+     * Without all of this the user closes the C64 window and the SID music
+     * plays on forever.
+     *
      * @param {boolean} [keepSplash=true] - If false, caller will swap content immediately.
      */
     async stopEmulator(keepSplash = true) {
@@ -1442,18 +1587,72 @@ class C64 extends AppBase {
             this._readyWatchdog = null;
         }
 
-        try {
-            if (typeof window.EJS_terminate === 'function') {
-                window.EJS_terminate();
-            } else if (window.EJS_emulator && typeof window.EJS_emulator.exit === 'function') {
-                window.EJS_emulator.exit();
-            }
-        } catch (e) {
-            console.warn('[C64] Error during emulator teardown:', e);
-        }
-        try { delete window.EJS_emulator; } catch { /* ignore */ }
+        const emu = window.EJS_emulator;
 
-        // Drop the entire DOM subtree so canvases / audio nodes get GC'd.
+        // 1. Pre-mute so anything in flight during teardown is silent.
+        try { emu?.setVolume?.(0); } catch { /* ignore */ }
+        try { emu?.gameManager?.setVolume?.(0); } catch { /* ignore */ }
+
+        // 2. Every documented exit / terminate path. We `await` each in case
+        //    the function returns a Promise. Individual failures are
+        //    expected (different EmulatorJS versions support different
+        //    subsets) — we keep going.
+        const exitPaths = [
+            () => emu?.callEvent?.('exit'),
+            () => emu?.exit?.(),
+            () => emu?.gameManager?.exit?.(),
+            () => emu?.gameManager?.Module?._exit?.(0),
+            () => window.EJS_terminate?.(),
+        ];
+        for (const fn of exitPaths) {
+            try { await Promise.resolve(fn()); } catch { /* ignore */ }
+        }
+
+        // 3. Explicitly close any AudioContext we can find. The terminate
+        //    hooks above don't always do this — the worker thread can still
+        //    keep an open AudioContext that pumps the SID buffer.
+        const audioCandidates = [
+            emu?.audioCtx,
+            emu?.audio?.audioCtx,
+            emu?.audio?.context,
+            emu?.gameManager?.audio?.audioCtx,
+            emu?.gameManager?.audio?.context,
+            emu?.gameManager?.Module?.SDL2?.audioContext,
+            emu?.gameManager?.Module?.SDL?.audioContext,
+            emu?.gameManager?.Module?.audioContext,
+        ];
+        for (const ctx of audioCandidates) {
+            if (ctx && typeof ctx.close === 'function' && ctx.state !== 'closed') {
+                try { ctx.close(); } catch { /* ignore */ }
+            }
+        }
+
+        // 4. Pause and unhook any <audio> elements under the player div.
+        if (stage) {
+            for (const a of stage.querySelectorAll('audio')) {
+                try { a.pause(); } catch { /* ignore */ }
+                try { a.removeAttribute('src'); a.load(); } catch { /* ignore */ }
+            }
+        }
+
+        // 5. Terminate Web Workers we can reach. EmulatorJS spawns one per
+        //    instance for the libretro core; if it survives the DOM drop it
+        //    can keep nudging the audio output until GC eventually reaps it.
+        const workerCandidates = [
+            emu?.gameManager?.Module?.worker,
+            emu?.gameManager?.worker,
+            emu?.worker,
+        ];
+        for (const w of workerCandidates) {
+            if (w && typeof w.terminate === 'function') {
+                try { w.terminate(); } catch { /* ignore */ }
+            }
+        }
+
+        try { delete window.EJS_emulator; } catch { /* non-configurable, ignore */ }
+
+        // 6. Drop the entire DOM subtree so canvases / WebGL ctx / any
+        //    surviving audio nodes lose all references and become GC-eligible.
         if (stage) stage.innerHTML = '';
 
         if (this.activeBlobUrl && this.currentRom === this.activeBlobUrl) {
@@ -1511,6 +1710,231 @@ class C64 extends AppBase {
         }
     }
 
+    // ── Toolbar Actions (also bound to keyboard shortcuts) ─────
+
+    /**
+     * Toggle pause / resume. Updates the button label so the user can
+     * tell at a glance which state they're in.
+     */
+    togglePause() {
+        if (!this.isRunning) return;
+        this._paused = !this._paused;
+        try {
+            window.EJS_emulator?.gameManager?.setPaused?.(this._paused);
+            // Older EmulatorJS exposed setPaused on the root; guard for both.
+            window.EJS_emulator?.setPaused?.(this._paused);
+        } catch (e) {
+            console.warn('[C64] togglePause failed:', e);
+        }
+        const btn = this.getElement('#c64PauseBtn');
+        if (btn) btn.innerHTML = this._paused ? '▶ Resume' : '⏸ Pause';
+        this.setStatus(this._paused ? 'Paused: ' + (this.currentRomName || '') : 'Running: ' + (this.currentRomName || ''));
+        this.emitAppEvent(this._paused ? 'paused' : 'resumed', { name: this.currentRomName });
+    }
+
+    /**
+     * Toggle mute. Restores the prior volume on un-mute.
+     */
+    toggleMute() {
+        this._muted = !this._muted;
+        if (this._muted) {
+            // Snapshot current volume before muting if we can read it.
+            const cur = window.EJS_emulator?.gameManager?.getVolume?.()
+                ?? window.EJS_emulator?.volume
+                ?? this._volumeBeforeMute;
+            if (typeof cur === 'number') this._volumeBeforeMute = cur;
+            this.setVolume(0);
+        } else {
+            this.setVolume(this._volumeBeforeMute || 0.5);
+        }
+        const btn = this.getElement('#c64MuteBtn');
+        if (btn) btn.innerHTML = this._muted ? '🔇' : '🔊';
+        if (btn) btn.title = (this._muted ? 'Unmute (M)' : 'Mute (M)');
+    }
+
+    /**
+     * Save the current emulator state to an in-memory slot. Per-session
+     * only — closing the C64 app discards it. (Persisting save states
+     * across sessions would belong in a follow-up wired through
+     * StorageManager so the save bytes are scoped to the right user.)
+     */
+    async saveState() {
+        if (!this.isRunning || !this.isReady) return;
+        try {
+            const gm = window.EJS_emulator?.gameManager;
+            if (!gm?.getState) {
+                this.setStatus('Save state not supported by this core build');
+                return;
+            }
+            const state = await Promise.resolve(gm.getState());
+            if (!state) throw new Error('getState returned empty');
+            this._lastSaveState = state;
+            const loadBtn = this.getElement('#c64LoadStateBtn');
+            if (loadBtn) loadBtn.disabled = false;
+            this.setStatus('State saved (in-memory, this session)');
+            this.emitAppEvent('stateSaved', { bytes: state?.length || 0 });
+        } catch (e) {
+            console.warn('[C64] saveState failed:', e);
+            this.setStatus('Save state failed: ' + (e?.message || e));
+        }
+    }
+
+    /**
+     * Restore the most-recent saved state. No-op if nothing is saved
+     * yet or if the emulator isn't ready.
+     */
+    async loadState() {
+        if (!this.isRunning || !this.isReady) return;
+        if (!this._lastSaveState) {
+            this.setStatus('No save state in this session yet');
+            return;
+        }
+        try {
+            const gm = window.EJS_emulator?.gameManager;
+            if (!gm?.loadState) {
+                this.setStatus('Load state not supported by this core build');
+                return;
+            }
+            await Promise.resolve(gm.loadState(this._lastSaveState));
+            this.setStatus('State restored');
+            this.emitAppEvent('stateLoaded', {});
+        } catch (e) {
+            console.warn('[C64] loadState failed:', e);
+            this.setStatus('Load state failed: ' + (e?.message || e));
+        }
+    }
+
+    /**
+     * Reload the currently-running ROM from scratch.
+     */
+    async resetCurrent() {
+        const url = this.currentRom;
+        const name = this.currentRomName;
+        await this.stopEmulator();
+        if (url !== null) await this.loadGame(url, name);
+    }
+
+    /**
+     * Map a keydown event to a toolbar action. Called from the document
+     * keydown listener, which is gated on `isFocused()` so we never
+     * eat keys destined for another app.
+     * @private
+     */
+    _handleShortcut(e) {
+        if (e.ctrlKey || e.metaKey) {
+            const key = e.key.toLowerCase();
+            if (key === 's') { e.preventDefault(); this.saveState(); return; }
+            if (key === 'l') { e.preventDefault(); this.loadState(); return; }
+            return;
+        }
+        // Plain shortcuts — ignore if any modifier is held to avoid
+        // colliding with browser shortcuts.
+        if (e.altKey || e.shiftKey) return;
+        switch (e.key) {
+            case 'Escape':
+                if (this.isRunning) { e.preventDefault(); this.stopEmulator(); }
+                break;
+            case 'p': case 'P':
+                if (this.isRunning) { e.preventDefault(); this.togglePause(); }
+                break;
+            case 'm': case 'M':
+                e.preventDefault(); this.toggleMute();
+                break;
+            case 'r': case 'R':
+                if (this.isRunning) { e.preventDefault(); this.resetCurrent(); }
+                break;
+            case 'f': case 'F':
+                e.preventDefault(); this.toggleFullscreen();
+                break;
+        }
+    }
+
+    // ── Recent Games (persisted to localStorage) ───────────────
+
+    /** localStorage key for the recent-games list. */
+    static get RECENTS_KEY() { return 'c64.recents.v1'; }
+    /** Hard cap on how many recents we keep. */
+    static get RECENTS_MAX() { return 6; }
+
+    /** @private */
+    _loadRecents() {
+        try {
+            const raw = localStorage.getItem(C64.RECENTS_KEY);
+            const arr = raw ? JSON.parse(raw) : [];
+            if (Array.isArray(arr)) {
+                this._recents = arr.filter(r =>
+                    r && typeof r === 'object' &&
+                    typeof r.name === 'string' &&
+                    (typeof r.url === 'string' || typeof r.iaItem === 'string' || typeof r.iaSearch === 'string')
+                ).slice(0, C64.RECENTS_MAX);
+            }
+        } catch { /* corrupt or unavailable storage — ignore */ }
+    }
+
+    /** @private */
+    _saveRecents() {
+        try {
+            localStorage.setItem(C64.RECENTS_KEY, JSON.stringify(this._recents));
+        } catch { /* quota / private mode — ignore */ }
+    }
+
+    /**
+     * Push an entry onto the recents list (most-recent first, deduped).
+     * @private
+     */
+    _pushRecent(entry) {
+        if (!entry || !entry.name) return;
+        // Dedup by url|iaItem|iaSearch so the same title coalesces across
+        // launches even if the resolved URL differs.
+        const key = entry.url || entry.iaItem || entry.iaSearch || entry.name;
+        const trimmed = {
+            name: entry.name,
+            icon: entry.icon || '💾',
+            url: entry.url,
+            iaItem: entry.iaItem,
+            iaSearch: entry.iaSearch,
+            category: entry.category,
+            year: entry.year,
+        };
+        const existingIdx = this._recents.findIndex(r =>
+            (r.url || r.iaItem || r.iaSearch || r.name) === key);
+        if (existingIdx !== -1) this._recents.splice(existingIdx, 1);
+        this._recents.unshift(trimmed);
+        if (this._recents.length > C64.RECENTS_MAX) this._recents.length = C64.RECENTS_MAX;
+        this._saveRecents();
+        this._renderRecents();
+    }
+
+    /**
+     * Render the recents bar. Hidden when empty.
+     * @private
+     */
+    _renderRecents() {
+        const bar = this.getElement('#c64Recents');
+        if (!bar) return;
+        if (this._recents.length === 0) {
+            bar.style.display = 'none';
+            bar.innerHTML = '';
+            return;
+        }
+        bar.style.display = 'flex';
+        const chips = this._recents.map((r, i) => {
+            const label = `${r.icon || '💾'} ${r.name}`;
+            return `<button class="c64-recent-chip" data-recent-idx="${i}"
+                            title="Re-launch ${escapeHtml(r.name)}">${escapeHtml(label)}</button>`;
+        }).join('');
+        bar.innerHTML = '<span class="c64-recents-label">Recent:</span>' + chips;
+        // Wire chip clicks. addHandler binds to the new nodes so the
+        // SubscriptionManager cleans them up on app close.
+        for (const chip of bar.querySelectorAll('.c64-recent-chip')) {
+            this.addHandler(chip, 'click', () => {
+                const idx = Number(chip.dataset.recentIdx);
+                const entry = this._recents[idx];
+                if (entry) this.loadLibraryEntry(entry);
+            });
+        }
+    }
+
     // ── Helpers ────────────────────────────────────────────────
 
     setStatus(text) {
@@ -1521,8 +1945,21 @@ class C64 extends AppBase {
     updateButtons(running) {
         const stopBtn = this.getElement('#c64StopBtn');
         const resetBtn = this.getElement('#c64ResetBtn');
+        const pauseBtn = this.getElement('#c64PauseBtn');
+        const saveStateBtn = this.getElement('#c64SaveStateBtn');
+        const loadStateBtn = this.getElement('#c64LoadStateBtn');
         if (stopBtn) stopBtn.disabled = !running;
         if (resetBtn) resetBtn.disabled = !running;
+        if (pauseBtn) pauseBtn.disabled = !running;
+        if (saveStateBtn) saveStateBtn.disabled = !running;
+        // Load state needs both a running emulator AND a saved snapshot.
+        if (loadStateBtn) loadStateBtn.disabled = !running || !this._lastSaveState;
+        // When the emulator stops, reset paused state so the next launch
+        // starts un-paused.
+        if (!running) {
+            this._paused = false;
+            if (pauseBtn) pauseBtn.innerHTML = '⏸ Pause';
+        }
     }
 
     /**
