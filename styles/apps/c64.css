@@ -222,6 +222,69 @@
     opacity: 0.7;
 }
 
+.c64-splash-keys {
+    display: inline-block;
+    margin-top: 6px;
+    font-family: 'VT323', 'Courier New', monospace;
+    font-size: 12px;
+    color: #c8c8ff;
+    opacity: 0.85;
+}
+
+.c64-splash-keys b {
+    color: #ffff66;
+    font-weight: bold;
+}
+
+/* ── Recents bar ─────────────────────────── */
+
+.c64-recents {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 6px;
+    background: var(--win95-gray, #c0c0c0);
+    border-bottom: 1px solid #808080;
+    border-top: 1px solid #ffffff;
+    overflow-x: auto;
+    flex-shrink: 0;
+}
+
+.c64-recents-label {
+    font-size: 11px;
+    font-weight: bold;
+    white-space: nowrap;
+    color: #000;
+    padding-right: 4px;
+}
+
+.c64-recent-chip {
+    padding: 2px 8px;
+    background: var(--win95-gray, #c0c0c0);
+    border-top: 2px solid #ffffff;
+    border-left: 2px solid #ffffff;
+    border-right: 2px solid #000000;
+    border-bottom: 2px solid #000000;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 11px;
+    white-space: nowrap;
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.c64-recent-chip:hover {
+    background: #d4d0c8;
+}
+
+.c64-recent-chip:active {
+    border-top: 2px solid #000000;
+    border-left: 2px solid #000000;
+    border-right: 2px solid #ffffff;
+    border-bottom: 2px solid #ffffff;
+}
+
 .c64-splash-link {
     display: inline-block;
     margin-top: 8px;
