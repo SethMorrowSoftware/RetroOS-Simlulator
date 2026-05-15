@@ -280,6 +280,286 @@ const GAME_LIBRARY = [
       desc: 'Archaeologist Joe Gunn — Gold Edition (Psytronik Software)',
       url: `${RETROBREWS_C64_BASE}/joegunngold.d64` },
 
+    // ── Classics from Internet Archive's C64 preservation collection ──────
+    // Each entry uses `iaSearch` (a Lucene query) rather than a hardcoded
+    // item ID. The resolver hits IA's advancedsearch.php at runtime, picks
+    // the top software-mediatype result, then resolves the file. Search
+    // results are cached per session.
+
+    // === Arcade Classics ==================================================
+    { name: 'Pac-Man', icon: '🟡', category: 'Arcade', year: 1983,
+      desc: 'Maze chase — Atarisoft port',
+      iaSearch: 'title:(pac-man OR "pac man") AND collection:softwarelibrary_c64_games' },
+    { name: 'Ms. Pac-Man', icon: '🎀', category: 'Arcade', year: 1984,
+      desc: 'Maze chase sequel — Atarisoft',
+      iaSearch: 'title:("ms pac-man" OR "ms. pac-man") AND collection:softwarelibrary_c64_games' },
+    { name: 'Donkey Kong', icon: '🦍', category: 'Arcade', year: 1983,
+      desc: 'Climb ladders, dodge barrels — Atarisoft',
+      iaSearch: 'title:"donkey kong" AND collection:softwarelibrary_c64_games' },
+    { name: 'Donkey Kong Jr.', icon: '🐒', category: 'Arcade', year: 1983,
+      desc: 'Rescue Pop — Atarisoft',
+      iaSearch: 'title:"donkey kong jr" AND collection:softwarelibrary_c64_games' },
+    { name: 'Centipede', icon: '🐛', category: 'Arcade', year: 1984,
+      desc: 'Mushroom field shooter — Atarisoft',
+      iaSearch: 'title:centipede AND collection:softwarelibrary_c64_games' },
+    { name: 'Galaga', icon: '👾', category: 'Arcade', year: 1985,
+      desc: 'Vertical-scroll shooter — Atarisoft',
+      iaSearch: 'title:galaga AND collection:softwarelibrary_c64_games' },
+    { name: 'Frogger', icon: '🐸', category: 'Arcade', year: 1983,
+      desc: 'Cross road and river — Sierra',
+      iaSearch: 'title:frogger AND collection:softwarelibrary_c64_games' },
+    { name: 'Q*bert', icon: '🟧', category: 'Arcade', year: 1983,
+      desc: 'Hop the pyramid — Parker Bros.',
+      iaSearch: 'title:qbert AND collection:softwarelibrary_c64_games' },
+    { name: 'Defender', icon: '🛸', category: 'Arcade', year: 1983,
+      desc: 'Side-scrolling rescue shooter — Atarisoft',
+      iaSearch: 'title:defender AND collection:softwarelibrary_c64_games' },
+    { name: 'Dig Dug', icon: '⛏️', category: 'Arcade', year: 1983,
+      desc: 'Underground inflator — Atarisoft',
+      iaSearch: 'title:"dig dug" AND collection:softwarelibrary_c64_games' },
+    { name: 'Joust', icon: '🪶', category: 'Arcade', year: 1983,
+      desc: 'Ostrich lance duels — Atari',
+      iaSearch: 'title:joust AND collection:softwarelibrary_c64_games' },
+    { name: 'Bubble Bobble', icon: '🫧', category: 'Arcade', year: 1987,
+      desc: 'Bubble-blowing dinosaurs — Taito',
+      iaSearch: 'title:"bubble bobble" AND collection:softwarelibrary_c64_games' },
+    { name: 'Mario Bros.', icon: '👨‍🔧', category: 'Arcade', year: 1984,
+      desc: 'Pre-Super plumber arcade — Atari',
+      iaSearch: 'title:"mario bros" AND collection:softwarelibrary_c64_games' },
+    { name: 'BurgerTime', icon: '🍔', category: 'Arcade', year: 1984,
+      desc: 'Stomp the buns — Mattel',
+      iaSearch: 'title:burgertime AND collection:softwarelibrary_c64_games' },
+    { name: 'Tapper', icon: '🍺', category: 'Arcade', year: 1984,
+      desc: 'Slide drinks down the bar — Bally',
+      iaSearch: 'title:tapper AND collection:softwarelibrary_c64_games' },
+    { name: 'Spy Hunter', icon: '🚗', category: 'Arcade', year: 1984,
+      desc: 'Combat driving — Bally Midway',
+      iaSearch: 'title:"spy hunter" AND collection:softwarelibrary_c64_games' },
+
+    // === Action / Action-Adventure ========================================
+    { name: 'The Last Ninja', icon: '🥷', category: 'Action', year: 1987,
+      desc: 'Isometric ninja saga — System 3',
+      iaSearch: 'title:"last ninja" AND collection:softwarelibrary_c64_games' },
+    { name: 'Last Ninja 2', icon: '🗡️', category: 'Action', year: 1988,
+      desc: 'Back With A Vengeance — System 3',
+      iaSearch: 'title:"last ninja 2" AND collection:softwarelibrary_c64_games' },
+    { name: 'Last Ninja 3', icon: '🐉', category: 'Action', year: 1991,
+      desc: 'Third entry — System 3',
+      iaSearch: 'title:"last ninja 3" AND collection:softwarelibrary_c64_games' },
+    { name: 'Paradroid', icon: '🤖', category: 'Action', year: 1985,
+      desc: 'Droid takeover — Andrew Braybrook',
+      iaSearch: 'title:paradroid AND collection:softwarelibrary_c64_games' },
+    { name: 'Mayhem in Monsterland', icon: '🐉', category: 'Action', year: 1993,
+      desc: 'Late-era multi-direction scroller — Apex',
+      iaSearch: 'title:"mayhem in monsterland" AND collection:softwarelibrary_c64_games' },
+    { name: 'Turrican', icon: '💥', category: 'Action', year: 1990,
+      desc: 'Run-and-gun explosion — Manfred Trenz',
+      iaSearch: 'title:turrican AND collection:softwarelibrary_c64_games' },
+    { name: 'Turrican II', icon: '⚙️', category: 'Action', year: 1991,
+      desc: 'The Final Fight',
+      iaSearch: 'title:"turrican ii" AND collection:softwarelibrary_c64_games' },
+    { name: 'Saboteur!', icon: '🕵️', category: 'Action', year: 1985,
+      desc: 'Side-scrolling infiltration — Durell',
+      iaSearch: 'title:saboteur AND collection:softwarelibrary_c64_games' },
+
+    // === Platformer ======================================================
+    { name: 'Bruce Lee', icon: '🥋', category: 'Platformer', year: 1984,
+      desc: 'Martial-arts platformer — Datasoft',
+      iaSearch: 'title:"bruce lee" AND collection:softwarelibrary_c64_games' },
+    { name: 'Impossible Mission', icon: '🤖', category: 'Platformer', year: 1984,
+      desc: 'Elvin Atombender — Epyx',
+      iaSearch: 'title:"impossible mission" AND collection:softwarelibrary_c64_games' },
+    { name: 'Impossible Mission II', icon: '🔓', category: 'Platformer', year: 1988,
+      desc: 'Sequel — Epyx',
+      iaSearch: 'title:"impossible mission ii" AND collection:softwarelibrary_c64_games' },
+    { name: 'Jumpman', icon: '🪜', category: 'Platformer', year: 1983,
+      desc: '30-level climber — Epyx',
+      iaSearch: 'title:jumpman AND collection:softwarelibrary_c64_games' },
+    { name: 'Jumpman Junior', icon: '🧗', category: 'Platformer', year: 1983,
+      desc: 'Cartridge-sized sequel — Epyx',
+      iaSearch: 'title:"jumpman junior" AND collection:softwarelibrary_c64_games' },
+    { name: 'Pitfall!', icon: '🐊', category: 'Platformer', year: 1983,
+      desc: 'Jungle classic — Activision',
+      iaSearch: 'title:pitfall AND collection:softwarelibrary_c64_games' },
+    { name: 'Pitfall II', icon: '🕳️', category: 'Platformer', year: 1984,
+      desc: 'Lost Caverns — Activision',
+      iaSearch: 'title:"pitfall ii" AND collection:softwarelibrary_c64_games' },
+    { name: 'Aztec Challenge', icon: '🐍', category: 'Platformer', year: 1983,
+      desc: 'Seven-level temple gauntlet — Cosmi',
+      iaSearch: 'title:"aztec challenge" AND collection:softwarelibrary_c64_games' },
+    { name: 'Boulder Dash', icon: '💎', category: 'Platformer', year: 1984,
+      desc: 'Gem-grabbing dig — First Star',
+      iaSearch: 'title:"boulder dash" AND collection:softwarelibrary_c64_games' },
+    { name: 'Boulder Dash II', icon: '🪨', category: 'Platformer', year: 1985,
+      desc: "Rockford's Revenge",
+      iaSearch: 'title:"boulder dash ii" AND collection:softwarelibrary_c64_games' },
+    { name: 'The Goonies', icon: '👻', category: 'Platformer', year: 1986,
+      desc: 'Movie tie-in — Datasoft',
+      iaSearch: 'title:goonies AND collection:softwarelibrary_c64_games' },
+    { name: 'Spelunker', icon: '🔦', category: 'Platformer', year: 1985,
+      desc: 'Cave-diver — Broderbund',
+      iaSearch: 'title:spelunker AND collection:softwarelibrary_c64_games' },
+    { name: 'Lode Runner', icon: '🏃', category: 'Platformer', year: 1984,
+      desc: 'Dig and grab gold — Broderbund',
+      iaSearch: 'title:"lode runner" AND collection:softwarelibrary_c64_games' },
+    { name: 'Wonder Boy', icon: '🍔', category: 'Platformer', year: 1987,
+      desc: 'Skateboard platformer — Sega',
+      iaSearch: 'title:"wonder boy" AND collection:softwarelibrary_c64_games' },
+
+    // === Shooter =========================================================
+    { name: 'Uridium', icon: '🚀', category: 'Shooter', year: 1986,
+      desc: 'Super-fast scroller — Andrew Braybrook',
+      iaSearch: 'title:uridium AND collection:softwarelibrary_c64_games' },
+    { name: 'Wizball', icon: '🧙', category: 'Shooter', year: 1987,
+      desc: 'Rolling wizard shooter — Sensible',
+      iaSearch: 'title:wizball AND collection:softwarelibrary_c64_games' },
+    { name: 'Delta', icon: '🔺', category: 'Shooter', year: 1987,
+      desc: 'Bullet-hell horizontal — Stavros Fasoulas',
+      iaSearch: 'title:delta AND collection:softwarelibrary_c64_games' },
+    { name: 'Sanxion', icon: '🛰️', category: 'Shooter', year: 1986,
+      desc: 'Vertical scroller, Rob Hubbard SID',
+      iaSearch: 'title:sanxion AND collection:softwarelibrary_c64_games' },
+    { name: 'Armalyte', icon: '⚔️', category: 'Shooter', year: 1988,
+      desc: 'R-Type-style scroller — Cyberdyne',
+      iaSearch: 'title:armalyte AND collection:softwarelibrary_c64_games' },
+    { name: 'IO', icon: '🌀', category: 'Shooter', year: 1987,
+      desc: 'Multi-stage scroller — Graftgold',
+      iaSearch: 'title:io AND collection:softwarelibrary_c64_games' },
+    { name: 'Dropzone', icon: '🪂', category: 'Shooter', year: 1984,
+      desc: 'Defender-style rescue — Archer Maclean',
+      iaSearch: 'title:dropzone AND collection:softwarelibrary_c64_games' },
+    { name: 'Hawkeye', icon: '🦅', category: 'Shooter', year: 1988,
+      desc: 'Run-and-gun — Boys Without Brains',
+      iaSearch: 'title:hawkeye AND collection:softwarelibrary_c64_games' },
+    { name: 'R-Type', icon: '🐉', category: 'Shooter', year: 1989,
+      desc: 'Scrolling shooter — Irem',
+      iaSearch: 'title:"r-type" AND collection:softwarelibrary_c64_games' },
+
+    // === Adventure ========================================================
+    { name: 'Maniac Mansion', icon: '🏚️', category: 'Adventure', year: 1987,
+      desc: 'First SCUMM adventure — Lucasfilm',
+      iaSearch: 'title:"maniac mansion" AND collection:softwarelibrary_c64_games' },
+    { name: 'Zak McKracken', icon: '👽', category: 'Adventure', year: 1988,
+      desc: 'Alien Mindbenders — Lucasfilm',
+      iaSearch: 'title:"zak mckracken" AND collection:softwarelibrary_c64_games' },
+    { name: 'Defender of the Crown', icon: '👑', category: 'Adventure', year: 1987,
+      desc: 'Knights and sieges — Cinemaware',
+      iaSearch: 'title:"defender of the crown" AND collection:softwarelibrary_c64_games' },
+    { name: "Sid Meier's Pirates!", icon: '🏴‍☠️', category: 'Adventure', year: 1987,
+      desc: 'Caribbean sandbox — MicroProse',
+      iaSearch: 'title:pirates AND collection:softwarelibrary_c64_games' },
+    { name: 'Carmen Sandiego (World)', icon: '🌎', category: 'Adventure', year: 1985,
+      desc: 'Edutainment classic — Broderbund',
+      iaSearch: 'title:"carmen sandiego" AND collection:softwarelibrary_c64_games' },
+    { name: 'The Hobbit', icon: '💍', category: 'Adventure', year: 1985,
+      desc: 'Illustrated text adventure — Melbourne House',
+      iaSearch: 'title:hobbit AND collection:softwarelibrary_c64_games' },
+    { name: 'Below the Root', icon: '🌳', category: 'Adventure', year: 1984,
+      desc: 'Literary adventure — CBS Software',
+      iaSearch: 'title:"below the root" AND collection:softwarelibrary_c64_games' },
+
+    // === Text Adventure ===================================================
+    { name: 'Zork I', icon: '📜', category: 'Text Adventure', year: 1983,
+      desc: 'Great Underground Empire — Infocom',
+      iaSearch: 'title:"zork i" AND collection:softwarelibrary_c64_games' },
+    { name: "Hitchhiker's Guide", icon: '🐬', category: 'Text Adventure', year: 1984,
+      desc: 'Douglas Adams + Infocom',
+      iaSearch: 'title:hitchhiker AND collection:softwarelibrary_c64_games' },
+
+    // === RPG ==============================================================
+    { name: "The Bard's Tale", icon: '🎵', category: 'RPG', year: 1985,
+      desc: 'Dungeon-crawler — Interplay/EA',
+      iaSearch: 'title:"bards tale" AND collection:softwarelibrary_c64_games' },
+    { name: 'Ultima IV', icon: '👑', category: 'RPG', year: 1985,
+      desc: 'Quest of the Avatar — Origin',
+      iaSearch: 'title:"ultima iv" AND collection:softwarelibrary_c64_games' },
+    { name: 'Ultima V', icon: '🗡️', category: 'RPG', year: 1988,
+      desc: 'Warriors of Destiny — Origin',
+      iaSearch: 'title:"ultima v" AND collection:softwarelibrary_c64_games' },
+    { name: 'Wasteland', icon: '☢️', category: 'RPG', year: 1988,
+      desc: 'Post-apocalyptic RPG — Interplay',
+      iaSearch: 'title:wasteland AND collection:softwarelibrary_c64_games' },
+    { name: 'Pool of Radiance', icon: '🐲', category: 'RPG', year: 1988,
+      desc: 'First SSI Gold Box D&D',
+      iaSearch: 'title:"pool of radiance" AND collection:softwarelibrary_c64_games' },
+
+    // === Strategy / Simulation ============================================
+    { name: 'M.U.L.E.', icon: '🐴', category: 'Strategy', year: 1983,
+      desc: 'Economic strategy — Ozark Softscape',
+      iaSearch: 'title:mule AND collection:softwarelibrary_c64_games' },
+    { name: 'Archon', icon: '♛', category: 'Strategy', year: 1983,
+      desc: 'Chess meets combat — Free Fall',
+      iaSearch: 'title:archon AND collection:softwarelibrary_c64_games' },
+    { name: 'Seven Cities of Gold', icon: '🌅', category: 'Strategy', year: 1984,
+      desc: 'New World exploration — Bunten',
+      iaSearch: 'title:"seven cities of gold" AND collection:softwarelibrary_c64_games' },
+    { name: 'SimCity', icon: '🏙️', category: 'Strategy', year: 1989,
+      desc: 'City-builder original — Maxis',
+      iaSearch: 'title:simcity AND collection:softwarelibrary_c64_games' },
+    { name: 'Little Computer People', icon: '🏠', category: 'Strategy', year: 1985,
+      desc: 'Ur-Sims experiment — Activision',
+      iaSearch: 'title:"little computer people" AND collection:softwarelibrary_c64_games' },
+    { name: 'F-15 Strike Eagle', icon: '✈️', category: 'Strategy', year: 1985,
+      desc: 'Fighter-jet sim — MicroProse',
+      iaSearch: 'title:"f-15 strike eagle" AND collection:softwarelibrary_c64_games' },
+
+    // === Sports ===========================================================
+    { name: 'California Games', icon: '🛹', category: 'Sports', year: 1987,
+      desc: 'Six west-coast events — Epyx',
+      iaSearch: 'title:"california games" AND collection:softwarelibrary_c64_games' },
+    { name: 'Summer Games', icon: '🏊', category: 'Sports', year: 1984,
+      desc: 'Eight-event Olympic sim — Epyx',
+      iaSearch: 'title:"summer games" AND collection:softwarelibrary_c64_games' },
+    { name: 'Summer Games II', icon: '🚴', category: 'Sports', year: 1985,
+      desc: 'Eight more events — Epyx',
+      iaSearch: 'title:"summer games ii" AND collection:softwarelibrary_c64_games' },
+    { name: 'Winter Games', icon: '⛷️', category: 'Sports', year: 1985,
+      desc: 'Ice and snow events — Epyx',
+      iaSearch: 'title:"winter games" AND collection:softwarelibrary_c64_games' },
+    { name: 'World Games', icon: '🌍', category: 'Sports', year: 1986,
+      desc: 'Caber toss, sumo, log roll — Epyx',
+      iaSearch: 'title:"world games" AND collection:softwarelibrary_c64_games' },
+    { name: 'International Karate', icon: '🥋', category: 'Fighting', year: 1985,
+      desc: 'Side-view karate — System 3',
+      iaSearch: 'title:"international karate" AND collection:softwarelibrary_c64_games' },
+    { name: 'IK+', icon: '🥷', category: 'Fighting', year: 1987,
+      desc: 'Three-fighter karate sequel',
+      iaSearch: 'title:"international karate plus" AND collection:softwarelibrary_c64_games' },
+    { name: 'Hardball!', icon: '⚾', category: 'Sports', year: 1985,
+      desc: 'Baseball sim — Accolade',
+      iaSearch: 'title:hardball AND collection:softwarelibrary_c64_games' },
+
+    // === Racing ===========================================================
+    { name: 'Pole Position', icon: '🏁', category: 'Racing', year: 1983,
+      desc: 'Formula 1 arcade port — Atarisoft',
+      iaSearch: 'title:"pole position" AND collection:softwarelibrary_c64_games' },
+    { name: 'Pitstop II', icon: '🏎️', category: 'Racing', year: 1984,
+      desc: 'Split-screen Grand Prix — Epyx',
+      iaSearch: 'title:"pitstop ii" AND collection:softwarelibrary_c64_games' },
+    { name: 'Test Drive', icon: '🚗', category: 'Racing', year: 1987,
+      desc: 'Supercar driving — Accolade',
+      iaSearch: 'title:"test drive" AND collection:softwarelibrary_c64_games' },
+    { name: 'Out Run', icon: '🌴', category: 'Racing', year: 1988,
+      desc: 'Convertible cruiser — Sega',
+      iaSearch: 'title:outrun AND collection:softwarelibrary_c64_games' },
+    { name: 'Lotus Esprit Turbo', icon: '🟡', category: 'Racing', year: 1990,
+      desc: 'Racer — Gremlin',
+      iaSearch: 'title:"lotus esprit" AND collection:softwarelibrary_c64_games' },
+
+    // === Puzzle ===========================================================
+    { name: 'Tetris', icon: '🟦', category: 'Puzzle', year: 1988,
+      desc: 'Falling-block classic — Mirrorsoft',
+      iaSearch: 'title:tetris AND collection:softwarelibrary_c64_games' },
+    { name: 'Lemmings', icon: '🐹', category: 'Puzzle', year: 1991,
+      desc: 'Save the suicide squad — DMA Design',
+      iaSearch: 'title:lemmings AND collection:softwarelibrary_c64_games' },
+    { name: 'The Sentinel', icon: '👁️', category: 'Puzzle', year: 1987,
+      desc: '3D strategy puzzle — Geoff Crammond',
+      iaSearch: 'title:sentinel AND collection:softwarelibrary_c64_games' },
+    { name: 'Stunt Car Racer', icon: '🎢', category: 'Puzzle', year: 1989,
+      desc: 'Rollercoaster racer — Crammond',
+      iaSearch: 'title:"stunt car racer" AND collection:softwarelibrary_c64_games' },
+
     // === Demoscene (experimental — proxied through IA, may not resolve) ====
     { name: 'Edge of Disgrace', icon: '✨', category: 'Demoscene', year: 2008,
       desc: 'Booze Design — acclaimed late-era demo',
@@ -301,6 +581,12 @@ const CATEGORY_ORDER = [
     'Platformer',
     'Puzzle',
     'Adventure',
+    'Text Adventure',
+    'RPG',
+    'Strategy',
+    'Sports',
+    'Fighting',
+    'Racing',
     'Demoscene',
     'Tools',
 ];
@@ -473,12 +759,14 @@ class C64 extends AppBase {
                             </div>
                         </div>
                         <div class="c64-splash-hint">
-                            48 freeware homebrew titles bundled — pick one from the <b>Disk</b>
-                            dropdown, paste a <code>.d64</code> / <code>.prg</code> / <code>.crt</code>
-                            URL, or click <b>File…</b> to load from your computer.<br>
+                            <b>~120 titles bundled</b> — 48 freeware homebrew (load instantly
+                            from GitHub) plus dozens of classics resolved from Internet Archive
+                            on first launch. Pick one from the <b>Disk</b> dropdown, paste a
+                            <code>.d64</code> / <code>.prg</code> / <code>.crt</code> URL, or
+                            click <b>File…</b> to load from your computer.<br>
                             <a class="c64-splash-link"
                                href="https://github.com/retrobrews/c64-games" target="_blank"
-                               rel="noopener">Browse the full retrobrews catalog on GitHub →</a><br>
+                               rel="noopener">Browse the full retrobrews homebrew catalog →</a><br>
                             <span class="c64-splash-credit">Powered by <b>EmulatorJS</b> / <b>VICE</b> — WebAssembly.</span>
                         </div>
                     </div>
@@ -666,8 +954,8 @@ class C64 extends AppBase {
             return;
         }
 
-        if (!entry.iaItem) {
-            this._showError('Library entry "' + displayName + '" has no url and no iaItem.');
+        if (!entry.iaItem && !entry.iaSearch) {
+            this._showError('Library entry "' + displayName + '" has no url, iaItem, or iaSearch.');
             return;
         }
 
@@ -675,32 +963,108 @@ class C64 extends AppBase {
         // feedback even before the resolver fetch returns. Without this the
         // splash stays up during the (sometimes slow) metadata round-trip
         // and it looks like the dropdown did nothing.
-        this._showLoading('Resolving "' + displayName + '" on Internet Archive…');
-        this.setStatus('Resolving: ' + entry.iaItem);
+        const resolveLabel = entry.iaItem
+            ? 'Resolving "' + displayName + '" on Internet Archive…'
+            : 'Searching Internet Archive for "' + displayName + '"…';
+        this._showLoading(resolveLabel);
+        this.setStatus(resolveLabel);
 
         try {
-            const url = await this._resolveIAItemToUrl(entry.iaItem);
+            // If the entry only has a search query, resolve it to a specific
+            // item ID first. The search result is cached so re-launching
+            // doesn't re-hit the search endpoint.
+            let itemId = entry.iaItem;
+            if (!itemId) {
+                itemId = await this._resolveIASearchToItemId(entry.iaSearch, displayName);
+                this._showLoading('Resolving "' + displayName + '" (' + itemId + ')…');
+            }
+            const url = await this._resolveIAItemToUrl(itemId);
             await this.loadGame(url, displayName);
         } catch (err) {
-            console.error('[C64] IA resolve failed for', entry.iaItem, '→', err);
-            const iaSearch = 'https://archive.org/search?query=' +
-                encodeURIComponent(displayName + ' commodore 64');
+            console.error('[C64] IA resolve failed for', entry.iaItem || entry.iaSearch, '→', err);
+            const iaSearchUrl = 'https://archive.org/search?query=' +
+                encodeURIComponent((entry.iaSearch || displayName) + ' commodore 64');
             this._showError(
                 `Couldn't load "${displayName}" from Internet Archive.`,
                 [
                     `Reason: ${err?.message || err}`,
-                    `The IA item ID "${entry.iaItem}" may have been renamed or removed.`,
+                    entry.iaItem
+                        ? `The IA item ID "${entry.iaItem}" may have been renamed or removed.`
+                        : `The IA search for this title returned no matching item.`,
                     'Try another title, paste a URL above, or click "File…" to load a local .d64.'
                 ],
-                { iaSearchUrl: iaSearch }
+                { iaSearchUrl }
             );
             this.setStatus('Failed: ' + (err?.message || err));
             this.emitAppEvent('error', {
                 error: err?.message || String(err),
                 iaItem: entry.iaItem,
+                iaSearch: entry.iaSearch,
                 name: displayName
             });
         }
+    }
+
+    /**
+     * Resolve an Internet Archive search query to a specific item ID.
+     * Hits IA's advancedsearch.php endpoint through our proxy (which
+     * sidesteps IA's inconsistent CORS posture) and picks the top result.
+     *
+     * The query is the value of `entry.iaSearch` — typically Lucene-style
+     * with `mediatype:software` and a collection filter to keep results
+     * narrowed to C64 software:
+     *
+     *   title:"Boulder Dash" AND collection:softwarelibrary_c64_games
+     *
+     * Cached per-instance. Concurrent calls for the same query are
+     * deduped through `_iaResolveInFlight`.
+     *
+     * @private
+     * @param {string} query
+     * @param {string} displayName - for error messages
+     * @returns {Promise<string>} the resolved IA item identifier
+     */
+    _resolveIASearchToItemId(query, displayName) {
+        const cacheKey = 'search:' + query;
+        if (this._iaUrlCache.has(cacheKey)) {
+            return Promise.resolve(this._iaUrlCache.get(cacheKey));
+        }
+        if (this._iaResolveInFlight.has(cacheKey)) {
+            return this._iaResolveInFlight.get(cacheKey);
+        }
+
+        const directSearchUrl =
+            'https://archive.org/advancedsearch.php' +
+            '?q=' + encodeURIComponent(query) +
+            '&fl[]=identifier&fl[]=title&fl[]=mediatype' +
+            '&rows=5&page=1&output=json';
+        const fetchUrl = this.getLoadUrl(directSearchUrl);
+
+        const promise = (async () => {
+            const res = await fetch(fetchUrl, { credentials: 'omit' });
+            if (!res.ok) {
+                throw new Error(`IA search HTTP ${res.status} for "${displayName}"`);
+            }
+            const data = await res.json();
+            const docs = data?.response?.docs;
+            if (!Array.isArray(docs) || docs.length === 0) {
+                throw new Error(`IA search returned no results for "${displayName}"`);
+            }
+            // Prefer software-mediatype results, fall back to the top hit.
+            const softwareHit = docs.find(d => d.mediatype === 'software');
+            const pick = softwareHit || docs[0];
+            const itemId = pick?.identifier;
+            if (typeof itemId !== 'string' || !itemId) {
+                throw new Error(`IA search result missing identifier for "${displayName}"`);
+            }
+            this._iaUrlCache.set(cacheKey, itemId);
+            return itemId;
+        })().finally(() => {
+            this._iaResolveInFlight.delete(cacheKey);
+        });
+
+        this._iaResolveInFlight.set(cacheKey, promise);
+        return promise;
     }
 
     /**
