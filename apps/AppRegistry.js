@@ -65,6 +65,7 @@ import GameLobby from './GameLobby.js';
 import BonziBuddy from './BonziBuddy.js';
 import DOSBox from './DOSBox.js';
 import C64 from './C64.js';
+import TRS80 from './TRS80.js';
 // --- System App Placeholders (Simple implementations for completeness) ---
 import AppBase from './AppBase.js';
 
@@ -236,6 +237,7 @@ class AppRegistryClass {
             new Tetris(),
             new DOSBox(),
             new C64(),
+            new TRS80(),
         ]);
 
         // --- Multimedia ---

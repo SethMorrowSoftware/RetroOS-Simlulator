@@ -1,0 +1,413 @@
+/* ============================================
+   TRS-80 Emulator App
+   ============================================ */
+
+.trs80-app {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    background: var(--win95-gray, #c0c0c0);
+    font-family: 'MS Sans Serif', 'Microsoft Sans Serif', Arial, sans-serif;
+    font-size: 12px;
+}
+
+/* ── Toolbar ─────────────────────────────── */
+
+.trs80-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 4px 6px;
+    background: var(--win95-gray, #c0c0c0);
+    border-bottom: 1px solid #808080;
+    align-items: center;
+}
+
+.trs80-toolbar-sub {
+    border-top: 1px solid #ffffff;
+}
+
+.trs80-bar {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex: 1;
+    min-width: 200px;
+}
+
+.trs80-label {
+    white-space: nowrap;
+    font-weight: bold;
+    font-size: 11px;
+}
+
+.trs80-input {
+    flex: 1;
+    padding: 2px 4px;
+    border: 2px solid;
+    border-color: #808080 #ffffff #ffffff #808080;
+    background: #fff;
+    font-family: inherit;
+    font-size: 12px;
+    min-width: 120px;
+}
+
+.trs80-input:focus { outline: none; }
+
+.trs80-select {
+    flex: 1;
+    min-width: 200px;
+    padding: 2px 4px;
+    border: 2px solid;
+    border-color: #808080 #ffffff #ffffff #808080;
+    background: #fff;
+    color: #000;
+    font-family: inherit;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.trs80-select:focus { outline: none; }
+
+.trs80-select optgroup {
+    font-weight: bold;
+    font-style: normal;
+    color: #006400;          /* TRS-80 green nods */
+}
+
+.trs80-buttons {
+    display: flex;
+    gap: 3px;
+    flex-wrap: wrap;
+}
+
+.trs80-btn {
+    padding: 3px 10px;
+    background: var(--win95-gray, #c0c0c0);
+    border-top: 2px solid #ffffff;
+    border-left: 2px solid #ffffff;
+    border-right: 2px solid #000000;
+    border-bottom: 2px solid #000000;
+    font-family: inherit;
+    font-size: 11px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.trs80-btn:hover { background: #d4d0c8; }
+
+.trs80-btn:active {
+    border-top: 2px solid #000000;
+    border-left: 2px solid #000000;
+    border-right: 2px solid #ffffff;
+    border-bottom: 2px solid #ffffff;
+    padding: 4px 9px 2px 11px;
+}
+
+.trs80-btn:disabled {
+    color: #808080;
+    cursor: default;
+    text-shadow: 1px 1px 0 #ffffff;
+}
+
+.trs80-btn:disabled:active {
+    border-top: 2px solid #ffffff;
+    border-left: 2px solid #ffffff;
+    border-right: 2px solid #000000;
+    border-bottom: 2px solid #000000;
+    padding: 3px 10px;
+}
+
+/* ── Recents bar ─────────────────────────── */
+
+.trs80-recents {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 6px;
+    background: var(--win95-gray, #c0c0c0);
+    border-bottom: 1px solid #808080;
+    border-top: 1px solid #ffffff;
+    overflow-x: auto;
+    flex-shrink: 0;
+}
+
+.trs80-recents-label {
+    font-size: 11px;
+    font-weight: bold;
+    white-space: nowrap;
+    color: #000;
+    padding-right: 4px;
+}
+
+.trs80-recent-chip {
+    padding: 2px 8px;
+    background: var(--win95-gray, #c0c0c0);
+    border-top: 2px solid #ffffff;
+    border-left: 2px solid #ffffff;
+    border-right: 2px solid #000000;
+    border-bottom: 2px solid #000000;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 11px;
+    white-space: nowrap;
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.trs80-recent-chip:hover { background: #d4d0c8; }
+
+.trs80-recent-chip:active {
+    border-top: 2px solid #000000;
+    border-left: 2px solid #000000;
+    border-right: 2px solid #ffffff;
+    border-bottom: 2px solid #ffffff;
+}
+
+/* ── Emulator Area ───────────────────────── */
+
+.trs80-emulator-area {
+    flex: 1;
+    position: relative;
+    background: #000;
+    min-height: 200px;
+    overflow: hidden;
+}
+
+/* All overlay children take dimensions from the parent's actual box —
+   defeats any 0×0 flex-chain collapse inside our Win95 window. */
+.trs80-splash,
+.trs80-stage,
+.trs80-loading,
+.trs80-error {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+}
+
+/* ── Splash (green phosphor monochrome) ── */
+
+.trs80-splash {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: #000;        /* CRT black */
+    color: #00ff66;          /* P31 phosphor green */
+    text-align: center;
+    gap: 18px;
+    padding: 24px;
+}
+
+.trs80-splash-screen {
+    background: #050a05;
+    color: #00ff66;
+    padding: 24px 28px;
+    border-radius: 4px;
+    box-shadow:
+        inset 0 0 0 2px #033b14,
+        inset 0 0 60px rgba(0, 255, 102, 0.18),
+        0 4px 12px rgba(0, 0, 0, 0.45);
+    font-family: 'VT323', 'Courier New', monospace;
+    font-size: 18px;
+    line-height: 1.4;
+    text-align: left;
+    letter-spacing: 1px;
+    text-shadow: 0 0 4px rgba(0, 255, 102, 0.55);
+    max-width: 520px;
+}
+
+.trs80-splash-banner {
+    white-space: nowrap;
+}
+
+@keyframes trs80-blink {
+    0%, 49% { opacity: 1; }
+    50%, 100% { opacity: 0; }
+}
+
+.trs80-cursor {
+    display: inline-block;
+    animation: trs80-blink 1s steps(1) infinite;
+    color: #00ff66;
+}
+
+.trs80-splash-hint {
+    font-size: 12px;
+    color: #c0c0c0;
+    max-width: 560px;
+    line-height: 1.55;
+    font-family: 'MS Sans Serif', 'Microsoft Sans Serif', Arial, sans-serif;
+    letter-spacing: 0;
+}
+
+.trs80-splash-hint code {
+    background: rgba(0, 255, 102, 0.10);
+    padding: 0 4px;
+    border-radius: 2px;
+    font-family: 'VT323', 'Courier New', monospace;
+    color: #d0ffe0;
+}
+
+.trs80-splash-hint b { color: #fff; }
+
+.trs80-splash-keys {
+    display: inline-block;
+    margin-top: 6px;
+    font-family: 'VT323', 'Courier New', monospace;
+    font-size: 12px;
+    color: #c0ffd0;
+    opacity: 0.85;
+}
+
+.trs80-splash-keys b { color: #00ff66; font-weight: bold; }
+
+.trs80-splash-credit {
+    display: inline-block;
+    margin-top: 8px;
+    opacity: 0.7;
+}
+
+/* ── Emulator Stage ──────────────────────── */
+
+.trs80-stage { overflow: hidden; }
+
+.trs80-root {
+    width: 100%;
+    height: 100%;
+    min-width: 320px;
+    min-height: 200px;
+    position: relative;
+    overflow: hidden;
+    background: #000;
+    /* Centre the inner CanvasScreen so it doesn't slam against the corner. */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.trs80-root canvas {
+    display: block;
+    image-rendering: pixelated;
+    max-width: 100%;
+    max-height: 100%;
+}
+
+/* Defensive: if trs80-emulator-web ever uses a class name like .window
+   internally (for a popup / settings panel), neutralise the IlluminatOS
+   global rule that hides .window. Same playbook as the C64 / DOSBox apps. */
+.trs80-root .window {
+    display: block !important;
+    position: relative !important;
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+    z-index: auto !important;
+    transition: none !important;
+    animation: none !important;
+}
+
+.trs80-root .title-bar,
+.trs80-root .background-image { all: revert; }
+
+/* ── Loading Overlay ─────────────────────── */
+
+.trs80-loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.85);
+    z-index: 10;
+    gap: 12px;
+}
+
+.trs80-loading-spinner {
+    width: 36px;
+    height: 36px;
+    border: 4px solid #033b14;
+    border-top: 4px solid #00ff66;
+    border-radius: 50%;
+    animation: trs80-spin 0.8s linear infinite;
+}
+
+@keyframes trs80-spin { to { transform: rotate(360deg); } }
+
+.trs80-loading-text {
+    color: #00ff66;
+    font-size: 14px;
+    font-family: 'VT323', 'Courier New', monospace;
+    text-shadow: 0 0 4px rgba(0, 255, 102, 0.55);
+}
+
+/* ── Error Overlay ───────────────────────── */
+
+.trs80-error {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: #000;
+    color: #00ff66;
+    text-align: center;
+    gap: 14px;
+    padding: 32px 28px;
+    z-index: 12;
+}
+
+.trs80-error-icon { font-size: 48px; margin-bottom: 4px; }
+
+.trs80-error-title {
+    font-size: 18px;
+    font-weight: bold;
+    color: #ffff66;
+    font-family: 'VT323', 'Courier New', monospace;
+    letter-spacing: 0.5px;
+    max-width: 520px;
+}
+
+.trs80-error-body {
+    color: #c0ffd0;
+    font-size: 13px;
+    line-height: 1.55;
+    max-width: 560px;
+}
+
+.trs80-error-line { margin: 4px 0; }
+
+.trs80-error-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 12px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+/* ── Status Bar ──────────────────────────── */
+
+.trs80-status {
+    padding: 2px 6px;
+    background: var(--win95-gray, #c0c0c0);
+    border-top: 1px solid #808080;
+    font-size: 11px;
+    color: #000;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex-shrink: 0;
+}
+
+/* ── Fullscreen ──────────────────────────── */
+
+.trs80-emulator-area:fullscreen { background: #000; }
+
+.trs80-emulator-area:fullscreen .trs80-stage,
+.trs80-emulator-area:fullscreen .trs80-root {
+    width: 100vw;
+    height: 100vh;
+}
