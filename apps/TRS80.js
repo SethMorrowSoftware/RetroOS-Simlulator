@@ -1,78 +1,176 @@
 /**
  * TRS-80 App - Tandy/Radio Shack TRS-80 Emulator for IlluminatOS!
  *
- * Runs Z80-based TRS-80 Model III software (.cmd / .cas / .wav / .dsk /
- * .jv1 / .jv3 / .dmk / .bas) in the browser via Lawrence Kesteloot's
- * `trs80-emulator-web` library, lazy-loaded from the esm.sh CDN.
+ * Runs Z80-based TRS-80 Model III software (.cmd / .cas / .bas / .dsk /
+ * .jv1 / .jv3 / .dmk) in the browser via Lawrence Kesteloot's
+ * `trs80-emulator` packages, lazy-loaded from the esm.sh CDN.
  *
- * Mirrors the architecture of apps/C64.js:
- *   - CDN-loaded engine, no iframe, mounted in a fresh <div> per session.
- *   - Aggressive audio teardown on close (mute → terminate worker →
- *     close AudioContext → drop DOM) so SID-style "music keeps playing"
- *     bugs can't recur on TRS-80's cassette/sound output either.
+ * Engine packages (all MIT, pinned to one exact version):
+ *   - trs80-emulator      Z80 + TRS-80 Model III hardware (Config, Trs80, …)
+ *   - trs80-emulator-web  CanvasScreen, WebKeyboard, WebSoundPlayer
+ *   - trs80-base          file-format decoders (decodeTrs80File, …)
+ *
+ * GAME / SOFTWARE LIBRARY (mirrors apps/DOSBox.js + apps/C64.js)
+ *   - A curated dropdown of classic TRS-80 titles resolved on demand from
+ *     the Internet Archive (`iaSearch` Lucene query → metadata API → file).
+ *   - A free-form URL field + local File… picker for any image.
  *   - Host-uploaded ROMs from `assets/trs80/local/` (api/trs80-local.php).
+ *   - Internet Archive downloads stream through the IlluminatOS CORS proxy
+ *     at `api/trs80-proxy.php` (archive.org's CORS posture is inconsistent
+ *     for third-party embeds) — exactly the api/c64-proxy.php pattern.
  *   - Recently-played chips persisted in localStorage.
- *   - Keyboard shortcuts gated by isFocused() so they don't fire while
- *     another app has focus.
- *   - Pause / Mute / Save State / Load State toolbar buttons.
  *
  * SCRIPTING SUPPORT
- *   Commands: run, runFile, stop, reset, fullscreen, setVolume, pause,
- *             resume, mute, unmute, saveState, loadState
+ *   Commands: run, stop, reset, fullscreen, setVolume, pause, resume,
+ *             mute, unmute
  *   Queries:  getState, getLibrary
  *   Events:   app:trs80:started, app:trs80:ready, app:trs80:stopped,
  *             app:trs80:error, app:trs80:paused, app:trs80:resumed
  *
- * License posture matches the C64 app: we link to the trs80-emulator-web
- * CDN (MIT) and to host-curated ROM directories. We do not redistribute
- * commercial software.
+ * License posture matches the C64 / DOSBox apps: we link to the
+ * trs80-emulator CDN (MIT) and to public preservation archives. We do not
+ * redistribute commercial software.
  */
 
 import AppBase from './AppBase.js';
 import { escapeHtml } from '../core/Sanitize.js';
 
 /**
- * CDN base for the lkesteloot/trs80 packages. esm.sh transparently
- * converts the published CommonJS to browser-loadable ES modules and
- * resolves the dependency graph (trs80-base, z80-base, etc.) for us.
+ * CDN URLs for the lkesteloot/trs80 packages. esm.sh transparently serves
+ * the published ES modules and resolves their dependency graph (z80-emulator,
+ * strongly-typed-events, etc.) for us.
  *
- * Pin to a major.minor so our usage doesn't break on a future
- * incompatible release. Update deliberately when bumping.
+ * Pinned to one EXACT version so a future incompatible release can't break
+ * our usage and so esm.sh never loads two copies of a shared dependency.
+ * Bump deliberately and re-test against the real API surface.
  */
-const TRS80_PKG_VERSION = '2.3';
-const TRS80_EMU_URL = `https://esm.sh/trs80-emulator@${TRS80_PKG_VERSION}`;
-const TRS80_WEB_URL = `https://esm.sh/trs80-emulator-web@${TRS80_PKG_VERSION}`;
+const TRS80_PKG_VERSION = '2.3.1';
+const TRS80_EMU_URL  = `https://esm.sh/trs80-emulator@${TRS80_PKG_VERSION}`;
+const TRS80_WEB_URL  = `https://esm.sh/trs80-emulator-web@${TRS80_PKG_VERSION}`;
 const TRS80_BASE_URL = `https://esm.sh/trs80-base@${TRS80_PKG_VERSION}`;
-
 /**
- * File extensions the emulator can load. Used by the file picker and to
- * pick a loader path inside `_runProgramFromBuffer`.
+ * WebSoundPlayer ships inside trs80-emulator-web but (as of 2.3.1) is not
+ * re-exported from the package index, so it has to be deep-imported by
+ * file path. If the deep import ever fails we fall back to the always-
+ * exported SilentSoundPlayer — the emulator still runs, just muted.
  */
-const FLOPPY_EXTS   = new Set(['dsk', 'jv1', 'jv3', 'dmk', 'dsk1', 'dsk3']);
-const CASSETTE_EXTS = new Set(['cas', 'wav']);
-const PROGRAM_EXTS  = new Set(['cmd', 'bas', 'bin']);
-const ALL_EXTS_LIST = '.cmd,.cas,.wav,.dsk,.jv1,.jv3,.dmk,.bas,.bin,.zip';
+const TRS80_SOUND_URL = `https://esm.sh/trs80-emulator-web@${TRS80_PKG_VERSION}/dist/WebSoundPlayer.js`;
+
+/** Internal pixel scale of the CanvasScreen bitmap (CSS scales it to fit). */
+const SCREEN_SCALE = 2;
+
+/** File extensions the emulator can decode — used for the File… picker. */
+const SUPPORTED_EXTS = '.cmd,.bas,.cas,.dsk,.jv1,.jv3,.dmk';
 
 /**
- * Curated starter library. The TRS-80 freeware/PD landscape is much
- * thinner than the C64's retrobrews collection, so this list stays
- * intentionally small — the host populates `assets/trs80/local/` for
- * anything else.
+ * Hosts whose responses send permissive CORS to third-party origins, so the
+ * browser can fetch them directly without the proxy.
+ */
+const CORS_FRIENDLY_HOSTS = new Set([
+    'raw.githubusercontent.com',
+]);
+
+/**
+ * Hosts the `api/trs80-proxy.php` CORS proxy is configured to fetch from.
+ * Must stay in sync with the `$allowed_hosts` list in api/trs80-proxy.php.
+ * archive.org also serves files from numbered ia######.us.archive.org
+ * subdomains, matched by suffix below.
+ */
+const PROXY_HOSTS = new Set([
+    'archive.org',
+]);
+
+/**
+ * File extensions to prefer when resolving an Internet Archive item to a
+ * single downloadable file. Native disk images first, then memory-image
+ * programs, then cassette/Basic. `.zip` is intentionally absent — the
+ * lkesteloot emulator decodes raw images, it does not unzip archives.
+ */
+const IA_PREFERRED_EXTS = ['.dsk', '.dmk', '.jv1', '.jv3', '.cmd', '.cas', '.bas'];
+
+/**
+ * Curated TRS-80 library.
  *
- * Each entry: { name, icon, category, year, desc, url? | iaItem? }
- *   - `url`:    Direct download URL (CORS-friendly hosts).
- *   - `iaItem`: Internet Archive item ID — resolved at runtime via the
- *               IA metadata API and routed through `api/trs80-local.php`'s
- *               sibling proxy or directly when CORS allows.
+ * Every entry past the "boot to BASIC" one is resolved on demand from the
+ * Internet Archive via an `iaSearch` Lucene query — the same mechanism the
+ * C64 app uses. The titles below are TRS-80-defining works (Big Five
+ * Software's arcade games, Tandy first-party adventures, etc.) that are
+ * effectively platform-exclusive, so a `title:"…" AND mediatype:software`
+ * search resolves to the TRS-80 item rather than a port.
+ *
+ * Each entry: { name, icon, category, year, desc, url? | iaItem? | iaSearch? }
+ *   - `url`:      Direct download URL, or '' to boot the bare machine.
+ *   - `iaItem`:   Explicit Internet Archive item identifier.
+ *   - `iaSearch`: Lucene query — resolved to an item at runtime, cached.
+ *
+ * Legality posture: we link to public preservation archives; we do not
+ * redistribute software. Load anything else from a URL or the File… button.
  */
 const GAME_LIBRARY = [
-    { name: 'TRS-80 Model III BASIC', icon: '⌨️', category: 'Tools', year: 1980,
+    { name: 'TRS-80 Model III BASIC', icon: '⌨️', category: 'System', year: 1980,
       desc: 'Boot to Level II BASIC — empty machine',
       url: '' /* empty URL = boot machine with no media */ },
+
+    // === Arcade — Big Five Software (TRS-80 arcade legends) ===
+    { name: 'Robot Attack', icon: '🤖', category: 'Arcade', year: 1981,
+      desc: 'Big Five — robot shoot-out with voice synthesis',
+      iaSearch: 'title:"Robot Attack" AND mediatype:software' },
+    { name: 'Defense Command', icon: '🛡️', category: 'Arcade', year: 1981,
+      desc: 'Big Five — Defender-style planetary defense',
+      iaSearch: 'title:"Defense Command" AND mediatype:software' },
+    { name: 'Cosmic Fighter', icon: '🚀', category: 'Arcade', year: 1980,
+      desc: 'Big Five — wave-based space shooter',
+      iaSearch: 'title:"Cosmic Fighter" AND mediatype:software' },
+    { name: 'Galaxy Invasion', icon: '👾', category: 'Arcade', year: 1980,
+      desc: 'Big Five — Galaxian-style alien attack',
+      iaSearch: 'title:"Galaxy Invasion" AND mediatype:software' },
+    { name: 'Attack Force', icon: '🛸', category: 'Arcade', year: 1981,
+      desc: 'Big Five — ram the alien ships in a maze',
+      iaSearch: 'title:"Attack Force" AND mediatype:software' },
+    { name: 'Meteor Mission II', icon: '🌠', category: 'Arcade', year: 1981,
+      desc: 'Big Five — rescue stranded astronauts',
+      iaSearch: 'title:"Meteor Mission" AND mediatype:software' },
+    { name: 'Stellar Escort', icon: '⭐', category: 'Arcade', year: 1982,
+      desc: 'Big Five — scrolling starfield shooter',
+      iaSearch: 'title:"Stellar Escort" AND mediatype:software' },
+    { name: 'Super Nova', icon: '💥', category: 'Arcade', year: 1980,
+      desc: 'Big Five — Asteroids-style rock blaster',
+      iaSearch: 'title:"Super Nova" AND mediatype:software' },
+
+    // === Action ===
+    { name: 'Sea Dragon', icon: '🐉', category: 'Action', year: 1982,
+      desc: 'Adventure International — submarine cavern run',
+      iaSearch: 'title:"Sea Dragon" AND mediatype:software' },
+    { name: 'Scarfman', icon: '👻', category: 'Action', year: 1981,
+      desc: 'The Cornsoft Group — TRS-80 maze-muncher',
+      iaSearch: 'title:"Scarfman" AND mediatype:software' },
+    { name: 'Android Nim', icon: '🟢', category: 'Action', year: 1978,
+      desc: 'The classic Nim with marching androids',
+      iaSearch: 'title:"Android Nim" AND mediatype:software' },
+    { name: 'Weerd', icon: '🟣', category: 'Action', year: 1982,
+      desc: 'Multi-stage arcade action',
+      iaSearch: 'title:"Weerd" AND mediatype:software' },
+
+    // === Adventure — Tandy first-party text adventures ===
+    { name: 'Raaka-Tu', icon: '🗿', category: 'Adventure', year: 1981,
+      desc: 'Tandy — curse of the temple text adventure',
+      iaSearch: 'title:"Raaka-Tu" AND mediatype:software' },
+    { name: 'Madness and the Minotaur', icon: '🐂', category: 'Adventure', year: 1981,
+      desc: 'Tandy — labyrinth text-and-graphics adventure',
+      iaSearch: 'title:"Madness and the Minotaur" AND mediatype:software' },
+    { name: 'Bedlam', icon: '🏚️', category: 'Adventure', year: 1982,
+      desc: 'Tandy — escape the lunatic asylum',
+      iaSearch: 'title:"Bedlam" AND mediatype:software AND year:[1980 TO 1985]' },
+
+    // === Tools / Toys ===
+    { name: 'Dancing Demon', icon: '🕺', category: 'Tools', year: 1979,
+      desc: 'Tandy — animated dancing / choreography toy',
+      iaSearch: 'title:"Dancing Demon" AND mediatype:software' },
 ];
 
 const CATEGORY_ORDER = [
     'Local Library',  // host-uploaded ROMs from assets/trs80/local/
+    'System',
     'Adventure',
     'Arcade',
     'Action',
@@ -101,22 +199,21 @@ class TRS80 extends AppBase {
         this.currentRomName = null;
         this.activeBlobUrl = null;
         this._modulesPromise = null;    // dynamic import promise — cached per session
-        this._modules = null;           // { emu, web, base } once loaded
-        this._trs80 = null;             // live Trs80 instance
-        this._screen = null;
-        this._keyboard = null;
-        this._cassette = null;
-        this._sound = null;
-        this._audioContext = null;      // we capture and explicitly close on stop
-        this._readyWatchdog = null;
+        this._modules = null;           // { emu, web, base, WebSoundPlayerClass } once loaded
+        this._trs80 = null;             // live Trs80 instance (fresh per launch)
+        this._screen = null;            // CanvasScreen (fresh per launch)
+        this._cassette = null;          // CassettePlayer stub (fresh per launch)
+        this._keyboard = null;          // WebKeyboard — created ONCE, reused (see _ensureKeyboard)
+        this._sound = null;             // SoundPlayer  — created ONCE, reused (see _ensureSound)
         this._localLibrary = [];        // host-uploaded ROMs from assets/trs80/local/
         this._dropdownEntries = new Map(); // option value → entry (rebuilt on local load)
+        this._iaUrlCache = new Map();      // IA query / item ID → resolved value
+        this._iaResolveInFlight = new Map(); // IA key → in-flight Promise (dedupes)
+        this._loadGeneration = 0;       // bumped on every load — cancels stale IA resolves
         this._paused = false;
         this._muted = false;
-        this._volumeBeforeMute = 0.5;
         this._recents = [];
         this._pagehideHandler = null;
-        this._lastSaveState = null;     // Uint8Array of most-recent save state
 
         this.registerCommands();
         this.registerQueries();
@@ -131,12 +228,12 @@ class TRS80 extends AppBase {
             this.loadGame(url, this.lookupBundleName(url));
             return { success: true, url };
         });
-        this.registerCommand('stop',       async () => { await this.stopEmulator(); return { success: true }; });
-        this.registerCommand('reset',      async () => { await this.resetCurrent();  return { success: true }; });
-        this.registerCommand('pause',          () => { this._setPaused(true);  return { success: true }; });
-        this.registerCommand('resume',         () => { this._setPaused(false); return { success: true }; });
-        this.registerCommand('mute',           () => { if (!this._muted) this.toggleMute(); return { success: true }; });
-        this.registerCommand('unmute',         () => { if ( this._muted) this.toggleMute(); return { success: true }; });
+        this.registerCommand('stop',   async () => { await this.stopEmulator(); return { success: true }; });
+        this.registerCommand('reset',  async () => { await this.resetCurrent();  return { success: true }; });
+        this.registerCommand('pause',      () => { this._setPaused(true);  return { success: true }; });
+        this.registerCommand('resume',     () => { this._setPaused(false); return { success: true }; });
+        this.registerCommand('mute',       () => { this._setMuted(true);   return { success: true }; });
+        this.registerCommand('unmute',     () => { this._setMuted(false);  return { success: true }; });
         this.registerCommand('fullscreen', (payload) => {
             const want = payload?.value;
             this.toggleFullscreen(typeof want === 'boolean' ? want : undefined);
@@ -145,11 +242,10 @@ class TRS80 extends AppBase {
         this.registerCommand('setVolume', (payload) => {
             const volume = payload?.volume ?? payload?.value;
             if (volume === undefined) return { success: false, error: 'Volume required (0-1)' };
-            this.setVolume(Number(volume));
+            // The TRS-80 sound player is on/off only — treat >0 as unmuted.
+            this._setMuted(Number(volume) <= 0);
             return { success: true, volume: Number(volume) };
         });
-        this.registerCommand('saveState', async () => { await this.saveState(); return { success: true }; });
-        this.registerCommand('loadState', async () => { await this.loadState(); return { success: true }; });
     }
 
     registerQueries() {
@@ -163,7 +259,7 @@ class TRS80 extends AppBase {
         }));
         this.registerQuery('getLibrary', () => GAME_LIBRARY.map(g => ({
             name: g.name, icon: g.icon, category: g.category, year: g.year,
-            desc: g.desc, url: g.url,
+            desc: g.desc, url: g.url, iaItem: g.iaItem, iaSearch: g.iaSearch,
         })));
     }
 
@@ -183,13 +279,11 @@ class TRS80 extends AppBase {
                         </select>
                     </div>
                     <div class="trs80-buttons">
-                        <button class="trs80-btn" id="trs80PauseBtn" title="Pause / resume (P)" disabled>⏸ Pause</button>
-                        <button class="trs80-btn" id="trs80MuteBtn" title="Mute / unmute (M)">🔊</button>
-                        <button class="trs80-btn" id="trs80SaveStateBtn" title="Save state (Ctrl+S)" disabled>💾 Save</button>
-                        <button class="trs80-btn" id="trs80LoadStateBtn" title="Load state (Ctrl+L)" disabled>📂 Load</button>
+                        <button class="trs80-btn" id="trs80PauseBtn" title="Pause / resume" disabled>⏸ Pause</button>
+                        <button class="trs80-btn" id="trs80MuteBtn" title="Mute / unmute">🔊</button>
                         <button class="trs80-btn" id="trs80StopBtn" title="Stop emulator (Esc)" disabled>⏹ Stop</button>
-                        <button class="trs80-btn" id="trs80ResetBtn" title="Reload current program (R)" disabled>🔄 Reset</button>
-                        <button class="trs80-btn" id="trs80FsBtn" title="Toggle fullscreen (F)">⛶ Fullscreen</button>
+                        <button class="trs80-btn" id="trs80ResetBtn" title="Reload current program" disabled>🔄 Reset</button>
+                        <button class="trs80-btn" id="trs80FsBtn" title="Toggle fullscreen">⛶ Fullscreen</button>
                     </div>
                 </div>
                 <div class="trs80-toolbar trs80-toolbar-sub">
@@ -200,7 +294,7 @@ class TRS80 extends AppBase {
                                spellcheck="false" />
                         <button class="trs80-btn" id="trs80RunBtn" title="Load & run this URL">▶ Run URL</button>
                         <button class="trs80-btn" id="trs80FileBtn" title="Open a local program/disk/cassette">📂 File…</button>
-                        <input type="file" id="trs80FileInput" accept="${ALL_EXTS_LIST}" style="display:none;" />
+                        <input type="file" id="trs80FileInput" accept="${SUPPORTED_EXTS}" style="display:none;" />
                     </div>
                 </div>
                 <div class="trs80-recents" id="trs80Recents" style="display:none;"></div>
@@ -215,12 +309,13 @@ class TRS80 extends AppBase {
                             </div>
                         </div>
                         <div class="trs80-splash-hint">
-                            <b>Program</b> dropdown picks from the bundled set plus any ROMs the
-                            host has dropped into <code>assets/trs80/local/</code>. Or paste a
-                            <code>.cmd</code> / <code>.dsk</code> / <code>.cas</code> URL, or
-                            click <b>File…</b> for a local file.<br>
-                            <span class="trs80-splash-keys">Keys: <b>P</b>=pause &middot; <b>M</b>=mute &middot; <b>R</b>=reset &middot; <b>F</b>=fullscreen &middot; <b>Esc</b>=stop &middot; <b>Ctrl+S/L</b>=save&nbsp;state</span><br>
-                            <span class="trs80-splash-credit">Powered by <b>trs80-emulator-web</b> (Lawrence Kesteloot, MIT) — WebAssembly Z80.</span>
+                            The <b>Program</b> dropdown has classic TRS-80 titles resolved on
+                            demand from the Internet Archive, plus any ROMs the host dropped
+                            into <code>assets/trs80/local/</code>. Or paste a <code>.cmd</code>
+                            / <code>.dsk</code> / <code>.cas</code> URL, or click <b>File…</b>
+                            for a local image.<br>
+                            <span class="trs80-splash-keys">Press <b>Esc</b> to stop. Use the toolbar for pause / mute / reset / fullscreen.</span><br>
+                            <span class="trs80-splash-credit">Powered by <b>trs80-emulator</b> (Lawrence Kesteloot, MIT) — a Z80 TRS-80 Model III in JavaScript.</span>
                         </div>
                     </div>
                     <div class="trs80-stage" id="trs80Stage" style="display:none;"></div>
@@ -233,6 +328,11 @@ class TRS80 extends AppBase {
                         <div class="trs80-error-title" id="trs80ErrorTitle">Something went wrong</div>
                         <div class="trs80-error-body" id="trs80ErrorBody"></div>
                         <div class="trs80-error-actions">
+                            <a class="trs80-btn trs80-error-link" id="trs80ErrorSearch"
+                               href="https://archive.org/search?query=trs-80"
+                               target="_blank" rel="noopener" style="display:none;">
+                                🔍 Search Internet Archive
+                            </a>
                             <button class="trs80-btn" id="trs80ErrorDismiss">Back to program list</button>
                         </div>
                     </div>
@@ -253,8 +353,6 @@ class TRS80 extends AppBase {
         const fsBtn = this.getElement('#trs80FsBtn');
         const pauseBtn = this.getElement('#trs80PauseBtn');
         const muteBtn = this.getElement('#trs80MuteBtn');
-        const saveStateBtn = this.getElement('#trs80SaveStateBtn');
-        const loadStateBtn = this.getElement('#trs80LoadStateBtn');
 
         this.addHandler(gameSelect, 'change', (e) => {
             const value = e.target.value;
@@ -288,9 +386,7 @@ class TRS80 extends AppBase {
         this.addHandler(resetBtn, 'click', () => this.resetCurrent());
         this.addHandler(fsBtn, 'click', () => this.toggleFullscreen());
         this.addHandler(pauseBtn, 'click', () => this.togglePause());
-        this.addHandler(muteBtn, 'click', () => this.toggleMute());
-        this.addHandler(saveStateBtn, 'click', () => this.saveState());
-        this.addHandler(loadStateBtn, 'click', () => this.loadState());
+        this.addHandler(muteBtn, 'click', () => this._setMuted(!this._muted));
 
         const errorDismiss = this.getElement('#trs80ErrorDismiss');
         this.addHandler(errorDismiss, 'click', () => {
@@ -302,17 +398,22 @@ class TRS80 extends AppBase {
             this.setStatus('Ready');
         });
 
-        // Keyboard shortcuts. Gated on isFocused() so we never grab keys
-        // intended for another app, and skipped when the user is typing
-        // in an input.
+        // Esc stops the emulator. Single-letter shortcuts are deliberately
+        // omitted: the trs80-emulator WebKeyboard captures keystrokes at
+        // document.body level while running, so a global "P"/"R" shortcut
+        // would also be typed into the running program. Gated on
+        // isFocused() and skipped while typing in a form field.
         this.addHandler(document, 'keydown', (e) => {
             if (!this.isFocused()) return;
             const tag = (e.target?.tagName || '').toLowerCase();
             if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
-            this._handleShortcut(e);
+            if (e.key === 'Escape' && this.isRunning) {
+                e.preventDefault();
+                this.stopEmulator();
+            }
         });
 
-        // Tab close / page navigate: kill audio + worker cleanly.
+        // Tab close / page navigate: kill audio + emulator cleanly.
         this._pagehideHandler = () => {
             try { this.stopEmulator(); } catch { /* ignore */ }
         };
@@ -321,8 +422,7 @@ class TRS80 extends AppBase {
         this._loadRecents();
         this._renderRecents();
 
-        // Background warmup of the CDN bundles so the first user-initiated
-        // launch is faster.
+        // Background warmup of the CDN bundles so the first launch is faster.
         this.ensureModulesLoaded().catch((err) => {
             console.warn('[TRS-80] Background module preload failed:', err);
         });
@@ -343,8 +443,23 @@ class TRS80 extends AppBase {
         }
     }
 
+    onFocus() {
+        // Re-arm keyboard interception when our window regains focus, so a
+        // running program keeps receiving keystrokes after an app switch.
+        if (this.isRunning && !this._paused && this._keyboard) {
+            this._keyboard.interceptKeys = true;
+        }
+    }
+
+    onBlur() {
+        // Stop eating keystrokes the moment another app takes focus —
+        // WebKeyboard listens on document.body, so this gate is essential.
+        if (this._keyboard) this._keyboard.interceptKeys = false;
+    }
+
     onResize() {
-        // CanvasScreen sizes itself based on its parent; nothing to do.
+        // CanvasScreen renders to a fixed-size bitmap; CSS object-fit scales
+        // it to the stage. Nothing to recompute on resize.
     }
 
     // ── Library / Dropdown Helpers ─────────────────────────────
@@ -410,8 +525,10 @@ class TRS80 extends AppBase {
 
     /**
      * Lazy-load the trs80-emulator + trs80-emulator-web + trs80-base
-     * packages from esm.sh. Cached on the instance so concurrent callers
-     * share one load.
+     * packages from esm.sh. The WebSoundPlayer is deep-imported separately
+     * (it isn't re-exported from the web package index); failure there is
+     * non-fatal — we fall back to SilentSoundPlayer. Cached on the instance
+     * so concurrent callers share one load.
      */
     ensureModulesLoaded() {
         if (this._modules) return Promise.resolve(this._modules);
@@ -434,7 +551,15 @@ class TRS80 extends AppBase {
                 import(TRS80_WEB_URL),
                 import(TRS80_BASE_URL),
             ]);
-            this._modules = { emu, web, base };
+            // WebSoundPlayer is optional — never let it block the engine.
+            let WebSoundPlayerClass = null;
+            try {
+                const soundMod = await import(TRS80_SOUND_URL);
+                WebSoundPlayerClass = soundMod.WebSoundPlayer || soundMod.default || null;
+            } catch (err) {
+                console.warn('[TRS-80] WebSoundPlayer deep import failed — running silent:', err);
+            }
+            this._modules = { emu, web, base, WebSoundPlayerClass };
             return this._modules;
         })().catch((err) => {
             this._modulesPromise = null; // allow retry
@@ -460,33 +585,248 @@ class TRS80 extends AppBase {
         }
         const blobUrl = URL.createObjectURL(file);
         this.activeBlobUrl = blobUrl;
-        await this._startEmulatorWith({
-            url: blobUrl,
-            displayName: file.name,
-            // Hint the format so we don't have to guess by content sniffing.
-            extHint: file.name.split('.').pop().toLowerCase(),
-        });
+        await this._startEmulatorWith({ url: blobUrl, displayName: file.name });
     }
 
+    /**
+     * Launch a curated / recents library entry. Entries carry either a
+     * direct `url`, an `iaItem` identifier, or an `iaSearch` Lucene query
+     * that is resolved against the Internet Archive at runtime.
+     */
     async loadLibraryEntry(entry) {
         if (!entry) return;
         const displayName = entry.name || this.lookupBundleName(entry.url || '');
+
+        // Direct URL (including '' for "boot to BASIC") wins.
         if (typeof entry.url === 'string') {
+            // Skip recents for the BASIC entry (no media) and blob URLs
+            // (they don't survive a session — re-launching would 404).
             if (entry.url && !entry.url.startsWith('blob:')) {
                 this._pushRecent(entry);
             }
             await this.loadGame(entry.url, displayName);
             return;
         }
-        this._showError('Library entry "' + displayName + '" has no url.');
+
+        if (!entry.iaItem && !entry.iaSearch) {
+            this._showError('Library entry "' + displayName + '" has no url, iaItem, or iaSearch.');
+            return;
+        }
+
+        // Swap to the loading overlay immediately so the (sometimes slow)
+        // metadata round-trip gives visible feedback.
+        const generation = ++this._loadGeneration;
+        const resolveLabel = entry.iaItem
+            ? 'Resolving "' + displayName + '" on Internet Archive…'
+            : 'Searching Internet Archive for "' + displayName + '"…';
+        this._showLoading(resolveLabel);
+        this.setStatus(resolveLabel);
+
+        try {
+            let itemId = entry.iaItem;
+            if (!itemId) {
+                itemId = await this._resolveIASearchToItemId(entry.iaSearch, displayName);
+            }
+            if (generation !== this._loadGeneration) return; // superseded
+            this._showLoading('Resolving "' + displayName + '" (' + itemId + ')…');
+            const url = await this._resolveIAItemToUrl(itemId);
+            if (generation !== this._loadGeneration) return; // superseded
+            this._pushRecent(entry);
+            await this.loadGame(url, displayName);
+        } catch (err) {
+            if (generation !== this._loadGeneration) return;
+            console.error('[TRS-80] IA resolve failed for', entry.iaItem || entry.iaSearch, '→', err);
+            const iaSearchUrl = 'https://archive.org/search?query=' +
+                encodeURIComponent(displayName + ' TRS-80');
+            this._showError(
+                `Couldn't load "${displayName}" from the Internet Archive.`,
+                [
+                    `Reason: ${err?.message || err}`,
+                    entry.iaItem
+                        ? `The IA item "${entry.iaItem}" may have been renamed or removed.`
+                        : 'The IA search for this title returned no usable item.',
+                    'Try another title, paste a URL above, or click "File…" to load a local image.',
+                ],
+                { iaSearchUrl }
+            );
+            this.setStatus('Failed: ' + (err?.message || err));
+            this.emitAppEvent('error', {
+                error: err?.message || String(err),
+                iaItem: entry.iaItem, iaSearch: entry.iaSearch, name: displayName,
+            });
+        }
     }
 
     /**
-     * Stop any running instance, build a fresh emulator, fetch the program
-     * and dispatch to the right loader (floppy / cassette / cmd).
+     * Resolve an Internet Archive search query to a single item identifier.
+     * Hits advancedsearch.php (through the proxy) and prefers a software-
+     * mediatype result. Cached per-instance; concurrent calls are deduped.
      * @private
      */
-    async _startEmulatorWith({ url, displayName, extHint }) {
+    _resolveIASearchToItemId(query, displayName) {
+        const cacheKey = 'search:' + query;
+        if (this._iaUrlCache.has(cacheKey)) {
+            return Promise.resolve(this._iaUrlCache.get(cacheKey));
+        }
+        if (this._iaResolveInFlight.has(cacheKey)) {
+            return this._iaResolveInFlight.get(cacheKey);
+        }
+
+        const directSearchUrl =
+            'https://archive.org/advancedsearch.php' +
+            '?q=' + encodeURIComponent(query) +
+            '&fl[]=identifier&fl[]=title&fl[]=mediatype' +
+            '&rows=5&page=1&output=json';
+        const fetchUrl = this.getLoadUrl(directSearchUrl);
+
+        const promise = (async () => {
+            const res = await fetch(fetchUrl, { credentials: 'omit' });
+            if (!res.ok) {
+                throw new Error(`IA search HTTP ${res.status} for "${displayName}"`);
+            }
+            const data = await res.json();
+            const docs = data?.response?.docs;
+            if (!Array.isArray(docs) || docs.length === 0) {
+                throw new Error(`IA search returned no results for "${displayName}"`);
+            }
+            const softwareHit = docs.find(d => d.mediatype === 'software');
+            const pick = softwareHit || docs[0];
+            const itemId = pick?.identifier;
+            if (typeof itemId !== 'string' || !itemId) {
+                throw new Error(`IA search result missing identifier for "${displayName}"`);
+            }
+            this._iaUrlCache.set(cacheKey, itemId);
+            return itemId;
+        })().finally(() => {
+            this._iaResolveInFlight.delete(cacheKey);
+        });
+
+        this._iaResolveInFlight.set(cacheKey, promise);
+        return promise;
+    }
+
+    /**
+     * Resolve an Internet Archive item identifier to a direct download URL
+     * for the best emulator-loadable file. Hits the IA metadata API and
+     * picks the most specific extension (see IA_PREFERRED_EXTS). Cached
+     * per-instance; concurrent calls are deduped.
+     * @private
+     */
+    _resolveIAItemToUrl(itemId) {
+        if (this._iaUrlCache.has(itemId)) {
+            return Promise.resolve(this._iaUrlCache.get(itemId));
+        }
+        if (this._iaResolveInFlight.has(itemId)) {
+            return this._iaResolveInFlight.get(itemId);
+        }
+
+        const directMetaUrl = `https://archive.org/metadata/${encodeURIComponent(itemId)}`;
+        const fetchUrl = this.getLoadUrl(directMetaUrl);
+
+        const promise = (async () => {
+            const res = await fetch(fetchUrl, { credentials: 'omit' });
+            if (!res.ok) {
+                throw new Error(`IA metadata HTTP ${res.status} for "${itemId}"`);
+            }
+            const meta = await res.json();
+            const files = Array.isArray(meta?.files) ? meta.files : [];
+            if (files.length === 0) {
+                throw new Error(`IA item "${itemId}" has no files (renamed or removed?)`);
+            }
+
+            // Pick the most specific extension. Within a tier, prefer the
+            // shorter filename (usually the original, un-derived upload).
+            let pick = null;
+            for (const ext of IA_PREFERRED_EXTS) {
+                const matches = files.filter(f =>
+                    typeof f.name === 'string' &&
+                    f.name.toLowerCase().endsWith(ext) &&
+                    !/_archive\.zip$/i.test(f.name) &&
+                    !/_files\.xml$/i.test(f.name) &&
+                    !/_meta\.(xml|sqlite)$/i.test(f.name)
+                );
+                if (matches.length) {
+                    matches.sort((a, b) => a.name.length - b.name.length);
+                    pick = matches[0];
+                    break;
+                }
+            }
+            if (!pick) {
+                throw new Error(`No supported file in IA item "${itemId}" (looked for ${IA_PREFERRED_EXTS.join(', ')})`);
+            }
+
+            const url = `https://archive.org/download/${encodeURIComponent(itemId)}/${encodeURI(pick.name)}`;
+            this._iaUrlCache.set(itemId, url);
+            return url;
+        })().finally(() => {
+            this._iaResolveInFlight.delete(itemId);
+        });
+
+        this._iaResolveInFlight.set(itemId, promise);
+        return promise;
+    }
+
+    /**
+     * Resolve a user-facing URL into the URL we should actually fetch.
+     * archive.org (and its ia######.us.archive.org file subdomains) is
+     * routed through the IlluminatOS PHP proxy because its CORS posture for
+     * third-party browser embeds is inconsistent. CORS-friendly hosts,
+     * same-origin URLs, and local schemes (blob:/data:/file:) pass through.
+     *
+     * Deployments can override the proxy URL by setting
+     *   window.__TRS80_PROXY_URL = 'https://example.com/proxy.php';
+     * before the TRS-80 app launches.
+     *
+     * @param {string} originalUrl
+     * @returns {string}
+     */
+    getLoadUrl(originalUrl) {
+        if (!originalUrl) return originalUrl;
+        try {
+            const u = new URL(originalUrl, document.baseURI);
+            const host = u.hostname.toLowerCase();
+
+            // Local schemes — never proxy.
+            if (u.protocol === 'blob:' || u.protocol === 'data:' || u.protocol === 'file:') {
+                return originalUrl;
+            }
+            // Same-origin — no CORS issue.
+            if (host === location.hostname.toLowerCase()) {
+                return originalUrl;
+            }
+            // Explicit CORS-friendly hosts — fetch direct.
+            if (CORS_FRIENDLY_HOSTS.has(host)) {
+                return originalUrl;
+            }
+
+            const isProxyAllowed =
+                PROXY_HOSTS.has(host) ||
+                host.endsWith('.archive.org') ||
+                /\.us\.archive\.org$/i.test(host);
+
+            if (isProxyAllowed) {
+                const customProxy = (typeof window !== 'undefined' && window.__TRS80_PROXY_URL) || null;
+                const proxyBase = customProxy
+                    ? customProxy
+                    : new URL('api/trs80-proxy.php', document.baseURI).toString();
+                const sep = proxyBase.includes('?') ? '&' : '?';
+                return proxyBase + sep + 'url=' + encodeURIComponent(originalUrl);
+            }
+            // Unknown host — pass through; CORS may fail with a clear console error.
+            return originalUrl;
+        } catch {
+            return originalUrl;
+        }
+    }
+
+    /**
+     * Stop any running instance, build a fresh emulator, and (if media was
+     * requested) fetch + run it. The trs80-emulator `runTrs80File` handles
+     * every supported format — floppy, CMD, cassette, Basic — including its
+     * own reset + boot timing, so no per-format branching is needed.
+     * @private
+     */
+    async _startEmulatorWith({ url, displayName }) {
         const stage = this.getElement('#trs80Stage');
         const splash = this.getElement('#trs80Splash');
         const loading = this.getElement('#trs80Loading');
@@ -495,7 +835,12 @@ class TRS80 extends AppBase {
 
         if (!stage) return;
 
+        // Tear down any prior instance first — stopEmulator() bumps
+        // _loadGeneration, cancelling in-flight loads — THEN claim a fresh
+        // generation for this launch so our own supersede-checks below
+        // compare against the right value.
         await this.stopEmulator(/* keepSplash= */ false);
+        const generation = ++this._loadGeneration;
         this.playSound('floppy');
 
         if (splash) splash.style.display = 'none';
@@ -506,6 +851,7 @@ class TRS80 extends AppBase {
 
         try {
             const { emu, web } = await this.ensureModulesLoaded();
+            if (generation !== this._loadGeneration) return; // superseded mid-load
             if (loadingText) loadingText.textContent = 'Booting Z80…';
 
             // Fresh root <div> per session — same defensive pattern as C64.
@@ -515,8 +861,6 @@ class TRS80 extends AppBase {
             root.id = `trs80-player-${Date.now()}`;
             stage.appendChild(root);
 
-            await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-
             this.currentRom = url;
             this.currentRomName = displayName;
             this.isRunning = true;
@@ -524,63 +868,51 @@ class TRS80 extends AppBase {
             this.updateButtons(true);
             this.setStatus('Starting: ' + displayName);
 
-            // Build the emulator graph.
+            // Build the emulator graph. The screen is created fresh per
+            // launch and its node appended into the fresh root. The
+            // keyboard and sound player are created ONCE and reused — a
+            // fresh WebKeyboard would attach a second set of document.body
+            // listeners every launch (the library never removes them).
             const config = emu.Config.makeDefault();
-            this._screen = new web.CanvasScreen(root);
-            this._keyboard = new web.WebKeyboard();
-            // Gate keyboard interception on our window having focus so the
-            // TRS-80 doesn't eat keys typed into another app's window.
-            this._keyboard.interceptKeys = () => this.isFocused();
+            this._screen = new web.CanvasScreen(SCREEN_SCALE);
+            root.appendChild(this._screen.getNode());
+            this._ensureKeyboard(web);
+            this._ensureSound(emu);
             this._cassette = new emu.CassettePlayer();
-            this._sound = new web.WebSoundPlayer(false /* not muted */);
-            // Capture the AudioContext if WebSoundPlayer exposes it so we
-            // can explicitly close it on stop. Different versions surface
-            // it under different names — try them all.
-            this._audioContext =
-                this._sound?.audioCtx ||
-                this._sound?.audioContext ||
-                this._sound?.context ||
-                null;
 
             this._trs80 = new emu.Trs80(
                 config, this._screen, this._keyboard, this._cassette, this._sound
             );
-            this._keyboard.configureKeyboard?.();
             this._trs80.reset();
             this._trs80.start();
+            // start() arms WebKeyboard interception; only keep it armed if
+            // our window actually has focus right now.
+            this._keyboard.interceptKeys = this.isFocused();
+            // WebSoundPlayer constructs muted — open the gate unless the
+            // user has explicitly muted this session.
+            if (!this._muted) this._sound?.unmute?.();
 
-            // Watchdog: surface a diagnostic if the emulator never makes
-            // visible progress in 30 s.
-            if (this._readyWatchdog) clearTimeout(this._readyWatchdog);
-            this._readyWatchdog = setTimeout(() => {
-                if (this.isRunning && !this.isReady) {
-                    console.warn('[TRS-80] Emulator did not signal ready in 30s.');
-                    this.setStatus('Stuck booting — check the browser console.');
-                }
-            }, 30000);
-
-            // If the user asked for a real program (URL or blob), fetch it
-            // and hand it to the right loader. Empty URL = boot to BASIC.
+            // Real program requested (URL or blob): fetch it and hand the
+            // decoded file to runTrs80File. Empty URL = boot to BASIC.
             if (url) {
                 if (loadingText) loadingText.textContent = 'Fetching program…';
-                await this._fetchAndLoad(url, displayName, extHint);
+                await this._fetchAndRun(url, displayName);
+                if (generation !== this._loadGeneration) return;
             }
 
             this.isReady = true;
-            if (this._readyWatchdog) {
-                clearTimeout(this._readyWatchdog);
-                this._readyWatchdog = null;
-            }
             if (loading) loading.style.display = 'none';
             this.setStatus('Running: ' + displayName);
             this.emitAppEvent('started', { url, name: displayName });
             this.emitAppEvent('ready',   { name: displayName });
         } catch (err) {
+            if (generation !== this._loadGeneration) return;
             console.error('[TRS-80] Failed to start:', err);
             this._showError(
-                'Failed to start TRS-80 emulator',
+                'Failed to start the TRS-80 emulator',
                 [
                     `Reason: ${err?.message || err}`,
+                    'If this is a URL load, the host may be blocking cross-origin requests.',
                     'Check the browser console for the full stack.',
                 ]
             );
@@ -593,79 +925,74 @@ class TRS80 extends AppBase {
     }
 
     /**
-     * Fetch a program URL and dispatch to the right Trs80 loader based on
-     * the file extension.
+     * Fetch a program URL (through the CORS proxy when needed), decode it,
+     * and run it. `decodeTrs80File` auto-detects floppy / CMD / cassette /
+     * Basic from the bytes; `runTrs80File` dispatches accordingly.
      * @private
      */
-    async _fetchAndLoad(url, displayName, extHint) {
-        const res = await fetch(url, { credentials: 'omit' });
+    async _fetchAndRun(url, displayName) {
+        // Capture the live emulator + modules up front. If a newer launch
+        // swaps them out while we're awaiting the download, this file must
+        // not be run into the wrong (or a torn-down) instance.
+        const trs80 = this._trs80;
+        const modules = this._modules;
+        if (!trs80 || !modules) {
+            throw new Error('Emulator was not initialised');
+        }
+        const res = await fetch(this.getLoadUrl(url), { credentials: 'omit' });
         if (!res.ok) {
             throw new Error(`HTTP ${res.status} fetching ${displayName}`);
         }
         const buf = new Uint8Array(await res.arrayBuffer());
-        await this._runProgramFromBuffer(buf, extHint || this._extOf(url));
+        if (buf.length === 0) {
+            throw new Error(`Downloaded file for "${displayName}" was empty`);
+        }
+        if (trs80 !== this._trs80) {
+            return; // superseded by a newer launch — drop this quietly
+        }
+        const filename = this.getBundleName(url) || displayName;
+        const trs80File = modules.base.decodeTrs80File(buf, filename);
+        if (!trs80File || trs80File.className === 'RawBinaryFile') {
+            throw new Error(
+                `Unrecognized TRS-80 file format for "${displayName}". ` +
+                'Supported: .cmd .bas .cas .dsk .jv1 .jv3 .dmk'
+            );
+        }
+        if (trs80File.error) {
+            // Partial decodes (e.g. a disk with a few bad CRCs) often still
+            // run — log the warning but go ahead and try.
+            console.warn('[TRS-80] decode reported:', trs80File.error);
+        }
+        trs80.runTrs80File(trs80File);
+    }
+
+    /** Create the reusable WebKeyboard on first use. @private */
+    _ensureKeyboard(web) {
+        if (!this._keyboard) {
+            this._keyboard = new web.WebKeyboard();
+            // Attaches keydown/keyup/paste listeners to document.body. Done
+            // exactly once — the library exposes no removal API.
+            this._keyboard.configureKeyboard();
+        } else {
+            this._keyboard.clearKeyboard();
+        }
+        return this._keyboard;
+    }
+
+    /** Create the reusable sound player on first use. @private */
+    _ensureSound(emu) {
+        if (!this._sound) {
+            const SoundClass = this._modules?.WebSoundPlayerClass;
+            this._sound = SoundClass ? new SoundClass() : new emu.SilentSoundPlayer();
+        }
+        return this._sound;
     }
 
     /**
-     * Dispatch a loaded buffer to the right loader on the Trs80 instance.
-     * @private
-     */
-    async _runProgramFromBuffer(buf, ext) {
-        if (!this._trs80) throw new Error('Emulator not initialised');
-        const lower = (ext || '').toLowerCase();
-
-        // Floppy disk image — preferred on disk-based titles.
-        if (FLOPPY_EXTS.has(lower)) {
-            const { base } = this._modules;
-            const floppy = base.decodeTrs80File
-                ? base.decodeTrs80File(buf, { filename: this.currentRomName, disassemble: false })
-                : null;
-            // decodeTrs80File can return either a FloppyDisk or a typed
-            // wrapper. Try both shapes.
-            const disk = floppy && floppy.kind === 'floppy' ? floppy
-                       : (base.decodeFloppyDisk ? base.decodeFloppyDisk(buf, this.currentRomName) : null);
-            if (!disk) throw new Error('Could not decode floppy disk image');
-            this._trs80.loadFloppyDisk(disk, 0);
-            this._trs80.reset();
-            return;
-        }
-
-        // Cassette image (.cas) or audio (.wav) — feed to the cassette player.
-        if (CASSETTE_EXTS.has(lower)) {
-            // The default CassettePlayer is a stub; trs80-cassette-player
-            // (separate package) does the real work. For now, surface a
-            // clear message — cassette support is a follow-up.
-            throw new Error('Cassette playback (.cas/.wav) not wired in this build — use .cmd or .dsk');
-        }
-
-        // CMD program — load into memory and run.
-        if (PROGRAM_EXTS.has(lower)) {
-            const { base } = this._modules;
-            // Auto-decode via decodeTrs80File when available.
-            const decoded = base.decodeTrs80File
-                ? base.decodeTrs80File(buf, { filename: this.currentRomName, disassemble: false })
-                : null;
-            if (decoded && decoded.kind === 'cmd-program' && this._trs80.runUserProgram) {
-                this._trs80.runUserProgram(decoded);
-                return;
-            }
-            // Fall back: try common method names exposed by older versions.
-            if (this._trs80.runUserProgram) {
-                this._trs80.runUserProgram(buf);
-                return;
-            }
-            throw new Error('CMD loader not exposed by this engine version');
-        }
-
-        throw new Error(`Unrecognised file extension "${ext}" — supported: .cmd .dsk .jv1 .jv3 .dmk .bas`);
-    }
-
-    /**
-     * Stop the running emulator and fully tear down workers, audio, and DOM.
-     * Mirrors the aggressive sequence in apps/C64.js — pre-mute, every
-     * documented exit/terminate hook, explicitly close every AudioContext
-     * we can reach, terminate any reachable Web Workers, drop the DOM,
-     * null all our refs.
+     * Stop the running emulator and tear down per-session objects. The
+     * reusable keyboard and sound player are kept (the keyboard's body
+     * listeners can't be removed; the sound player owns a single shared
+     * AudioContext) but the keyboard is disarmed and the sound muted.
      *
      * @param {boolean} [keepSplash=true]
      */
@@ -673,66 +1000,25 @@ class TRS80 extends AppBase {
         const stage = this.getElement('#trs80Stage');
         const splash = this.getElement('#trs80Splash');
 
-        if (this._readyWatchdog) {
-            clearTimeout(this._readyWatchdog);
-            this._readyWatchdog = null;
+        // Bump the generation so any in-flight load/resolve becomes a no-op.
+        this._loadGeneration++;
+
+        // Disarm keyboard interception and silence the sound player before
+        // anything else, so teardown can't leak a keystroke or a sample.
+        if (this._keyboard) {
+            try { this._keyboard.interceptKeys = false; } catch { /* ignore */ }
+            try { this._keyboard.clearKeyboard(); } catch { /* ignore */ }
         }
+        try { this._sound?.mute?.(); } catch { /* ignore */ }
+        try { this._sound?.setFloppyMotorOn?.(false); } catch { /* ignore */ }
 
-        // 1. Pre-mute so anything in flight during teardown is silent.
-        try { this._sound?.setMuted?.(true); } catch { /* ignore */ }
-        try { this._sound?.setVolume?.(0); } catch { /* ignore */ }
-
-        // 2. Stop the Z80. Different library versions expose different
-        //    teardown hooks — try every plausible one.
-        const stopPaths = [
-            () => this._trs80?.stop?.(),
-            () => this._trs80?.setRunningState?.(this._modules?.emu?.RunningState?.STOPPED),
-            () => this._trs80?.dispose?.(),
-            () => this._trs80?.shutdown?.(),
-        ];
-        for (const fn of stopPaths) {
-            try { await Promise.resolve(fn()); } catch { /* ignore */ }
-        }
-
-        // 3. Eject any mounted floppies so their handles are released.
+        // Stop the Z80 tick loop.
+        try { this._trs80?.stop?.(); } catch { /* ignore */ }
+        // Eject floppies so their handles are released.
         try { this._trs80?.ejectAllFloppyDisks?.(); } catch { /* ignore */ }
 
-        // 4. Explicitly close any AudioContext we captured. WebSoundPlayer
-        //    keeps its AudioContext alive otherwise, and the AudioWorklet
-        //    will keep producing samples until the GC eventually reaps it.
-        const audioCandidates = [
-            this._audioContext,
-            this._sound?.audioCtx,
-            this._sound?.audioContext,
-            this._sound?.context,
-        ];
-        for (const ctx of audioCandidates) {
-            if (ctx && typeof ctx.close === 'function' && ctx.state !== 'closed') {
-                try { ctx.close(); } catch { /* ignore */ }
-            }
-        }
-
-        // 5. Pause and unhook any <audio> elements.
-        if (stage) {
-            for (const a of stage.querySelectorAll('audio')) {
-                try { a.pause(); } catch { /* ignore */ }
-                try { a.removeAttribute('src'); a.load(); } catch { /* ignore */ }
-            }
-        }
-
-        // 6. Terminate any Web Workers reachable from the emulator object.
-        const workerCandidates = [
-            this._sound?.worker,
-            this._trs80?.worker,
-        ];
-        for (const w of workerCandidates) {
-            if (w && typeof w.terminate === 'function') {
-                try { w.terminate(); } catch { /* ignore */ }
-            }
-        }
-
-        // 7. Drop the DOM subtree so canvases/audio nodes lose all
-        //    references and become GC-eligible.
+        // Drop the DOM subtree (canvas + screen node) so it becomes
+        // GC-eligible.
         if (stage) stage.innerHTML = '';
 
         if (this.activeBlobUrl && this.currentRom === this.activeBlobUrl) {
@@ -740,16 +1026,14 @@ class TRS80 extends AppBase {
             this.activeBlobUrl = null;
         }
 
-        // 8. Null all our refs.
+        // Null the per-session refs. Keep _keyboard and _sound (reused).
         this._trs80 = null;
         this._screen = null;
-        this._keyboard = null;
         this._cassette = null;
-        this._sound = null;
-        this._audioContext = null;
 
         this.isRunning = false;
         this.isReady = false;
+        this._paused = false;
         this.updateButtons(false);
 
         if (keepSplash) {
@@ -774,15 +1058,6 @@ class TRS80 extends AppBase {
         });
     }
 
-    setVolume(volume) {
-        const v = Math.max(0, Math.min(1, Number(volume) || 0));
-        try {
-            this._sound?.setVolume?.(v);
-        } catch (e) {
-            console.warn('[TRS-80] setVolume failed:', e);
-        }
-    }
-
     // ── Toolbar Actions ────────────────────────────────────────
 
     togglePause() {
@@ -790,77 +1065,51 @@ class TRS80 extends AppBase {
         this._setPaused(!this._paused);
     }
 
-    /** @private */
+    /**
+     * Pause / resume. The trs80-emulator has no dedicated pause API —
+     * stop() cancels the tick loop (freezing the Z80) and start() resumes
+     * it, which is exactly pause/resume.
+     * @private
+     */
     _setPaused(want) {
         if (!this.isRunning) return;
         this._paused = !!want;
         try {
-            // The trs80 library exposes setRunningState; we toggle between
-            // STARTED and PAUSED.
-            const RunningState = this._modules?.emu?.RunningState;
-            if (RunningState && this._trs80?.setRunningState) {
-                this._trs80.setRunningState(this._paused ? RunningState.PAUSED : RunningState.STARTED);
-            } else if (this._trs80?.setPaused) {
-                this._trs80.setPaused(this._paused);
+            if (this._paused) {
+                this._trs80?.stop?.();
+            } else {
+                this._trs80?.start?.();
+                if (this._keyboard) this._keyboard.interceptKeys = this.isFocused();
             }
         } catch (e) {
             console.warn('[TRS-80] pause/resume failed:', e);
         }
         const btn = this.getElement('#trs80PauseBtn');
-        if (btn) btn.innerHTML = this._paused ? '▶ Resume' : '⏸ Pause';
-        this.setStatus(this._paused ? 'Paused: ' + (this.currentRomName || '') : 'Running: ' + (this.currentRomName || ''));
+        if (btn) btn.textContent = this._paused ? '▶ Resume' : '⏸ Pause';
+        this.setStatus(
+            (this._paused ? 'Paused: ' : 'Running: ') + (this.currentRomName || '')
+        );
         this.emitAppEvent(this._paused ? 'paused' : 'resumed', { name: this.currentRomName });
     }
 
-    toggleMute() {
-        this._muted = !this._muted;
-        if (this._muted) {
-            this.setVolume(0);
-        } else {
-            this.setVolume(this._volumeBeforeMute || 0.5);
+    /**
+     * Mute / unmute. The WebSoundPlayer is on/off only (no volume curve);
+     * SilentSoundPlayer has neither method, so the optional-chaining calls
+     * are simply no-ops when sound is unavailable.
+     * @private
+     */
+    _setMuted(want) {
+        this._muted = !!want;
+        try {
+            if (this._muted) this._sound?.mute?.();
+            else this._sound?.unmute?.();
+        } catch (e) {
+            console.warn('[TRS-80] mute/unmute failed:', e);
         }
         const btn = this.getElement('#trs80MuteBtn');
         if (btn) {
-            btn.innerHTML = this._muted ? '🔇' : '🔊';
-            btn.title = this._muted ? 'Unmute (M)' : 'Mute (M)';
-        }
-    }
-
-    async saveState() {
-        if (!this.isRunning || !this.isReady) return;
-        try {
-            // The trs80 emulator exposes save state via Trs80.save().
-            // Fall back to a no-op message if the running build doesn't
-            // expose it.
-            const state = this._trs80?.save?.();
-            if (!state) {
-                this.setStatus('Save state not supported by this engine build');
-                return;
-            }
-            this._lastSaveState = state;
-            const loadBtn = this.getElement('#trs80LoadStateBtn');
-            if (loadBtn) loadBtn.disabled = false;
-            this.setStatus('State saved (in-memory, this session)');
-            this.emitAppEvent('stateSaved', {});
-        } catch (e) {
-            console.warn('[TRS-80] saveState failed:', e);
-            this.setStatus('Save state failed: ' + (e?.message || e));
-        }
-    }
-
-    async loadState() {
-        if (!this.isRunning || !this.isReady) return;
-        if (!this._lastSaveState) {
-            this.setStatus('No save state in this session yet');
-            return;
-        }
-        try {
-            this._trs80?.restore?.(this._lastSaveState);
-            this.setStatus('State restored');
-            this.emitAppEvent('stateLoaded', {});
-        } catch (e) {
-            console.warn('[TRS-80] loadState failed:', e);
-            this.setStatus('Load state failed: ' + (e?.message || e));
+            btn.textContent = this._muted ? '🔇' : '🔊';
+            btn.title = this._muted ? 'Unmute' : 'Mute';
         }
     }
 
@@ -869,34 +1118,6 @@ class TRS80 extends AppBase {
         const name = this.currentRomName;
         await this.stopEmulator();
         if (url !== null) await this.loadGame(url, name);
-    }
-
-    /** @private */
-    _handleShortcut(e) {
-        if (e.ctrlKey || e.metaKey) {
-            const key = e.key.toLowerCase();
-            if (key === 's') { e.preventDefault(); this.saveState(); return; }
-            if (key === 'l') { e.preventDefault(); this.loadState(); return; }
-            return;
-        }
-        if (e.altKey || e.shiftKey) return;
-        switch (e.key) {
-            case 'Escape':
-                if (this.isRunning) { e.preventDefault(); this.stopEmulator(); }
-                break;
-            case 'p': case 'P':
-                if (this.isRunning) { e.preventDefault(); this.togglePause(); }
-                break;
-            case 'm': case 'M':
-                e.preventDefault(); this.toggleMute();
-                break;
-            case 'r': case 'R':
-                if (this.isRunning) { e.preventDefault(); this.resetCurrent(); }
-                break;
-            case 'f': case 'F':
-                e.preventDefault(); this.toggleFullscreen();
-                break;
-        }
     }
 
     // ── Recents (persisted to localStorage) ────────────────────
@@ -910,7 +1131,7 @@ class TRS80 extends AppBase {
             const arr = raw ? JSON.parse(raw) : [];
             if (Array.isArray(arr)) {
                 this._recents = arr.filter(r => r && typeof r === 'object' &&
-                    typeof r.name === 'string' && typeof r.url === 'string')
+                    typeof r.name === 'string')
                     .slice(0, TRS80.RECENTS_MAX);
             }
         } catch { /* ignore */ }
@@ -922,12 +1143,14 @@ class TRS80 extends AppBase {
 
     _pushRecent(entry) {
         if (!entry || !entry.name) return;
-        const key = entry.url || entry.name;
+        const key = entry.url || entry.iaItem || entry.iaSearch || entry.name;
         const trimmed = {
             name: entry.name, icon: entry.icon || '💾',
-            url: entry.url, category: entry.category, year: entry.year,
+            url: entry.url, iaItem: entry.iaItem, iaSearch: entry.iaSearch,
+            category: entry.category, year: entry.year,
         };
-        const idx = this._recents.findIndex(r => (r.url || r.name) === key);
+        const idx = this._recents.findIndex(r =>
+            (r.url || r.iaItem || r.iaSearch || r.name) === key);
         if (idx !== -1) this._recents.splice(idx, 1);
         this._recents.unshift(trimmed);
         if (this._recents.length > TRS80.RECENTS_MAX) this._recents.length = TRS80.RECENTS_MAX;
@@ -974,13 +1197,14 @@ class TRS80 extends AppBase {
         if (loadingText) loadingText.textContent = text || 'Loading…';
     }
 
-    _showError(title, lines = []) {
+    _showError(title, lines = [], opts = {}) {
         const splash = this.getElement('#trs80Splash');
         const stage = this.getElement('#trs80Stage');
         const loading = this.getElement('#trs80Loading');
         const errorOverlay = this.getElement('#trs80Error');
         const errorTitle = this.getElement('#trs80ErrorTitle');
         const errorBody = this.getElement('#trs80ErrorBody');
+        const errorSearch = this.getElement('#trs80ErrorSearch');
         if (splash) splash.style.display = 'none';
         if (stage) stage.style.display = 'none';
         if (loading) loading.style.display = 'none';
@@ -990,6 +1214,14 @@ class TRS80 extends AppBase {
             errorBody.innerHTML = (lines || []).map(line =>
                 `<div class="trs80-error-line">${escapeHtml(line)}</div>`
             ).join('');
+        }
+        if (errorSearch) {
+            if (opts.iaSearchUrl) {
+                errorSearch.style.display = 'inline-block';
+                errorSearch.href = opts.iaSearchUrl;
+            } else {
+                errorSearch.style.display = 'none';
+            }
         }
         errorOverlay.style.display = 'flex';
     }
@@ -1003,16 +1235,12 @@ class TRS80 extends AppBase {
         const stopBtn = this.getElement('#trs80StopBtn');
         const resetBtn = this.getElement('#trs80ResetBtn');
         const pauseBtn = this.getElement('#trs80PauseBtn');
-        const saveBtn = this.getElement('#trs80SaveStateBtn');
-        const loadBtn = this.getElement('#trs80LoadStateBtn');
         if (stopBtn) stopBtn.disabled = !running;
         if (resetBtn) resetBtn.disabled = !running;
         if (pauseBtn) pauseBtn.disabled = !running;
-        if (saveBtn) saveBtn.disabled = !running;
-        if (loadBtn) loadBtn.disabled = !running || !this._lastSaveState;
         if (!running) {
             this._paused = false;
-            if (pauseBtn) pauseBtn.innerHTML = '⏸ Pause';
+            if (pauseBtn) pauseBtn.textContent = '⏸ Pause';
         }
     }
 
@@ -1030,20 +1258,9 @@ class TRS80 extends AppBase {
         if (url.startsWith('blob:')) return 'local file';
         try {
             const parts = new URL(url, document.baseURI).pathname.split('/');
-            return parts[parts.length - 1] || url;
+            return decodeURIComponent(parts[parts.length - 1]) || url;
         } catch {
             return url;
-        }
-    }
-
-    /** @private */
-    _extOf(url) {
-        try {
-            const path = url.startsWith('blob:') ? '' : new URL(url, document.baseURI).pathname;
-            const m = path.match(/\.([a-z0-9]+)$/i);
-            return m ? m[1].toLowerCase() : '';
-        } catch {
-            return '';
         }
     }
 }
