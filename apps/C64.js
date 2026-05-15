@@ -58,8 +58,27 @@ const C64_CORE = 'c64';
  * IlluminatOS C64 proxy at `api/c64-proxy.php`, same pattern as DOSBox.
  */
 const CORS_FRIENDLY_HOSTS = new Set([
-    // (intentionally empty — IA is treated as proxy-routed for determinism)
+    // GitHub raw content — `Access-Control-Allow-Origin: *` for all
+    // public repos. Source for the bulk of our verified library
+    // (retrobrews/c64-games — see RETROBREWS_C64_BASE below).
+    'raw.githubusercontent.com',
 ]);
+
+/**
+ * The retrobrews homebrew C64 collection. ~48 freeware titles, each
+ * vetted by the curator and explicitly approved for free distribution
+ * by the original developers ("approved for free distribution on this
+ * site/project only" per the repo README — we link, we don't redistribute).
+ *
+ * raw.githubusercontent.com sends CORS so the browser fetches these
+ * directly without going through our proxy.
+ *
+ * Source repo (canonical):
+ *   https://github.com/retrobrews/c64-games
+ * Per-title metadata + screenshots:
+ *   https://github.com/retrobrews/c64-games/blob/master/gamelist.xml
+ */
+const RETROBREWS_C64_BASE = 'https://raw.githubusercontent.com/retrobrews/c64-games/master';
 
 /**
  * Hosts the proxy is configured to fetch from. Used only to decide
@@ -76,410 +95,213 @@ const PROXY_HOSTS = new Set([
 ]);
 
 /**
- * Curated C64 library — modeled on DOSBox's GAME_LIBRARY in scope and shape.
+ * Curated C64 library.
  *
- * Each entry: { name, icon, category, year, desc, iaItem? | url? }
- *   - `iaItem`: Internet Archive item ID; the actual .d64/.prg/.crt file
- *               is resolved at runtime via `_resolveIAItemToUrl()`. This
- *               avoids hardcoding filenames that change inside an item.
- *   - `url`:    Explicit download URL (used for BASIC's empty sentinel,
- *               and for any non-IA source you might add later).
+ * The bulk of this list (~48 titles) is sourced from the retrobrews/c64-games
+ * GitHub repository (a community-maintained collection of homebrew C64
+ * software explicitly approved by each developer for free distribution).
+ * Files are served from `raw.githubusercontent.com`, which sends
+ * permissive CORS to third-party origins, so the browser fetches them
+ * direct without our proxy.
  *
- * The metadata API at `https://archive.org/metadata/<itemId>` sends
- * permissive CORS headers, so the resolver fetch works straight from the
- * browser with no proxy.
+ * Each entry: { name, icon, category, year, desc, url? | iaItem? }
+ *   - `url`:    Direct download URL (CORS-friendly hosts only).
+ *   - `iaItem`: Internet Archive item ID — resolved at runtime via the
+ *               IA metadata API and routed through `api/c64-proxy.php`
+ *               for deterministic CORS. Used for the small experimental
+ *               demoscene tail; some IDs may need verification by hand.
  *
- * URL hygiene
- *   - IA's `archive.org/download/<itemId>/<file>` endpoints send
- *     `Access-Control-Allow-Origin: *` — EmulatorJS can fetch them.
- *   - If a specific item ID is wrong (404 from the metadata API), the
- *     resolver surfaces the error in the status bar so the user knows
- *     to pick another title.
- *   - To add titles: find the item on archive.org, copy the URL segment
- *     after `/details/`, paste it here as `iaItem`. The resolver picks
- *     the most appropriate file (.d64 > .prg > .crt > .t64 > .zip).
+ * To add titles
+ *   - Homebrew: contribute to retrobrews/c64-games then add an entry here.
+ *   - Demoscene: find the IA item, paste the ID as `iaItem`. The resolver
+ *               picks the best file (.d64 > .prg > .crt > .t64 > .zip).
  *
- * Legality posture matches the existing DOSBox app: we link to a public
- * preservation archive, we don't redistribute. Demoscene and homebrew
- * entries are explicit freeware; commercial titles fall under the same
- * archive-preservation framing IA uses across its Software Library.
+ * Legality posture: we link to public archives that hold redistribution
+ * rights from the original developers. We do not redistribute ROMs.
+ * Commercial titles still under copyright (e.g. Pirates!, Maniac Mansion)
+ * are deliberately not in this list — load those from your own .d64 file
+ * via the File… button.
  */
 const GAME_LIBRARY = [
-    // === Arcade Classics (ports of coin-op hits) ============================
-    { name: 'Pac-Man',              icon: '🟡', category: 'Arcade',     year: 1983,
-      desc: 'Namco\'s maze-chomper port',
-      iaItem: 'c64_Pac-Man' },
-    { name: 'Ms. Pac-Man',          icon: '🎀', category: 'Arcade',     year: 1984,
-      desc: 'Atari\'s arcade follow-up',
-      iaItem: 'c64_Ms_Pac-Man' },
-    { name: 'Donkey Kong',          icon: '🦍', category: 'Arcade',     year: 1983,
-      desc: 'Climb the girders, save the girl',
-      iaItem: 'c64_Donkey_Kong' },
-    { name: 'Centipede',            icon: '🐛', category: 'Arcade',     year: 1984,
-      desc: 'Atari\'s mushroom-field shooter',
-      iaItem: 'c64_Centipede' },
-    { name: 'Galaga',               icon: '👾', category: 'Arcade',     year: 1985,
-      desc: 'Namco\'s vertical insectoid shooter',
-      iaItem: 'c64_Galaga' },
-    { name: 'Frogger',              icon: '🐸', category: 'Arcade',     year: 1983,
-      desc: 'Cross the road, mind the logs',
-      iaItem: 'c64_Frogger' },
-    { name: 'Q*bert',               icon: '🟧', category: 'Arcade',     year: 1983,
-      desc: 'Hop on every cube',
-      iaItem: 'c64_Qbert' },
-    { name: 'Defender',             icon: '🛸', category: 'Arcade',     year: 1983,
-      desc: 'Williams\' side-scrolling rescue shooter',
-      iaItem: 'c64_Defender' },
-    { name: 'Dig Dug',              icon: '⛏️', category: 'Arcade',     year: 1983,
-      desc: 'Inflate Pookas underground',
-      iaItem: 'c64_Dig_Dug' },
-    { name: 'Joust',                icon: '🪶', category: 'Arcade',     year: 1983,
-      desc: 'Flying ostrich lance-duels',
-      iaItem: 'c64_Joust' },
-    { name: 'Bubble Bobble',        icon: '🫧', category: 'Arcade',     year: 1987,
-      desc: 'Taito\'s bubble-blowing dinos',
-      iaItem: 'c64_Bubble_Bobble' },
-    { name: 'Spy Hunter',           icon: '🚗', category: 'Arcade',     year: 1984,
-      desc: 'Midway\'s combat driving',
-      iaItem: 'c64_Spy_Hunter' },
-    { name: 'BurgerTime',           icon: '🍔', category: 'Arcade',     year: 1984,
-      desc: 'Stomp buns, dodge pickles',
-      iaItem: 'c64_BurgerTime' },
-    { name: 'Mr. Do!',              icon: '🤡', category: 'Arcade',     year: 1983,
-      desc: 'Universal\'s dig-and-fruit arcade',
-      iaItem: 'c64_Mr_Do' },
-    { name: 'Tapper',               icon: '🍺', category: 'Arcade',     year: 1984,
-      desc: 'Slide root beers down the bar',
-      iaItem: 'c64_Tapper' },
 
-    // === Platformer ===========================================================
-    { name: 'Bruce Lee',            icon: '🥋', category: 'Platformer', year: 1984,
-      desc: 'Datasoft\'s martial-arts platformer',
-      iaItem: 'c64_Bruce_Lee' },
-    { name: 'Impossible Mission',   icon: '🤖', category: 'Platformer', year: 1984,
-      desc: '"Stay awhile. Stay forever!" — Epyx',
-      iaItem: 'impossible_mission_202309' },
-    { name: 'Impossible Mission II', icon: '🔓', category: 'Platformer', year: 1988,
-      desc: 'The Elvin Atombender revenge',
-      iaItem: 'c64_Impossible_Mission_II' },
-    { name: 'Jumpman',              icon: '🪜', category: 'Platformer', year: 1983,
-      desc: 'Epyx\'s 30-level climber',
-      iaItem: 'c64_Jumpman' },
-    { name: 'Jumpman Junior',       icon: '🧗', category: 'Platformer', year: 1983,
-      desc: 'Cartridge-sized sequel',
-      iaItem: 'c64_Jumpman_Junior' },
-    { name: 'Pitfall!',             icon: '🐊', category: 'Platformer', year: 1983,
-      desc: 'Activision\'s jungle classic',
-      iaItem: 'c64_Pitfall' },
-    { name: 'Pitfall II: Lost Caverns', icon: '🕳️', category: 'Platformer', year: 1984,
-      desc: 'Multi-screen sequel with music',
-      iaItem: 'c64_Pitfall_II' },
-    { name: 'Mario Bros.',          icon: '👨‍🔧', category: 'Platformer', year: 1984,
-      desc: 'Pre-Super arcade port',
-      iaItem: 'c64_Mario_Bros' },
-    { name: 'Aztec Challenge',      icon: '🐍', category: 'Platformer', year: 1983,
-      desc: 'Cosmi\'s seven-level temple gauntlet',
-      iaItem: 'c64_Aztec_Challenge' },
-    { name: 'Boulder Dash',         icon: '💎', category: 'Platformer', year: 1984,
-      desc: 'First Star\'s gem-grabbing dig',
-      iaItem: 'c64_Boulder_Dash' },
-    { name: 'Boulder Dash II',      icon: '🪨', category: 'Platformer', year: 1985,
-      desc: 'Rockford\'s Revenge',
-      iaItem: 'c64_Boulder_Dash_II' },
-    { name: 'The Goonies',          icon: '👻', category: 'Platformer', year: 1986,
-      desc: 'Datasoft\'s movie tie-in',
-      iaItem: 'c64_The_Goonies' },
-    { name: 'Spelunker',            icon: '🔦', category: 'Platformer', year: 1985,
-      desc: 'Broderbund\'s fragile cave-diver',
-      iaItem: 'c64_Spelunker' },
-    { name: 'Lode Runner',          icon: '🏃', category: 'Platformer', year: 1984,
-      desc: 'Dig holes, grab gold — Broderbund',
-      iaItem: 'c64_Lode_Runner' },
-    { name: 'Wonder Boy',           icon: '🍔', category: 'Platformer', year: 1987,
-      desc: 'Sega\'s skateboard platformer',
-      iaItem: 'c64_Wonder_Boy' },
+    // === Arcade (1 titles, retrobrews/c64-games via raw.githubusercontent.com) ===
+    { name: 'MArkanoid', icon: '🧱', category: 'Arcade', year: 2003,
+      desc: 'Arkanoid clone in MArkanoid style (Ice Team)',
+      url: `${RETROBREWS_C64_BASE}/markanoid.prg` },
 
-    // === Shooter (vertical / horizontal / multi-directional) ================
-    { name: 'Uridium',              icon: '🚀', category: 'Shooter',    year: 1986,
-      desc: 'Andrew Braybrook\'s super-fast Hewson scroller',
-      iaItem: 'c64_Uridium' },
-    { name: 'Wizball',              icon: '🧙', category: 'Shooter',    year: 1987,
-      desc: 'Sensible Software\'s rolling-wizard shooter',
-      iaItem: 'c64_Wizball' },
-    { name: 'Delta',                icon: '🔺', category: 'Shooter',    year: 1987,
-      desc: 'Stavros Fasoulas\' bullet-hell horizontal scroller',
-      iaItem: 'c64_Delta' },
-    { name: 'Sanxion',              icon: '🛰️', category: 'Shooter',    year: 1986,
-      desc: 'Stavros Fasoulas + Rob Hubbard SID',
-      iaItem: 'c64_Sanxion' },
-    { name: 'IO',                   icon: '🌀', category: 'Shooter',    year: 1987,
-      desc: 'Graftgold\'s multi-stage scroller',
-      iaItem: 'c64_IO' },
-    { name: 'Armalyte',             icon: '⚔️', category: 'Shooter',    year: 1988,
-      desc: 'Cyberdyne\'s R-Type-esque masterpiece',
-      iaItem: 'c64_Armalyte' },
-    { name: 'Dropzone',             icon: '🪂', category: 'Shooter',    year: 1984,
-      desc: 'Archer Maclean\'s Defender-style rescue',
-      iaItem: 'c64_Dropzone' },
-    { name: 'Hawkeye',              icon: '🦅', category: 'Shooter',    year: 1988,
-      desc: 'Boys Without Brains run-and-gun',
-      iaItem: 'c64_Hawkeye' },
-    { name: 'R-Type',               icon: '🐉', category: 'Shooter',    year: 1989,
-      desc: 'Irem\'s scrolling arcade shooter',
-      iaItem: 'c64_R-Type' },
-    { name: 'Mega Apocalypse',      icon: '☄️', category: 'Shooter',    year: 1987,
-      desc: 'Martech\'s Asteroids successor',
-      iaItem: 'c64_Mega_Apocalypse' },
+    // === Action (18 titles, retrobrews/c64-games via raw.githubusercontent.com) ===
+    { name: 'Captain Cloudberry', icon: '☁️', category: 'Action', year: 2017,
+      desc: 'Pop radioactive weather balloons in your plane (Megastyle)',
+      url: `${RETROBREWS_C64_BASE}/captaincloudberry.d64` },
+    { name: 'Elav', icon: '🏗️', category: 'Action', year: 2006,
+      desc: 'Rampage clone in just 4 KB (Ice Team)',
+      url: `${RETROBREWS_C64_BASE}/elav.prg` },
+    { name: 'Electric Warrior', icon: '⚡', category: 'Action', year: 2018,
+      desc: 'Rabbitfighting cosmic monk on year-9634 Earth (PlayOrbit)',
+      url: `${RETROBREWS_C64_BASE}/electricwarrior.d64` },
+    { name: 'Exploding Fish', icon: '🐠', category: 'Action', year: 2018,
+      desc: 'Diver Dougal defuses reef bombs (Megastyle)',
+      url: `${RETROBREWS_C64_BASE}/explodingfish.d64` },
+    { name: 'Gruniozerca', icon: '🐹', category: 'Action', year: 2017,
+      desc: 'Guinea pig catches falling carrots (6bits (Lukasz Kies))',
+      url: `${RETROBREWS_C64_BASE}/gruniozerca.d64` },
+    { name: 'Happy Flappy', icon: '🐦', category: 'Action', year: 2018,
+      desc: 'Flappy Bird clone, one-button (Roysterini)',
+      url: `${RETROBREWS_C64_BASE}/happyflappy.prg` },
+    { name: 'Hektic II', icon: '🤯', category: 'Action', year: 2017,
+      desc: 'Arcade-platformer chaos sequel (Roysterini)',
+      url: `${RETROBREWS_C64_BASE}/hektic2.prg` },
+    { name: 'Honey Bee', icon: '🐝', category: 'Action', year: 2016,
+      desc: 'Buzzy the clumsy bee collects pollen (Psytronik Software)',
+      url: `${RETROBREWS_C64_BASE}/honeybee.d64` },
+    { name: 'Humpy64', icon: '💀', category: 'Action', year: 2018,
+      desc: 'Dodge the swinging wrecking ball (Roysterini)',
+      url: `${RETROBREWS_C64_BASE}/humpy64.prg` },
+    { name: 'Lumberjack 4k', icon: '🪓', category: 'Action', year: 2017,
+      desc: '4K lumberjack — reveal the red flannel (Megastyle)',
+      url: `${RETROBREWS_C64_BASE}/lumberjack.d64` },
+    { name: 'Monster Hunt', icon: '👹', category: 'Action', year: 2018,
+      desc: 'Chase monsters into the black hole (Cout Games)',
+      url: `${RETROBREWS_C64_BASE}/monsterhunt.prg` },
+    { name: 'Moon Rock', icon: '🌙', category: 'Action', year: 2018,
+      desc: 'Pick your nose for moon rocks (yes really) (Cout Games)',
+      url: `${RETROBREWS_C64_BASE}/moonrock.prg` },
+    { name: 'Paper Plane', icon: '🛩️', category: 'Action', year: 2017,
+      desc: 'Guide a paper plane through hazards (Roysterini)',
+      url: `${RETROBREWS_C64_BASE}/paperplane.prg` },
+    { name: 'Sentence', icon: '🔫', category: 'Action', year: 2018,
+      desc: 'Run-and-gun with dubious combat sections (Roysterini)',
+      url: `${RETROBREWS_C64_BASE}/sentence.d64` },
+    { name: 'Shinobiden Zero', icon: '🥷', category: 'Action', year: 2018,
+      desc: 'Aomaru the ninja-in-training adventure (Tekkamansoul)',
+      url: `${RETROBREWS_C64_BASE}/shinobidenzero.prg` },
+    { name: 'Snafu', icon: '🐍', category: 'Action', year: 2017,
+      desc: 'Classic snake trap — direct without dying (Megastyle)',
+      url: `${RETROBREWS_C64_BASE}/snafu.d64` },
+    { name: 'Tombstones', icon: '🪦', category: 'Action', year: 2017,
+      desc: 'El Gringo guns down 6 outlaws across 3 stages (Megastyle)',
+      url: `${RETROBREWS_C64_BASE}/tombstones.d64` },
+    { name: 'Trolley Follies', icon: '🚋', category: 'Action', year: 2018,
+      desc: 'One or two-player trolley adventure (Blackcastle)',
+      url: `${RETROBREWS_C64_BASE}/trolleyfollies.d64` },
 
-    // === Action / Action-Adventure ==========================================
-    { name: 'The Last Ninja',       icon: '🥷', category: 'Action',     year: 1987,
-      desc: 'System 3\'s isometric ninja saga',
-      iaItem: 'c64_The_Last_Ninja' },
-    { name: 'The Last Ninja 2',     icon: '🗡️', category: 'Action',     year: 1988,
-      desc: 'Back With A Vengeance',
-      iaItem: 'c64_The_Last_Ninja_2' },
-    { name: 'The Last Ninja 3',     icon: '🐉', category: 'Action',     year: 1991,
-      desc: 'Final System 3 entry',
-      iaItem: 'c64_The_Last_Ninja_3' },
-    { name: 'Paradroid',            icon: '🤖', category: 'Action',     year: 1985,
-      desc: 'Andrew Braybrook\'s droid-takeover masterpiece',
-      iaItem: 'c64_Paradroid' },
-    { name: 'Mayhem in Monsterland', icon: '🐉', category: 'Action',    year: 1993,
-      desc: 'Apex\'s late-era miracle scroller',
-      iaItem: 'c64_Mayhem_in_Monsterland' },
-    { name: 'Turrican',             icon: '💥', category: 'Action',     year: 1990,
-      desc: 'Manfred Trenz\'s explosive run-and-gun',
-      iaItem: 'c64_Turrican' },
-    { name: 'Turrican II',          icon: '⚙️', category: 'Action',     year: 1991,
-      desc: 'The Final Fight',
-      iaItem: 'c64_Turrican_II' },
-    { name: 'Creatures',            icon: '😺', category: 'Action',     year: 1990,
-      desc: 'Apex Computer\'s fuzzy-horror romp',
-      iaItem: 'c64_Creatures' },
-    { name: 'Mayhem',               icon: '💣', category: 'Action',     year: 1985,
-      desc: 'Vintage chaos title',
-      iaItem: 'c64_Mayhem' },
-    { name: 'Saboteur!',            icon: '🕵️', category: 'Action',     year: 1985,
-      desc: 'Durell\'s side-scrolling infiltration',
-      iaItem: 'c64_Saboteur' },
+    // === Shooter (3 titles, retrobrews/c64-games via raw.githubusercontent.com) ===
+    { name: 'Algol', icon: '🛸', category: 'Shooter', year: 2018,
+      desc: 'Control the Harvester of Doom over planet Eden (PlayOrbit)',
+      url: `${RETROBREWS_C64_BASE}/algol.d64` },
+    { name: 'Pulse', icon: '💥', category: 'Shooter', year: 2017,
+      desc: 'Smooth horizontal-scrolling shoot-\u2019em-up (East Yorkshire Engineering Software)',
+      url: `${RETROBREWS_C64_BASE}/pulse.prg` },
+    { name: 'The Vice Squad', icon: '🚓', category: 'Shooter', year: 0,
+      desc: 'Multi-level scrolling shooter, multiple weapons (Psytronik Software)',
+      url: `${RETROBREWS_C64_BASE}/thevicesquad.d64` },
 
-    // === Adventure (point-and-click / illustrated text) =====================
-    { name: 'Maniac Mansion',       icon: '🏚️', category: 'Adventure',  year: 1987,
-      desc: 'Lucasfilm\'s first SCUMM adventure',
-      iaItem: 'c64_Maniac_Mansion' },
-    { name: 'Zak McKracken',        icon: '👽', category: 'Adventure',  year: 1988,
-      desc: 'Alien Mindbenders — Lucasfilm',
-      iaItem: 'c64_Zak_McKracken_and_the_Alien_Mindbenders' },
-    { name: 'The Hobbit',           icon: '💍', category: 'Adventure',  year: 1985,
-      desc: 'Melbourne House — Inglish-engine adventure',
-      iaItem: 'c64_The_Hobbit' },
-    { name: 'Indiana Jones (Temple of Doom)', icon: '🏛️', category: 'Adventure', year: 1987,
-      desc: 'Mindscape arcade-adventure port',
-      iaItem: 'c64_Indiana_Jones_and_the_Temple_of_Doom' },
-    { name: 'Below the Root',       icon: '🌳', category: 'Adventure',  year: 1984,
-      desc: 'Windham/CBS Software literary adventure',
-      iaItem: 'c64_Below_the_Root' },
-    { name: 'Defender of the Crown', icon: '👑', category: 'Adventure', year: 1987,
-      desc: 'Cinemaware\'s knights & sieges',
-      iaItem: 'c64_Defender_of_the_Crown' },
-    { name: 'Sid Meier\'s Pirates!', icon: '🏴‍☠️', category: 'Adventure', year: 1987,
-      desc: 'MicroProse\'s Caribbean sandbox',
-      iaItem: 'c64_Pirates' },
-    { name: 'Where in the World is Carmen Sandiego?', icon: '🌎', category: 'Adventure', year: 1985,
-      desc: 'Broderbund\'s edutainment classic',
-      iaItem: 'c64_Where_in_the_World_is_Carmen_Sandiego' },
-    { name: 'The Pawn',             icon: '♟️', category: 'Adventure',  year: 1986,
-      desc: 'Magnetic Scrolls illustrated text adventure',
-      iaItem: 'c64_The_Pawn' },
-    { name: 'Times of Lore',        icon: '⚔️', category: 'Adventure',  year: 1988,
-      desc: 'Origin Systems action-RPG hybrid',
-      iaItem: 'c64_Times_of_Lore' },
+    // === Platformer (6 titles, retrobrews/c64-games via raw.githubusercontent.com) ===
+    { name: 'It\'s Magic', icon: '🧙', category: 'Platformer', year: 2006,
+      desc: 'Cute Protovision jump-and-run platformer (Protovision)',
+      url: `${RETROBREWS_C64_BASE}/itsmagic.d64` },
+    { name: 'Little Sara Sister Trilogy', icon: '👧', category: 'Platformer', year: 2017,
+      desc: 'Little Sara Sister trilogy on tape (Ice Team)',
+      url: `${RETROBREWS_C64_BASE}/lsstrilogy.tap` },
+    { name: 'Nanako in Classic Japanese Monster Castle', icon: '🏯', category: 'Platformer', year: 2010,
+      desc: 'Mojon Twins 25-level monster castle (Mojon Twins)',
+      url: `${RETROBREWS_C64_BASE}/nanakoincastle.d64` },
+    { name: 'Quod Init Exit', icon: '🚪', category: 'Platformer', year: 2018,
+      desc: 'Zampo escapes randomly-generated rooms (Retream)',
+      url: `${RETROBREWS_C64_BASE}/quodinitexit.d64` },
+    { name: 'Sir Ababol', icon: '🌸', category: 'Platformer', year: 2012,
+      desc: 'Gather 25 ababol flowers across Monegros (Mojon Twins)',
+      url: `${RETROBREWS_C64_BASE}/sirababol.d64` },
+    { name: 'Uwol, Quest for Money', icon: '💎', category: 'Platformer', year: 2009,
+      desc: 'Steal as many coins as Uwol can carry (Mojon Twins)',
+      url: `${RETROBREWS_C64_BASE}/uwolquestformoney.d64` },
 
-    // === Text Adventure (Infocom et al.) ====================================
-    { name: 'Zork I',               icon: '📜', category: 'Text Adventure', year: 1983,
-      desc: 'Infocom\'s Great Underground Empire',
-      iaItem: 'c64_Zork_I' },
-    { name: 'Hitchhiker\'s Guide',  icon: '🐬', category: 'Text Adventure', year: 1984,
-      desc: 'Infocom + Douglas Adams',
-      iaItem: 'c64_The_Hitchhikers_Guide_to_the_Galaxy' },
+    // === Puzzle (18 titles, retrobrews/c64-games via raw.githubusercontent.com) ===
+    { name: '$100 Box', icon: '🎲', category: 'Puzzle', year: 2018,
+      desc: 'Math game theory puzzle — guess the lucky box (Cout Games)',
+      url: `${RETROBREWS_C64_BASE}/100box.prg` },
+    { name: 'Bapple-Ships', icon: '🚢', category: 'Puzzle', year: 2018,
+      desc: 'Battleship vs. the computer on a 10×10 grid (Cout Games)',
+      url: `${RETROBREWS_C64_BASE}/bappleship.prg` },
+    { name: 'Find The Pussy', icon: '🐱', category: 'Puzzle', year: 2018,
+      desc: 'Logic-deduction game (find the cat in 6 guesses) (Cout Games)',
+      url: `${RETROBREWS_C64_BASE}/findthepussy.prg` },
+    { name: 'Iceblox Plus', icon: '🐧', category: 'Puzzle', year: 2019,
+      desc: 'Pixel Pete the penguin pushes ice blocks (Psytronik Software)',
+      url: `${RETROBREWS_C64_BASE}/icebloxplus.d64` },
+    { name: 'Lights Off', icon: '💡', category: 'Puzzle', year: 2018,
+      desc: 'Turn off all the lights on a 3×3 grid (Cout Games)',
+      url: `${RETROBREWS_C64_BASE}/lightsoff.prg` },
+    { name: 'Lights On', icon: '🔆', category: 'Puzzle', year: 2018,
+      desc: 'Turn on all the lights on a 3×3 grid (Cout Games)',
+      url: `${RETROBREWS_C64_BASE}/lightson.prg` },
+    { name: 'Magic Squares', icon: '🟥', category: 'Puzzle', year: 2018,
+      desc: 'Colour all 3×3 squares except the centre (Cout Games)',
+      url: `${RETROBREWS_C64_BASE}/magicsquares.prg` },
+    { name: 'Maze of Death', icon: '🌀', category: 'Puzzle', year: 2018,
+      desc: 'Navigate a poison-walled maze (Hamrath)',
+      url: `${RETROBREWS_C64_BASE}/mazeofdeath.d64` },
+    { name: 'NumTrap', icon: '🔢', category: 'Puzzle', year: 2018,
+      desc: 'Trap the number — guess high/low (Cout Games)',
+      url: `${RETROBREWS_C64_BASE}/numtrap.prg` },
+    { name: 'Plunko', icon: '💰', category: 'Puzzle', year: 2018,
+      desc: 'Price-is-Right Plinko-style pricing game (Cout Games)',
+      url: `${RETROBREWS_C64_BASE}/plunko.prg` },
+    { name: 'Roll Roll Roll', icon: '🎲', category: 'Puzzle', year: 2018,
+      desc: 'Single six-sided dice strategy game (Cout Games)',
+      url: `${RETROBREWS_C64_BASE}/rollrollroll.prg` },
+    { name: 'Scissors Paper Rock', icon: '✂️', category: 'Puzzle', year: 2018,
+      desc: 'Computerised rock-paper-scissors (Cout Games)',
+      url: `${RETROBREWS_C64_BASE}/scissorspaperrock.prg` },
+    { name: 'Scissors Paper Rock Lizard Spock', icon: '🖖', category: 'Puzzle', year: 2018,
+      desc: 'Extended Big Bang Theory RPSLS version (Cout Games)',
+      url: `${RETROBREWS_C64_BASE}/scissorspaperrocklizardspock.prg` },
+    { name: 'Simon', icon: '🟢', category: 'Puzzle', year: 2018,
+      desc: 'Classic 80s memory game with coloured keys (Cout Games)',
+      url: `${RETROBREWS_C64_BASE}/simon.prg` },
+    { name: 'The Labyrinth', icon: '🧭', category: 'Puzzle', year: 2018,
+      desc: '3D maze with map (VIC-20 port) (Cout Games)',
+      url: `${RETROBREWS_C64_BASE}/thelabyrinth.prg` },
+    { name: 'Warner Thomas Fahrenheit', icon: '🎱', category: 'Puzzle', year: 2018,
+      desc: 'Warner Thomas Fahrenheit — guide the ball (Misfit)',
+      url: `${RETROBREWS_C64_BASE}/wtf.prg` },
+    { name: 'Winky Blinky', icon: '😉', category: 'Puzzle', year: 2018,
+      desc: 'Reaction game — read Ben Turpin\u2019s eyes (Roysterini)',
+      url: `${RETROBREWS_C64_BASE}/winkyblinky.prg` },
+    { name: 'Zilspleef', icon: '🫧', category: 'Puzzle', year: 2018,
+      desc: 'Squeaky bubble through dimensional terror (PlayOrbit)',
+      url: `${RETROBREWS_C64_BASE}/zilspleef.d64` },
 
-    // === RPG ================================================================
-    { name: 'The Bard\'s Tale',     icon: '🎵', category: 'RPG',        year: 1985,
-      desc: 'Interplay/EA dungeon-crawler',
-      iaItem: 'c64_The_Bards_Tale' },
-    { name: 'Ultima IV',            icon: '👑', category: 'RPG',        year: 1985,
-      desc: 'Origin\'s Quest of the Avatar',
-      iaItem: 'c64_Ultima_IV' },
-    { name: 'Ultima V',             icon: '🗡️', category: 'RPG',        year: 1988,
-      desc: 'Warriors of Destiny',
-      iaItem: 'c64_Ultima_V' },
-    { name: 'Wasteland',            icon: '☢️', category: 'RPG',        year: 1988,
-      desc: 'Interplay/EA post-apocalyptic RPG',
-      iaItem: 'c64_Wasteland' },
-    { name: 'Pool of Radiance',     icon: '🐲', category: 'RPG',        year: 1988,
-      desc: 'First SSI Gold Box D&D game',
-      iaItem: 'c64_Pool_of_Radiance' },
+    // === Adventure (2 titles, retrobrews/c64-games via raw.githubusercontent.com) ===
+    { name: 'Atom Heart', icon: '☢️', category: 'Adventure', year: 2018,
+      desc: 'Captain the ATOM-X nuclear sci-fi adventure (PlayOrbit)',
+      url: `${RETROBREWS_C64_BASE}/atomheart.d64` },
+    { name: 'Joe Gunn Gold Edition', icon: '🪙', category: 'Adventure', year: 2018,
+      desc: 'Archaeologist Joe Gunn — Gold Edition (Psytronik Software)',
+      url: `${RETROBREWS_C64_BASE}/joegunngold.d64` },
 
-    // === Strategy / Simulation ==============================================
-    { name: 'M.U.L.E.',             icon: '🐴', category: 'Strategy',   year: 1983,
-      desc: 'Ozark Softscape economic strategy',
-      iaItem: 'c64_M_U_L_E' },
-    { name: 'Archon: Light & Dark', icon: '♛', category: 'Strategy',    year: 1983,
-      desc: 'Free Fall Associates chess-meets-combat',
-      iaItem: 'c64_Archon' },
-    { name: 'The Seven Cities of Gold', icon: '🌅', category: 'Strategy', year: 1984,
-      desc: 'Dani Bunten\'s New World exploration',
-      iaItem: 'c64_The_Seven_Cities_of_Gold' },
-    { name: 'Reach for the Stars',  icon: '🌌', category: 'Strategy',   year: 1986,
-      desc: 'SSG 4X space strategy',
-      iaItem: 'c64_Reach_for_the_Stars' },
-    { name: 'SimCity',              icon: '🏙️', category: 'Strategy',   year: 1989,
-      desc: 'Maxis\' city-builder original',
-      iaItem: 'c64_SimCity' },
-    { name: 'Little Computer People', icon: '🏠', category: 'Simulation', year: 1985,
-      desc: 'Activision\'s ur-Sims experiment',
-      iaItem: 'c64_Little_Computer_People' },
-    { name: 'Microprose Soccer',    icon: '⚽', category: 'Simulation', year: 1988,
-      desc: 'Sensible Software in MicroProse\'s clothes',
-      iaItem: 'c64_MicroProse_Soccer' },
-    { name: 'F-15 Strike Eagle',    icon: '✈️', category: 'Simulation', year: 1985,
-      desc: 'MicroProse fighter-jet sim',
-      iaItem: 'c64_F-15_Strike_Eagle' },
-
-    // === Sports =============================================================
-    { name: 'California Games',     icon: '🛹', category: 'Sports',     year: 1987,
-      desc: 'Epyx\'s six-event west-coast sampler',
-      iaItem: 'c64_California_Games' },
-    { name: 'Summer Games',         icon: '🏊', category: 'Sports',     year: 1984,
-      desc: 'Epyx\'s eight-event Olympic sim',
-      iaItem: 'c64_Summer_Games' },
-    { name: 'Summer Games II',      icon: '🚴', category: 'Sports',     year: 1985,
-      desc: 'Eight more Olympic events',
-      iaItem: 'c64_Summer_Games_II' },
-    { name: 'Winter Games',         icon: '⛷️', category: 'Sports',     year: 1985,
-      desc: 'Epyx\'s ice-and-snow version',
-      iaItem: 'c64_Winter_Games' },
-    { name: 'World Games',          icon: '🌍', category: 'Sports',     year: 1986,
-      desc: 'Caber toss, log roll, sumo',
-      iaItem: 'c64_World_Games' },
-    { name: 'International Karate', icon: '🥋', category: 'Fighting',   year: 1985,
-      desc: 'System 3\'s side-view karate',
-      iaItem: 'c64_International_Karate' },
-    { name: 'IK+',                  icon: '🥷', category: 'Fighting',   year: 1987,
-      desc: 'International Karate Plus — three fighters',
-      iaItem: 'c64_International_Karate_Plus' },
-    { name: 'Hardball!',            icon: '⚾', category: 'Sports',     year: 1985,
-      desc: 'Accolade\'s baseball sim',
-      iaItem: 'c64_Hardball' },
-
-    // === Racing =============================================================
-    { name: 'Pole Position',        icon: '🏁', category: 'Racing',     year: 1983,
-      desc: 'Atarisoft\'s Formula 1 arcade port',
-      iaItem: 'c64_Pole_Position' },
-    { name: 'Pitstop II',           icon: '🏎️', category: 'Racing',     year: 1984,
-      desc: 'Epyx split-screen Grand Prix',
-      iaItem: 'c64_Pitstop_II' },
-    { name: 'Test Drive',           icon: '🚗', category: 'Racing',     year: 1987,
-      desc: 'Accolade\'s supercar driving',
-      iaItem: 'c64_Test_Drive' },
-    { name: 'Out Run',              icon: '🌴', category: 'Racing',     year: 1988,
-      desc: 'Sega arcade convertible cruiser',
-      iaItem: 'c64_OutRun' },
-    { name: 'Lotus Esprit Turbo Challenge', icon: '🟡', category: 'Racing', year: 1990,
-      desc: 'Magnetic Fields/Gremlin racer',
-      iaItem: 'c64_Lotus_Esprit_Turbo_Challenge' },
-
-    // === Puzzle =============================================================
-    { name: 'Tetris',               icon: '🟦', category: 'Puzzle',     year: 1988,
-      desc: 'Mirrorsoft / Spectrum Holobyte port',
-      iaItem: 'c64_Tetris' },
-    { name: 'Lemmings',             icon: '🐹', category: 'Puzzle',     year: 1991,
-      desc: 'DMA Design\'s green-haired suicide squad',
-      iaItem: 'c64_Lemmings' },
-    { name: 'The Sentinel',         icon: '👁️', category: 'Puzzle',     year: 1987,
-      desc: 'Geoff Crammond\'s 3D strategy puzzle',
-      iaItem: 'c64_The_Sentinel' },
-    { name: 'The Castles of Dr. Creep', icon: '🏰', category: 'Puzzle', year: 1984,
-      desc: 'Broderbund trap-laden mansion',
-      iaItem: 'c64_The_Castles_of_Dr_Creep' },
-    { name: 'Stunt Car Racer',      icon: '🎢', category: 'Puzzle',     year: 1989,
-      desc: 'Geoff Crammond rollercoaster racer',
-      iaItem: 'c64_Stunt_Car_Racer' },
-
-    // === Demoscene (legally released by the authors) ========================
-    { name: 'Booze Design — Edge of Disgrace', icon: '✨', category: 'Demoscene', year: 2008,
-      desc: 'One of the most acclaimed C64 demos ever',
+    // === Demoscene (experimental — proxied through IA, may not resolve) ====
+    { name: 'Edge of Disgrace', icon: '✨', category: 'Demoscene', year: 2008,
+      desc: 'Booze Design — acclaimed late-era demo',
       iaItem: 'c64_demo_edge_of_disgrace' },
-    { name: 'Crest — Deus Ex Machina', icon: '🌀', category: 'Demoscene', year: 2000,
-      desc: 'Classic Crest demoscene release',
-      iaItem: 'c64_demo_deus_ex_machina' },
-    { name: 'Censor Design — Comaland 100%', icon: '🌈', category: 'Demoscene', year: 2014,
-      desc: 'Multi-part demo, Datastorm winner',
+    { name: 'Comaland 100%', icon: '🌈', category: 'Demoscene', year: 2014,
+      desc: 'Censor Design — Datastorm winner',
       iaItem: 'c64_demo_comaland_100' },
-    { name: 'Oxyron — One-der',     icon: '🎇', category: 'Demoscene', year: 2017,
-      desc: 'Oxyron raster-bar wizardry',
-      iaItem: 'c64_demo_oneder' },
-    { name: 'Algotech',             icon: '🧪', category: 'Demoscene', year: 2014,
-      desc: 'Algorithm-driven demo techniques',
-      iaItem: 'c64_demo_algotech' },
 
-    // === Modern Homebrew (released as freeware by the authors) ==============
-    { name: '8-Bit Slicks (Demo)',  icon: '🏎️', category: 'Homebrew',  year: 2018,
-      desc: 'Multiplayer top-down racer — RGCD',
-      iaItem: 'c64_homebrew_8bit_slicks' },
-    { name: 'Aviator Arcade II',    icon: '✈️', category: 'Homebrew',  year: 2020,
-      desc: 'Single-screen biplane shooter',
-      iaItem: 'c64_homebrew_aviator_arcade_ii' },
-    { name: 'Sam\'s Journey (Demo)', icon: '🧢', category: 'Homebrew', year: 2017,
-      desc: 'Knights of Bytes platform showcase',
-      iaItem: 'c64_homebrew_sams_journey_demo' },
-    { name: 'L\'Abbaye des Morts',  icon: '⛪', category: 'Homebrew',  year: 2017,
-      desc: 'Locomalito ZX Spectrum port to C64',
-      iaItem: 'c64_homebrew_labbaye_des_morts' },
-    { name: 'Galencia',             icon: '🛸', category: 'Homebrew',  year: 2017,
-      desc: 'Protovision\'s polished Galaga-like',
-      iaItem: 'c64_homebrew_galencia' },
-
-    // === Educational ========================================================
-    { name: 'Number Munchers',      icon: '🔢', category: 'Educational', year: 1986,
-      desc: 'MECC math edutainment',
-      iaItem: 'c64_Number_Munchers' },
-    { name: 'Word Munchers',        icon: '📚', category: 'Educational', year: 1985,
-      desc: 'MECC vocabulary version',
-      iaItem: 'c64_Word_Munchers' },
-    { name: 'Math Blaster!',        icon: '🧮', category: 'Educational', year: 1987,
-      desc: 'Davidson & Associates math drills',
-      iaItem: 'c64_Math_Blaster' },
-
-    // === Tools / Productivity ===============================================
-    { name: 'Commodore BASIC (built-in)', icon: '⌨️', category: 'Tools', year: 1982,
+    // === Tools ===========================================================
+    { name: 'Commodore BASIC (no disk)', icon: '⌨️', category: 'Tools', year: 1982,
       desc: 'Boot to the famous "READY." prompt',
       url: '' /* empty URL sentinel = boot machine with no media */ },
-    { name: 'GEOS',                 icon: '🖱️', category: 'Tools',     year: 1986,
-      desc: 'Berkeley Softworks\' GUI for C64',
-      iaItem: 'c64_GEOS' },
-    { name: 'Print Shop',           icon: '🖨️', category: 'Tools',     year: 1984,
-      desc: 'Broderbund\'s banner/card maker',
-      iaItem: 'c64_The_Print_Shop' },
 ];
 
 const CATEGORY_ORDER = [
     'Arcade',
-    'Platformer',
-    'Shooter',
     'Action',
-    'Adventure',
-    'Text Adventure',
-    'RPG',
-    'Strategy',
-    'Simulation',
-    'Sports',
-    'Fighting',
-    'Racing',
+    'Shooter',
+    'Platformer',
     'Puzzle',
+    'Adventure',
     'Demoscene',
-    'Homebrew',
-    'Educational',
     'Tools',
 ];
 
@@ -651,9 +473,12 @@ class C64 extends AppBase {
                             </div>
                         </div>
                         <div class="c64-splash-hint">
-                            Pick a disk from the <b>Disk</b> dropdown, paste a <code>.d64</code> /
-                            <code>.prg</code> / <code>.crt</code> URL, or click <b>File…</b> to load
-                            from your computer.<br>
+                            48 freeware homebrew titles bundled — pick one from the <b>Disk</b>
+                            dropdown, paste a <code>.d64</code> / <code>.prg</code> / <code>.crt</code>
+                            URL, or click <b>File…</b> to load from your computer.<br>
+                            <a class="c64-splash-link"
+                               href="https://github.com/retrobrews/c64-games" target="_blank"
+                               rel="noopener">Browse the full retrobrews catalog on GitHub →</a><br>
                             <span class="c64-splash-credit">Powered by <b>EmulatorJS</b> / <b>VICE</b> — WebAssembly.</span>
                         </div>
                     </div>

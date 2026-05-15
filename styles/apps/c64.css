@@ -222,6 +222,18 @@
     opacity: 0.7;
 }
 
+.c64-splash-link {
+    display: inline-block;
+    margin-top: 8px;
+    color: #c8c8ff;
+    text-decoration: underline;
+    font-size: 12px;
+}
+
+.c64-splash-link:hover {
+    color: #fff;
+}
+
 /* ── EmulatorJS Stage / Root ─────────────── */
 
 /* A fresh `.c64-root` is mounted into the stage per emulator session
