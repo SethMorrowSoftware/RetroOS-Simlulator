@@ -7,9 +7,9 @@
  * fetches at startup to populate a "Local Library" section in the
  * dropdown.
  *
- * Drop files (`.cmd`, `.cas`, `.wav`, `.dsk`, `.jv1`, `.jv3`, `.dmk`,
- * `.bas`, `.bin`, `.zip`) into `assets/trs80/local/` and they show
- * up automatically — no rebuild, no code changes.
+ * Drop files (`.cmd`, `.bas`, `.cas`, `.dsk`, `.jv1`, `.jv3`, `.dmk`)
+ * into `assets/trs80/local/` and they show up automatically — no
+ * rebuild, no code changes.
  *
  * Optional metadata sidecar: alongside `mygame.dsk`, drop a
  * `mygame.json` with `{ "name", "year", "desc", "icon", "category" }`.
@@ -47,7 +47,10 @@ if ($projectRoot && strpos($localDir, $projectRoot) !== 0) {
     exit;
 }
 
-$ALLOWED_EXTS = ['cmd', 'cas', 'wav', 'dsk', 'jv1', 'jv3', 'dmk', 'bas', 'bin', 'zip'];
+// Kept in sync with the formats apps/TRS80.js can actually decode. `.wav`
+// (raw cassette audio) and `.zip` are intentionally absent — the emulator
+// decodes raw images, it neither demodulates audio nor unpacks archives.
+$ALLOWED_EXTS = ['cmd', 'bas', 'cas', 'dsk', 'jv1', 'jv3', 'dmk'];
 
 $entries = [];
 $dh = @opendir($localDir);

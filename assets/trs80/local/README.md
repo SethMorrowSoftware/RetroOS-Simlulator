@@ -11,10 +11,13 @@ no rebuild, no code changes, no restart.
 |---|---|---|
 | Floppy disk image | `.dsk` `.jv1` `.jv3` `.dmk` | Mounted on drive 0; machine reboots into it |
 | Command file | `.cmd` | Loaded into memory and executed |
-| BASIC program | `.bas` | Tokenised BASIC |
-| Raw binary | `.bin` | Raw Z80 image |
-| Cassette image | `.cas` `.wav` | (cassette playback wiring is a follow-up) |
-| Archive | `.zip` | Auto-unpacked by the engine when supported |
+| BASIC program | `.bas` | Tokenised or ASCII BASIC |
+| Cassette image | `.cas` | The first program on the tape is loaded and run |
+
+The format is detected from the file contents, so the extension only has
+to be one the scanner accepts. `.wav` (raw cassette audio) and `.zip`
+archives are **not** supported — the emulator decodes raw images, it does
+not demodulate audio or unpack archives.
 
 ## How discovery works
 
@@ -63,16 +66,18 @@ For freely-redistributable programs, the
 [Ira Goldklang's TRS-80 archive](https://www.trs-80.com/wordpress/) are
 good starting points.
 
-## Why local + URL bar?
+## Where the rest of the library comes from
 
-Unlike the C64 (where retrobrews maintains a curated GitHub-hosted
-freeware collection), the TRS-80 doesn't have a single canonical
-CORS-friendly CDN. The app ships with the BASIC "boot to READY" entry
-and relies on:
+The **Program** dropdown is populated from three sources:
 
 1. **Local (this directory)** — host-supplied programs, served same-origin.
-2. **URL bar** — paste any CORS-friendly download URL.
-3. **File…** — pick a file from your own machine via Blob URL.
+   The fastest path: no CORS hop, no proxy round-trip.
+2. **Curated titles** — classic TRS-80 software resolved on demand from the
+   Internet Archive. Those downloads are streamed through the CORS proxy at
+   `api/trs80-proxy.php` (archive.org's headers aren't reliable for
+   third-party browser embeds), exactly like the C64 / DOSBox apps.
+3. **URL bar / File…** — paste any download URL, or pick a file from your
+   own machine via a Blob URL.
 
-Adding a curated bundled library is a follow-up — please contribute
-known-redistributable URLs upstream if you find good ones.
+Drop your own preservation backups in this directory to give them top
+billing — the "Local Library" group sorts to the top of the dropdown.
