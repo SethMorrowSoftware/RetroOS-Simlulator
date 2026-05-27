@@ -1163,32 +1163,59 @@ class C64 extends AppBase {
             return this._iaResolveInFlight.get(cacheKey);
         }
 
-        const directSearchUrl =
-            'https://archive.org/advancedsearch.php' +
-            '?q=' + encodeURIComponent(query) +
-            '&fl[]=identifier&fl[]=title&fl[]=mediatype' +
-            '&rows=5&page=1&output=json';
-        const fetchUrl = this.getLoadUrl(directSearchUrl);
+        // Build a fallback chain: the original (strict) query first, then
+        // the same query with the `collection:softwarelibrary_c64_games`
+        // filter relaxed, then a bare-title C64-flavored fuzzy search. IA's
+        // collection assignments shifted over the years — many items have
+        // moved to `c64_apple_etc`, `cd-roms_software`, or unfiltered
+        // mediatype:software, so the narrow original query 0-hits even when
+        // the item is sitting in IA.
+        const queries = [query];
+        const noCollection = query
+            .replace(/\s+AND\s+collection:\S+/ig, '')
+            .replace(/\s+AND\s+mediatype:\w+/ig, '')
+            .trim();
+        if (noCollection && noCollection !== query) queries.push(noCollection);
+        const titleMatch = query.match(/title:\(([^)]+)\)|title:"([^"]+)"|title:(\S+)/i);
+        if (titleMatch) {
+            const bare = (titleMatch[1] || titleMatch[2] || titleMatch[3] || '')
+                .replace(/^"|"$/g, '').replace(/\s+OR\s+/i, ' ').trim();
+            if (bare) queries.push('"' + bare + '" commodore 64');
+        }
 
         const promise = (async () => {
-            const res = await fetch(fetchUrl, { credentials: 'omit' });
-            if (!res.ok) {
-                throw new Error(`IA search HTTP ${res.status} for "${displayName}"`);
+            let lastErr = null;
+            for (const q of queries) {
+                const url = 'https://archive.org/advancedsearch.php' +
+                    '?q=' + encodeURIComponent(q) +
+                    '&fl[]=identifier&fl[]=title&fl[]=mediatype' +
+                    '&rows=5&page=1&output=json';
+                try {
+                    const res = await fetch(this.getLoadUrl(url), { credentials: 'omit' });
+                    if (!res.ok) {
+                        lastErr = new Error(`IA search HTTP ${res.status} for "${displayName}"`);
+                        continue;
+                    }
+                    const data = await res.json();
+                    const docs = data?.response?.docs;
+                    if (!Array.isArray(docs) || docs.length === 0) {
+                        lastErr = new Error(`IA search returned no results for "${displayName}"`);
+                        continue;
+                    }
+                    const softwareHit = docs.find(d => d.mediatype === 'software');
+                    const pick = softwareHit || docs[0];
+                    const itemId = pick?.identifier;
+                    if (typeof itemId !== 'string' || !itemId) {
+                        lastErr = new Error(`IA search result missing identifier for "${displayName}"`);
+                        continue;
+                    }
+                    this._iaUrlCache.set(cacheKey, itemId);
+                    return itemId;
+                } catch (err) {
+                    lastErr = err;
+                }
             }
-            const data = await res.json();
-            const docs = data?.response?.docs;
-            if (!Array.isArray(docs) || docs.length === 0) {
-                throw new Error(`IA search returned no results for "${displayName}"`);
-            }
-            // Prefer software-mediatype results, fall back to the top hit.
-            const softwareHit = docs.find(d => d.mediatype === 'software');
-            const pick = softwareHit || docs[0];
-            const itemId = pick?.identifier;
-            if (typeof itemId !== 'string' || !itemId) {
-                throw new Error(`IA search result missing identifier for "${displayName}"`);
-            }
-            this._iaUrlCache.set(cacheKey, itemId);
-            return itemId;
+            throw lastErr || new Error(`IA search exhausted all fallbacks for "${displayName}"`);
         })().finally(() => {
             this._iaResolveInFlight.delete(cacheKey);
         });

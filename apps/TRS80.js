@@ -46,16 +46,33 @@ import { escapeHtml } from '../core/Sanitize.js';
  */
 const TRS80_PKG_VERSION = '2.3.1';
 /**
- * esm.sh URLs with `?bundle` so the CDN inlines transitive deps (z80-emulator,
- * strongly-typed-events, base64-js, etc.) into one module. Without ?bundle,
- * esm.sh emits import statements that resolve to its `/stable/` paths — any
- * one of which can fail with an opaque error and bring the whole load down
- * with no useful diagnostics. Bundling is slightly more bytes but FAR more
- * reliable for legacy (now-deprecated on npm) packages like this one.
+ * CDN strategy for the three trs80-* packages.
+ *
+ * trs80-emulator@2.3.1 was published in Jan 2022, is now deprecated on npm,
+ * and depends on `strongly-typed-events@^1.7.3` — which pulls in the
+ * `ste-core` / `ste-events` / `ste-simple-events` / `ste-signals` family.
+ * Those packages have since published incompatible 3.x majors that
+ * restructured their internal paths (no more `dist/dispatching.js` etc.).
+ * esm.sh resolves transitive deps to "latest" by default, so a bare
+ * `https://esm.sh/trs80-emulator@2.3.1` cascades into 404s on
+ * `ste-core/dist/dispatching?target=es2022` and friends. `?bundle` alone
+ * doesn't help — esm.sh's bundler still chases the wrong resolved versions.
+ *
+ * Primary fix: jsDelivr's `/+esm` endpoint runs the published npm tarball
+ * through esbuild and inlines every transitive dep at the *original*
+ * package.json's declared version. One URL → one self-contained module,
+ * no runtime re-resolution.
+ *
+ * Fallback: esm.sh with explicit `?deps=` pins for the strongly-typed-events
+ * family, plus `?bundle`. Used only if jsDelivr is unreachable.
  */
-const TRS80_EMU_URL  = `https://esm.sh/trs80-emulator@${TRS80_PKG_VERSION}?bundle`;
-const TRS80_WEB_URL  = `https://esm.sh/trs80-emulator-web@${TRS80_PKG_VERSION}?bundle`;
-const TRS80_BASE_URL = `https://esm.sh/trs80-base@${TRS80_PKG_VERSION}?bundle`;
+const ESM_DEP_PINS = 'strongly-typed-events@1.7.3,ste-core@1.7.3,ste-events@1.7.3,ste-simple-events@1.7.3,ste-signals@1.7.3';
+const _jsd = (pkg) => `https://cdn.jsdelivr.net/npm/${pkg}@${TRS80_PKG_VERSION}/+esm`;
+const _esm = (pkg) => `https://esm.sh/${pkg}@${TRS80_PKG_VERSION}?bundle&deps=${encodeURIComponent(ESM_DEP_PINS)}`;
+
+const TRS80_EMU_URLS  = [_jsd('trs80-emulator'),     _esm('trs80-emulator')];
+const TRS80_WEB_URLS  = [_jsd('trs80-emulator-web'), _esm('trs80-emulator-web')];
+const TRS80_BASE_URLS = [_jsd('trs80-base'),         _esm('trs80-base')];
 
 /** Internal pixel scale of the CanvasScreen bitmap (CSS scales it to fit). */
 const SCREEN_SCALE = 2;
@@ -536,32 +553,43 @@ class TRS80 extends AppBase {
         if (this._modulesPromise) return this._modulesPromise;
         this.setStatus('Loading TRS-80 emulator engine from CDN…');
 
-        // Hint the browser to start the connection early.
-        if (!document.querySelector('link[data-trs80-preconnect="1"]')) {
+        // Hint the browser to start connections for both CDNs early.
+        const preconnect = (host) => {
+            const sel = `link[data-trs80-preconnect="${host}"]`;
+            if (document.querySelector(sel)) return;
             const link = document.createElement('link');
             link.rel = 'preconnect';
-            link.href = 'https://esm.sh';
+            link.href = host;
             link.crossOrigin = 'anonymous';
-            link.dataset.trs80Preconnect = '1';
+            link.dataset.trs80Preconnect = host;
             document.head.appendChild(link);
-        }
+        };
+        preconnect('https://cdn.jsdelivr.net');
+        preconnect('https://esm.sh');
 
         this._modulesPromise = (async () => {
-            // Import each package separately so a failure tells us WHICH
-            // package broke instead of a generic Promise.all rejection that
-            // can come back with an empty message and leave the user staring
-            // at "Failed to start:".
-            const safeImport = async (url, label) => {
-                try {
-                    return await import(url);
-                } catch (err) {
-                    const msg = err?.message || String(err) || 'unknown error';
-                    throw new Error(`Failed to load ${label} from ${url}: ${msg}`);
+            // Try each candidate URL in order; first one that imports wins.
+            // jsDelivr's `+esm` is the primary path because it bundles the
+            // tarball with its original deps; esm.sh is the fallback.
+            const safeImport = async (urls, label) => {
+                const errors = [];
+                for (const url of urls) {
+                    try {
+                        return await import(url);
+                    } catch (err) {
+                        const msg = err?.message || String(err) || 'unknown error';
+                        console.warn(`[TRS-80] ${label} failed from ${url}: ${msg}`);
+                        errors.push(`${url}: ${msg}`);
+                    }
                 }
+                throw new Error(
+                    `Failed to load ${label} from any CDN.\n` +
+                    errors.map(e => '  • ' + e).join('\n')
+                );
             };
-            const emu  = await safeImport(TRS80_EMU_URL,  'trs80-emulator');
-            const web  = await safeImport(TRS80_WEB_URL,  'trs80-emulator-web');
-            const base = await safeImport(TRS80_BASE_URL, 'trs80-base');
+            const emu  = await safeImport(TRS80_EMU_URLS,  'trs80-emulator');
+            const web  = await safeImport(TRS80_WEB_URLS,  'trs80-emulator-web');
+            const base = await safeImport(TRS80_BASE_URLS, 'trs80-base');
 
             // WebSoundPlayer is re-exported from the trs80-emulator-web index
             // (verified against the v2.3.1 source). If a future build drops
@@ -707,24 +735,55 @@ class TRS80 extends AppBase {
             '&rows=5&page=1&output=json';
         const fetchUrl = this.getLoadUrl(directSearchUrl);
 
+        // Build a fallback chain: the original (strict) query first, then the
+        // same query with `AND mediatype:software` stripped, then a final
+        // bare-title fuzzy search. IA's catalogue has shifted over the years
+        // — many TRS-80 items live under `mediatype:texts` (manual scans
+        // bundled with software) or have only their title indexed without a
+        // strict mediatype, so the narrow original query returns 0 hits
+        // even when the item is sitting right there.
+        const queries = [query];
+        const stripped = query.replace(/\s+AND\s+mediatype:\w+/ig, '').trim();
+        if (stripped && stripped !== query) queries.push(stripped);
+        const titleMatch = query.match(/title:"([^"]+)"|title:(\S+)/i);
+        if (titleMatch) {
+            const bare = (titleMatch[1] || titleMatch[2] || '').trim();
+            if (bare) queries.push('"' + bare + '" trs-80');
+        }
+
         const promise = (async () => {
-            const res = await fetch(fetchUrl, { credentials: 'omit' });
-            if (!res.ok) {
-                throw new Error(`IA search HTTP ${res.status} for "${displayName}"`);
+            let lastErr = null;
+            for (const q of queries) {
+                const url = 'https://archive.org/advancedsearch.php' +
+                    '?q=' + encodeURIComponent(q) +
+                    '&fl[]=identifier&fl[]=title&fl[]=mediatype' +
+                    '&rows=5&page=1&output=json';
+                try {
+                    const res = await fetch(this.getLoadUrl(url), { credentials: 'omit' });
+                    if (!res.ok) {
+                        lastErr = new Error(`IA search HTTP ${res.status} for "${displayName}"`);
+                        continue;
+                    }
+                    const data = await res.json();
+                    const docs = data?.response?.docs;
+                    if (!Array.isArray(docs) || docs.length === 0) {
+                        lastErr = new Error(`IA search returned no results for "${displayName}"`);
+                        continue;
+                    }
+                    const softwareHit = docs.find(d => d.mediatype === 'software');
+                    const pick = softwareHit || docs[0];
+                    const itemId = pick?.identifier;
+                    if (typeof itemId !== 'string' || !itemId) {
+                        lastErr = new Error(`IA search result missing identifier for "${displayName}"`);
+                        continue;
+                    }
+                    this._iaUrlCache.set(cacheKey, itemId);
+                    return itemId;
+                } catch (err) {
+                    lastErr = err;
+                }
             }
-            const data = await res.json();
-            const docs = data?.response?.docs;
-            if (!Array.isArray(docs) || docs.length === 0) {
-                throw new Error(`IA search returned no results for "${displayName}"`);
-            }
-            const softwareHit = docs.find(d => d.mediatype === 'software');
-            const pick = softwareHit || docs[0];
-            const itemId = pick?.identifier;
-            if (typeof itemId !== 'string' || !itemId) {
-                throw new Error(`IA search result missing identifier for "${displayName}"`);
-            }
-            this._iaUrlCache.set(cacheKey, itemId);
-            return itemId;
+            throw lastErr || new Error(`IA search exhausted all fallbacks for "${displayName}"`);
         })().finally(() => {
             this._iaResolveInFlight.delete(cacheKey);
         });
