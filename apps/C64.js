@@ -622,6 +622,7 @@ class C64 extends AppBase {
         this._pagehideHandler = null;   // bound listener so we can remove it on close
         this._loadGeneration = 0;       // monotonically increasing — cancels stale resolves
         this._lastSaveState = null;     // Uint8Array of the most-recent save state (per session)
+        this._prefetchBlobUrl = null;   // Blob URL of the most-recent pre-fetched ROM (revoked on stop)
 
         this.registerCommands();
         this.registerQueries();
@@ -1378,6 +1379,71 @@ class C64 extends AppBase {
     }
 
     /**
+     * Pre-fetch a ROM URL into a Blob and return a same-origin blob URL, so
+     * EmulatorJS / Emscripten doesn't see CORS or HTML error pages.
+     *
+     * EmulatorJS hands EJS_gameUrl to Emscripten's preloadFile, which fetches
+     * via XHR inside the WASM-instantiated worker. If that fetch returns a
+     * 4xx with an HTML body — which the IA proxy WILL do when an item ID is
+     * stale or the file is missing — the bytes get treated as a ROM and the
+     * libretro core aborts with "RuntimeError: Aborted(undefined)", giving
+     * the user a black screen and a useless stack.
+     *
+     * Pre-fetching gives us a chance to sanity-check before the WASM ever
+     * sees the bytes: 4xx/5xx becomes a real error message; HTML responses
+     * are rejected as not-a-ROM; empty bodies are rejected too. Successful
+     * fetches become a blob URL that's same-origin to us, so EmulatorJS
+     * loads it without any CORS dance.
+     *
+     * @private
+     * @param {string} originalUrl - The user-facing URL (will be passed through getLoadUrl)
+     * @param {string} displayName
+     * @param {(text:string)=>void} [onProgress]
+     * @returns {Promise<string>} A blob: URL ready to hand to EmulatorJS
+     */
+    async _prefetchRomToBlob(originalUrl, displayName, onProgress) {
+        // Local schemes are already same-origin / in-memory — nothing to do.
+        if (originalUrl.startsWith('blob:') || originalUrl.startsWith('data:')) {
+            return originalUrl;
+        }
+        const fetchUrl = this.getLoadUrl(originalUrl);
+        onProgress?.(`Downloading "${displayName}"…`);
+
+        let res;
+        try {
+            res = await fetch(fetchUrl, { credentials: 'omit' });
+        } catch (e) {
+            throw new Error(`Network error fetching "${displayName}": ${e?.message || e}`);
+        }
+        if (!res.ok) {
+            // Try to read the proxy's text error body for a useful message.
+            let detail = '';
+            try { detail = (await res.text()).slice(0, 200); } catch { /* ignore */ }
+            throw new Error(
+                `HTTP ${res.status} ${res.statusText || ''} fetching "${displayName}"` +
+                (detail ? ` — ${detail}` : '')
+            );
+        }
+        const ct = (res.headers.get('content-type') || '').toLowerCase();
+        // The proxy is supposed to forward the upstream content-type. If it
+        // comes back as text/html the upstream sent an error page and the
+        // file we wanted isn't there. (Don't bounce on text/plain — GitHub
+        // raw serves .prg as text/plain even though the bytes are binary.)
+        if (ct.startsWith('text/html')) {
+            throw new Error(
+                `"${displayName}" upstream returned ${ct} (expected a disk image). ` +
+                `The Internet Archive item may have been renamed.`
+            );
+        }
+        const buf = await res.arrayBuffer();
+        if (buf.byteLength < 32) {
+            throw new Error(`"${displayName}" downloaded ${buf.byteLength} bytes — not a ROM.`);
+        }
+        const blob = new Blob([buf], { type: ct || 'application/octet-stream' });
+        return URL.createObjectURL(blob);
+    }
+
+    /**
      * Stop any running instance, then start a fresh one with the given URL.
      * @private
      */
@@ -1420,6 +1486,21 @@ class C64 extends AppBase {
             this.updateButtons(true);
             this.setStatus('Starting: ' + displayName);
 
+            // Pre-fetch the ROM into a same-origin blob URL so EmulatorJS
+            // never sees a CORS hop, HTML error page, or 4xx — all of which
+            // make the libretro core abort with no useful diagnostic. This
+            // is the single biggest reliability win for "Aborted(undefined)"
+            // crashes from IA-resolved entries.
+            let emulatorUrl = '';
+            if (url) {
+                if (loadingText) loadingText.textContent = `Downloading "${displayName}"…`;
+                emulatorUrl = await this._prefetchRomToBlob(url, displayName, (text) => {
+                    if (loadingText) loadingText.textContent = text;
+                    this.setStatus(text);
+                });
+                this._prefetchBlobUrl = emulatorUrl; // tracked for revocation on stop
+            }
+
             if (loadingText) loadingText.textContent = 'Booting C64…';
 
             // Watchdog — if the emulator never signals ready in 60 s,
@@ -1433,10 +1514,12 @@ class C64 extends AppBase {
             }, 60000);
 
             // Configure EmulatorJS via globals + inject loader.js. The
-            // loader reads `window.EJS_*` at script-execute time.
+            // loader reads `window.EJS_*` at script-execute time. We hand it
+            // the pre-fetched blob URL (or empty for boot-to-BASIC) so its
+            // internal fetch is a local Blob read, never a cross-origin one.
             this._configureEmulatorJSGlobals({
                 playerSelector: `#${root.id}`,
-                gameUrl: url,
+                gameUrl: emulatorUrl,
                 gameName: displayName,
                 onReady: () => this._handleEmulatorReady()
             });
@@ -1447,15 +1530,32 @@ class C64 extends AppBase {
 
             this.emitAppEvent('started', { url, name: displayName });
         } catch (err) {
+            const reason = err?.message || String(err) || 'Unknown error';
             console.error('[C64] Failed to start emulator:', err);
-            this.setStatus('Error: ' + (err?.message || err));
+            this.setStatus('Error: ' + reason);
             if (loading) loading.style.display = 'none';
-            if (stage) stage.style.display = 'none';
-            if (splash) splash.style.display = 'flex';
+            this._showError(
+                `Couldn't start "${displayName}"`,
+                [
+                    `Reason: ${reason}`,
+                    url
+                        ? 'The ROM may be unavailable upstream, or the proxy returned an error page.'
+                        : 'EmulatorJS failed to initialise.',
+                    'Try another title, paste a URL above, or click "File…" to load a local .d64.',
+                ],
+                url
+                    ? { iaSearchUrl: 'https://archive.org/search?query=' + encodeURIComponent(displayName + ' commodore 64') }
+                    : {}
+            );
+            // Drop the half-attached prefetch blob if we made one.
+            if (this._prefetchBlobUrl) {
+                try { URL.revokeObjectURL(this._prefetchBlobUrl); } catch { /* ignore */ }
+                this._prefetchBlobUrl = null;
+            }
             this.isRunning = false;
             this.isReady = false;
             this.updateButtons(false);
-            this.emitAppEvent('error', { error: err?.message || String(err), url });
+            this.emitAppEvent('error', { error: reason, url });
         }
     }
 
@@ -1482,16 +1582,15 @@ class C64 extends AppBase {
         window.EJS_player = playerSelector;
         window.EJS_core = C64_CORE;
         window.EJS_pathtodata = EJS_DATA_PATH;
-        // Route the ROM through our CORS proxy if the upstream host needs
-        // it (matches DOSBox.getLoadUrl in apps/DOSBox.js).
-        // When no URL is supplied, clear EJS_gameUrl entirely — setting
-        // it to an empty string makes EmulatorJS try to fetch "" and
-        // silently fail before anything visible happens. Clearing the
-        // global tells EmulatorJS to boot the machine with no media,
-        // which on C64 lands at the "READY." BASIC prompt.
-        const fetchableUrl = gameUrl ? this.getLoadUrl(gameUrl) : '';
-        if (fetchableUrl) {
-            window.EJS_gameUrl = fetchableUrl;
+        // gameUrl is already a same-origin blob: URL (or '' for boot-to-BASIC)
+        // because `_startEmulatorWith` pre-fetches via `_prefetchRomToBlob`.
+        // When no URL is supplied, clear EJS_gameUrl entirely — setting it to
+        // an empty string makes EmulatorJS try to fetch "" and silently fail
+        // before anything visible happens. Clearing the global tells
+        // EmulatorJS to boot the machine with no media, which on C64 lands
+        // at the "READY." BASIC prompt.
+        if (gameUrl) {
+            window.EJS_gameUrl = gameUrl;
         } else {
             try { delete window.EJS_gameUrl; } catch { /* ignore */ }
         }
@@ -1658,6 +1757,12 @@ class C64 extends AppBase {
         if (this.activeBlobUrl && this.currentRom === this.activeBlobUrl) {
             URL.revokeObjectURL(this.activeBlobUrl);
             this.activeBlobUrl = null;
+        }
+        // Revoke the pre-fetch blob too — it was bytes we created on this
+        // launch, kept alive only so EmulatorJS could read it.
+        if (this._prefetchBlobUrl) {
+            try { URL.revokeObjectURL(this._prefetchBlobUrl); } catch { /* ignore */ }
+            this._prefetchBlobUrl = null;
         }
 
         this.isRunning = false;

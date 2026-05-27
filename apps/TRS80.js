@@ -45,16 +45,17 @@ import { escapeHtml } from '../core/Sanitize.js';
  * Bump deliberately and re-test against the real API surface.
  */
 const TRS80_PKG_VERSION = '2.3.1';
-const TRS80_EMU_URL  = `https://esm.sh/trs80-emulator@${TRS80_PKG_VERSION}`;
-const TRS80_WEB_URL  = `https://esm.sh/trs80-emulator-web@${TRS80_PKG_VERSION}`;
-const TRS80_BASE_URL = `https://esm.sh/trs80-base@${TRS80_PKG_VERSION}`;
 /**
- * WebSoundPlayer ships inside trs80-emulator-web but (as of 2.3.1) is not
- * re-exported from the package index, so it has to be deep-imported by
- * file path. If the deep import ever fails we fall back to the always-
- * exported SilentSoundPlayer — the emulator still runs, just muted.
+ * esm.sh URLs with `?bundle` so the CDN inlines transitive deps (z80-emulator,
+ * strongly-typed-events, base64-js, etc.) into one module. Without ?bundle,
+ * esm.sh emits import statements that resolve to its `/stable/` paths — any
+ * one of which can fail with an opaque error and bring the whole load down
+ * with no useful diagnostics. Bundling is slightly more bytes but FAR more
+ * reliable for legacy (now-deprecated on npm) packages like this one.
  */
-const TRS80_SOUND_URL = `https://esm.sh/trs80-emulator-web@${TRS80_PKG_VERSION}/dist/WebSoundPlayer.js`;
+const TRS80_EMU_URL  = `https://esm.sh/trs80-emulator@${TRS80_PKG_VERSION}?bundle`;
+const TRS80_WEB_URL  = `https://esm.sh/trs80-emulator-web@${TRS80_PKG_VERSION}?bundle`;
+const TRS80_BASE_URL = `https://esm.sh/trs80-base@${TRS80_PKG_VERSION}?bundle`;
 
 /** Internal pixel scale of the CanvasScreen bitmap (CSS scales it to fit). */
 const SCREEN_SCALE = 2;
@@ -546,18 +547,29 @@ class TRS80 extends AppBase {
         }
 
         this._modulesPromise = (async () => {
-            const [emu, web, base] = await Promise.all([
-                import(TRS80_EMU_URL),
-                import(TRS80_WEB_URL),
-                import(TRS80_BASE_URL),
-            ]);
-            // WebSoundPlayer is optional — never let it block the engine.
-            let WebSoundPlayerClass = null;
-            try {
-                const soundMod = await import(TRS80_SOUND_URL);
-                WebSoundPlayerClass = soundMod.WebSoundPlayer || soundMod.default || null;
-            } catch (err) {
-                console.warn('[TRS-80] WebSoundPlayer deep import failed — running silent:', err);
+            // Import each package separately so a failure tells us WHICH
+            // package broke instead of a generic Promise.all rejection that
+            // can come back with an empty message and leave the user staring
+            // at "Failed to start:".
+            const safeImport = async (url, label) => {
+                try {
+                    return await import(url);
+                } catch (err) {
+                    const msg = err?.message || String(err) || 'unknown error';
+                    throw new Error(`Failed to load ${label} from ${url}: ${msg}`);
+                }
+            };
+            const emu  = await safeImport(TRS80_EMU_URL,  'trs80-emulator');
+            const web  = await safeImport(TRS80_WEB_URL,  'trs80-emulator-web');
+            const base = await safeImport(TRS80_BASE_URL, 'trs80-base');
+
+            // WebSoundPlayer is re-exported from the trs80-emulator-web index
+            // (verified against the v2.3.1 source). If a future build drops
+            // it, we fall back to SilentSoundPlayer — the emulator still
+            // runs, just silent.
+            const WebSoundPlayerClass = web?.WebSoundPlayer || null;
+            if (!WebSoundPlayerClass) {
+                console.warn('[TRS-80] WebSoundPlayer not found in trs80-emulator-web — running silent.');
             }
             this._modules = { emu, web, base, WebSoundPlayerClass };
             return this._modules;
@@ -566,6 +578,21 @@ class TRS80 extends AppBase {
             throw err;
         });
         return this._modulesPromise;
+    }
+
+    /**
+     * Stringify an unknown error value for user-facing messages. The catch
+     * block in `_startEmulatorWith` used to do `err?.message || err` and
+     * render `Error: ` (empty trailing) when something threw `''`, null,
+     * undefined, or a plain string. This handles all of those.
+     * @private
+     */
+    _errToText(err) {
+        if (err == null) return 'Unknown error (no detail available)';
+        if (typeof err === 'string') return err || 'Unknown error (empty)';
+        if (err.message) return err.message;
+        if (err.stack)   return String(err.stack).split('\n')[0];
+        try { return JSON.stringify(err); } catch { return String(err); }
     }
 
     // ── Core Methods ──────────────────────────────────────────
@@ -635,13 +662,14 @@ class TRS80 extends AppBase {
             await this.loadGame(url, displayName);
         } catch (err) {
             if (generation !== this._loadGeneration) return;
+            const reason = this._errToText(err);
             console.error('[TRS-80] IA resolve failed for', entry.iaItem || entry.iaSearch, '→', err);
             const iaSearchUrl = 'https://archive.org/search?query=' +
                 encodeURIComponent(displayName + ' TRS-80');
             this._showError(
                 `Couldn't load "${displayName}" from the Internet Archive.`,
                 [
-                    `Reason: ${err?.message || err}`,
+                    `Reason: ${reason}`,
                     entry.iaItem
                         ? `The IA item "${entry.iaItem}" may have been renamed or removed.`
                         : 'The IA search for this title returned no usable item.',
@@ -649,9 +677,9 @@ class TRS80 extends AppBase {
                 ],
                 { iaSearchUrl }
             );
-            this.setStatus('Failed: ' + (err?.message || err));
+            this.setStatus('Failed: ' + reason);
             this.emitAppEvent('error', {
-                error: err?.message || String(err),
+                error: reason,
                 iaItem: entry.iaItem, iaSearch: entry.iaSearch, name: displayName,
             });
         }
@@ -907,20 +935,21 @@ class TRS80 extends AppBase {
             this.emitAppEvent('ready',   { name: displayName });
         } catch (err) {
             if (generation !== this._loadGeneration) return;
-            console.error('[TRS-80] Failed to start:', err);
+            const reason = this._errToText(err);
+            console.error('[TRS-80] Failed to start:', err || '(no error object)');
             this._showError(
                 'Failed to start the TRS-80 emulator',
                 [
-                    `Reason: ${err?.message || err}`,
+                    `Reason: ${reason}`,
                     'If this is a URL load, the host may be blocking cross-origin requests.',
                     'Check the browser console for the full stack.',
                 ]
             );
-            this.setStatus('Error: ' + (err?.message || err));
+            this.setStatus('Error: ' + reason);
             this.isRunning = false;
             this.isReady = false;
             this.updateButtons(false);
-            this.emitAppEvent('error', { error: err?.message || String(err), url });
+            this.emitAppEvent('error', { error: reason, url });
         }
     }
 
