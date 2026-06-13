@@ -10,6 +10,7 @@
 #   3. bash scripts/lint-innerhtml.sh
 #   4. bash scripts/test-retroscript.sh
 #   5. node scripts/check-event-schema-coverage.mjs
+#   6. php scripts/test-websocket-frames.php (RFC 6455 codec regression)
 
 set -uo pipefail
 
@@ -25,7 +26,7 @@ report() {
     fi
 }
 
-section "1/5 JS syntax (node --check)"
+section "1/6 JS syntax (node --check)"
 js_failed=0
 while IFS= read -r -d '' f; do
     if ! node --check "$f" >/dev/null 2>&1; then
@@ -35,7 +36,7 @@ while IFS= read -r -d '' f; do
 done < <(find core apps features ui admin plugins -name '*.js' -not -path '*/node_modules/*' -print0; printf 'index.js\0')
 report "JS syntax check" "$js_failed"
 
-section "2/5 PHP lint"
+section "2/6 PHP lint"
 php_failed=0
 if command -v php >/dev/null 2>&1; then
     while IFS= read -r -d '' f; do
@@ -49,17 +50,26 @@ else
 fi
 report "PHP lint" "$php_failed"
 
-section "3/5 innerHTML sanitize lint"
+section "3/6 innerHTML sanitize lint"
 bash scripts/lint-innerhtml.sh
 report "innerHTML lint" $?
 
-section "4/5 RetroScript tests"
+section "4/6 RetroScript tests"
 bash scripts/test-retroscript.sh
 report "retroscript tests" $?
 
-section "5/5 Event schema coverage"
+section "5/6 Event schema coverage"
 node scripts/check-event-schema-coverage.mjs
 report "schema coverage" $?
+
+section "6/6 WebSocket frame codec"
+if command -v php >/dev/null 2>&1; then
+    php scripts/test-websocket-frames.php
+    report "websocket frame tests" $?
+else
+    echo "  php not installed — skipping (run on a host with PHP)"
+    report "websocket frame tests" 0
+fi
 
 echo
 if [ "$fail" -ne 0 ]; then

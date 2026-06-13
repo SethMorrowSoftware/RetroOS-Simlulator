@@ -384,7 +384,8 @@ class Terminal extends AppBase {
         });
 
         // Delete a file
-        this.registerCommand('deleteFile', (filePath) => {
+        this.registerCommand('deleteFile', (payload) => {
+            const filePath = typeof payload === 'string' ? payload : (payload?.filePath ?? payload?.path);
             try {
                 const resolvedPath = this.resolvePath(filePath);
                 FileSystemManager.deleteFile(resolvedPath);
@@ -396,7 +397,8 @@ class Terminal extends AppBase {
         });
 
         // Check if file exists
-        this.registerCommand('fileExists', (filePath) => {
+        this.registerCommand('fileExists', (payload) => {
+            const filePath = typeof payload === 'string' ? payload : (payload?.filePath ?? payload?.path);
             try {
                 const resolvedPath = this.resolvePath(filePath);
                 const exists = FileSystemManager.exists(resolvedPath);
@@ -407,7 +409,9 @@ class Terminal extends AppBase {
         });
 
         // Launch an application
-        this.registerCommand('launchApp', (appId, params = {}) => {
+        this.registerCommand('launchApp', (payload = {}) => {
+            const appId = typeof payload === 'string' ? payload : payload.appId;
+            const params = (typeof payload === 'object' && payload.params) || {};
             if (!appId) {
                 return { success: false, error: 'App ID required' };
             }

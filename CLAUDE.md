@@ -82,9 +82,10 @@ bash scripts/lint-innerhtml.sh        # Detect unsafe innerHTML usage
 
 ### Aggregated CI gate
 ```bash
-bash scripts/ci-gate.sh                # Runs all 5 gates: JS syntax, PHP lint,
-                                       # innerHTML safety, RetroScript harness,
-                                       # event-schema coverage
+bash scripts/ci-gate.sh                # Runs all 6 gates: JS syntax (incl. admin/
+                                       # + plugins/), PHP lint, innerHTML safety,
+                                       # RetroScript harness, event-schema
+                                       # coverage, WebSocket frame codec tests
 ```
 
 ### Manual validation checklist
