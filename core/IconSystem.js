@@ -526,15 +526,17 @@ export function renderIcon(iconValue, options = {}) {
         return icon(iconValue, options);
     }
 
-    // If it looks like a FA class, use it directly
-    if (iconValue && iconValue.includes('fa-')) {
+    // If it looks like a FA class, use it directly — but only with safe
+    // class characters, and escape the label (attribute context).
+    if (iconValue && iconValue.includes('fa-') && /^[a-zA-Z0-9_ -]+$/.test(iconValue)) {
         const classes = [iconValue, IconConfig.baseClass];
         if (options.class) classes.push(options.class);
-        return `<i class="${classes.join(' ')}" role="img" aria-label="${options.label || 'icon'}"></i>`;
+        return `<i class="${classes.join(' ')}" role="img" aria-label="${escapeHtml(options.label || 'icon')}"></i>`;
     }
 
-    // Fallback to displaying as-is (might be an emoji)
-    return iconValue || '';
+    // Fallback to displaying as-is (might be an emoji) — escaped, since
+    // callers interpolate this return value into innerHTML.
+    return iconValue ? escapeHtml(iconValue) : '';
 }
 
 /**

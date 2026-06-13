@@ -118,9 +118,22 @@ export const systemEvents = {
         description: 'User successfully reauthenticated after an auth:expired prompt (fired by ReauthGate)',
         payload: {
             username: 'string',
+            userUuid: 'string?',
             reason: 'string?'
         },
         example: { username: 'alice', reason: 'session_expired' }
+    },
+
+    'session:relogin': {
+        namespace: 'session',
+        action: 'relogin',
+        description: 'A mid-session login completed (logoff → login screen). The boot module re-wires storage scope, realtime, multiplayer, and presence in response.',
+        payload: {
+            username: 'string',
+            userUuid: 'string?',
+            mode: 'string?'
+        },
+        example: { username: 'alice', mode: 'login' }
     },
 
     // ==========================================

@@ -21,6 +21,10 @@ const ALLOWED_PREFIXES = [
     'C:/Users/User/Videos/',
     'C:/Users/User/Projects/',
     'C:/Users/User/Secret/',
+    // Campaign packages seed narrative content here (CampaignManager
+    // _seedFilesystem) — the writes route through command:fs:* and would
+    // otherwise be silently blocked.
+    'C:/Campaigns/',
     'C:/Windows/',
     'C:/Windows/System32/'
 ];
@@ -40,7 +44,11 @@ export function validateScriptPath(path, { line } = {}) {
     if (/[\x00-\x1f]/.test(path)) {
         throw new RuntimeError('File path contains invalid characters', { line });
     }
-    const normalized = path.replace(/\\/g, '/');
+    let normalized = path.replace(/\\/g, '/');
+    // Normalize the drive designator's case ('c:/x', '/c/x') — media
+    // builtins accept lowercase drives, so file ops should too. The rest
+    // of the path keeps its case (the VFS is case-sensitive).
+    normalized = normalized.replace(/^c:/, 'C:').replace(/^\/c\//, '/C/');
     const segments = normalized.split('/');
     if (segments.some(seg => seg === '..')) {
         throw new RuntimeError(`File path traversal not permitted: ${path}`, { line });

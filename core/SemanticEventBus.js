@@ -152,6 +152,13 @@ class SemanticEventBusClass {
     on(eventName, callback, options = {}) {
         const { priority = this.PRIORITY.NORMAL, once = false } = options;
 
+        // Non-string names must no-op like every other invalid name —
+        // .replace() on undefined would throw instead.
+        if (typeof eventName !== 'string') {
+            console.error(`[SemanticEventBus] Rejected non-string event name in on():`, eventName);
+            return () => {};
+        }
+
         // Guard against prototype-pollution event names
         if (!this._isValidEventName(eventName.replace(/\*/g, '_'))) {
             console.error(`[SemanticEventBus] Rejected invalid event name in on(): "${eventName}"`);

@@ -47,9 +47,79 @@ export class Interpreter {
         this.isRunning = false;
         this.shouldStop = false;
 
+        // Handler-execution safety (see visitOnStatement / visitEmitStatement).
+        // The interpreter keeps its execution context (currentEnv/controlFlow/
+        // returnValue) as instance state, which is only safe for strictly
+        // LIFO-nested execution. These fields enforce that: script-initiated
+        // emits run their handlers inline and AWAIT them, while externally
+        // triggered handlers are serialized behind the running script through
+        // _executionLock so two async bodies never interleave.
+        this._scriptEmitCollector = null; // array while a script `emit` is dispatching
+        this._handlerDepth = 0;           // inline handler nesting (emit-within-handler)
+        this._executionLock = Promise.resolve();
+        this._inFlight = false;           // a locked execution is currently running
+        this._handlerWindowStart = 0;     // rolling 1s window for the invocation breaker
+        this._handlerWindowCount = 0;
+        this._handlerBreakerTripped = false;
+
         // Output callbacks
         this.onOutput = options.onOutput || (() => {});
         this.onError = options.onError || (() => {});
+    }
+
+    /**
+     * Maximum inline handler nesting (emit inside a handler triggering
+     * another handler, recursively). Past this depth the invocation is
+     * dropped with an error — an `on x { emit x }` loop would otherwise
+     * recurse until the JS stack blows.
+     */
+    static get MAX_HANDLER_DEPTH() { return 32; }
+
+    /**
+     * Maximum handler invocations per rolling second. An async emit cascade
+     * (e.g. `on x { emit x count=1 }`) never grows the stack, so the depth
+     * cap can't catch it — this breaker does, by dropping invocations for
+     * the rest of the window, which severs the cascade chain.
+     */
+    static get MAX_HANDLER_RATE() { return 600; }
+
+    /**
+     * Serialize an execution flow behind any currently running one.
+     * Mutual exclusion is what keeps the shared execution-context fields
+     * coherent when async bodies (wait/sleep) are involved.
+     */
+    async _withLock(fn) {
+        const prev = this._executionLock;
+        let release;
+        this._executionLock = new Promise(resolve => { release = resolve; });
+        await prev;
+        try {
+            return await fn();
+        } finally {
+            release();
+        }
+    }
+
+    /**
+     * Rolling-window breaker for handler invocations. Returns false when
+     * this invocation should be dropped.
+     */
+    _handlerRateOk(eventName) {
+        const now = Date.now();
+        if (now - this._handlerWindowStart > 1000) {
+            this._handlerWindowStart = now;
+            this._handlerWindowCount = 0;
+            this._handlerBreakerTripped = false;
+        }
+        this._handlerWindowCount++;
+        if (this._handlerWindowCount > Interpreter.MAX_HANDLER_RATE) {
+            if (!this._handlerBreakerTripped) {
+                this._handlerBreakerTripped = true;
+                this.onError(`Event handler rate limit exceeded (${Interpreter.MAX_HANDLER_RATE}/s) on "${eventName}" — dropping invocations for this window (possible emit loop)`);
+            }
+            return false;
+        }
+        return true;
     }
 
     /**
@@ -59,6 +129,24 @@ export class Interpreter {
      * @returns {*} Result of execution
      */
     async execute(statements, env = null) {
+        // Nested execute() from within the running flow (e.g. a command
+        // handler that runs another script synchronously) is awaited by its
+        // caller, so it nests LIFO-safely and must NOT re-acquire the lock
+        // (that would deadlock). Independent callers serialize.
+        if (this._inFlight) {
+            return this._executeBody(statements, env);
+        }
+        return this._withLock(async () => {
+            this._inFlight = true;
+            try {
+                return await this._executeBody(statements, env);
+            } finally {
+                this._inFlight = false;
+            }
+        });
+    }
+
+    async _executeBody(statements, env = null) {
         const previousEnv = this.currentEnv;
         if (env) {
             this.currentEnv = env;
@@ -223,6 +311,12 @@ export class Interpreter {
         try {
             for (let i = 0; i < iterations; i++) {
                 this.limits.checkTimeout();
+                // Yield a real macrotask periodically so a compute-heavy loop
+                // can't freeze the tab for the whole timeout budget — awaits
+                // on resolved promises only pump the microtask queue.
+                if (i > 0 && i % 250 === 0) {
+                    await new Promise(resolve => setTimeout(resolve, 0));
+                }
                 loopEnv.set('i', i);
 
                 for (const s of stmt.body) {
@@ -265,6 +359,11 @@ export class Interpreter {
                     );
                 }
 
+                // Yield a real macrotask periodically (see visitLoopStatement).
+                if (iterations % 250 === 0) {
+                    await new Promise(resolve => setTimeout(resolve, 0));
+                }
+
                 const condition = await this.visitExpression(stmt.condition);
                 if (!this.isTruthy(condition)) {
                     break;
@@ -304,6 +403,12 @@ export class Interpreter {
                 const array = [...iterableValue];
                 for (let i = 0; i < array.length; i++) {
                     this.limits.checkTimeout();
+                    if (i > 0 && i % 250 === 0) {
+                        await new Promise(resolve => setTimeout(resolve, 0));
+                    }
+                    // Bind the implicit index FIRST so a user loop variable
+                    // named $i wins (it used to be silently clobbered).
+                    loopEnv.set('i', i);
                     if (stmt.valueVarName) {
                         // foreach $index, $value in $array
                         loopEnv.set(stmt.varName, i);
@@ -311,7 +416,6 @@ export class Interpreter {
                     } else {
                         loopEnv.set(stmt.varName, array[i]);
                     }
-                    loopEnv.set('i', i);
 
                     for (const s of stmt.body) {
                         await this.visitStatement(s);
@@ -334,12 +438,16 @@ export class Interpreter {
                 const entries = Object.entries(iterableValue);
                 for (let i = 0; i < entries.length; i++) {
                     this.limits.checkTimeout();
+                    if (i > 0 && i % 250 === 0) {
+                        await new Promise(resolve => setTimeout(resolve, 0));
+                    }
                     const [key, value] = entries[i];
+                    // Implicit index first so a user variable named $i wins.
+                    loopEnv.set('i', i);
                     loopEnv.set(stmt.varName, key);
                     if (stmt.valueVarName) {
                         loopEnv.set(stmt.valueVarName, value);
                     }
-                    loopEnv.set('i', i);
 
                     for (const s of stmt.body) {
                         await this.visitStatement(s);
@@ -406,6 +514,13 @@ export class Interpreter {
                 }
             }
         } catch (error) {
+            // Safety-limit guards are not catchable by scripts — a try/catch
+            // wrapper must not be able to swallow the engine's timeout or
+            // recursion protection.
+            if (error instanceof TimeoutError || error instanceof RecursionError) {
+                throw error;
+            }
+
             // Store error in catch variable
             const catchEnv = this.currentEnv.extend();
             catchEnv.set(stmt.errorVar, error.message || String(error));
@@ -448,7 +563,14 @@ export class Interpreter {
         // Capture the environment at registration time for proper closure behavior
         const closureEnv = this.currentEnv;
 
-        const handler = async (eventData) => {
+        const runBody = async (eventData) => {
+            if (this.shouldStop) return;
+
+            if (this._handlerDepth >= Interpreter.MAX_HANDLER_DEPTH) {
+                this.onError(`Event handler cascade exceeded depth limit (${Interpreter.MAX_HANDLER_DEPTH}) on "${stmt.eventName}" — possible infinite emit loop`);
+                return;
+            }
+
             const handlerEnv = closureEnv.extend();
             handlerEnv.set('event', eventData);
 
@@ -457,22 +579,50 @@ export class Interpreter {
             const savedControlFlow = this.controlFlow;
             const savedReturnValue = this.returnValue;
 
+            // Detached invocations (external events) have no execution clock
+            // running, which used to make checkTimeout() a permanent no-op
+            // inside handler bodies. Give each top-level invocation the same
+            // timeout budget as a script run.
+            const ownsClock = this.limits.executionStartTime === null;
+
+            this._handlerDepth++;
+            if (ownsClock) this.limits.startExecution();
+
             this.currentEnv = handlerEnv;
             this.controlFlow = ControlFlow.NONE;
             this.returnValue = null;
 
             try {
                 for (const s of stmt.body) {
+                    this.limits.checkTimeout();
                     await this.visitStatement(s);
                     if (this.controlFlow !== ControlFlow.NONE) break;
                 }
             } catch (error) {
                 this.onError(error.message);
             } finally {
+                this._handlerDepth--;
+                if (ownsClock) this.limits.stopExecution();
                 // Restore full interpreter state
                 this.currentEnv = savedEnv;
                 this.controlFlow = savedControlFlow;
                 this.returnValue = savedReturnValue;
+            }
+        };
+
+        const handler = (eventData) => {
+            if (!this._handlerRateOk(stmt.eventName)) return;
+
+            if (this._scriptEmitCollector) {
+                // Script-initiated `emit`: run inline. visitEmitStatement
+                // awaits the collected promise, so the save/restore above
+                // nests LIFO and cannot interleave with the emitting script.
+                this._scriptEmitCollector.push(runBody(eventData));
+            } else {
+                // Externally triggered (bus event from outside the script):
+                // serialize behind whatever script/handler is running so an
+                // async body can't clobber the shared execution context.
+                void this._withLock(() => runBody(eventData));
             }
         };
 
@@ -498,7 +648,22 @@ export class Interpreter {
             payload[key] = await this.visitExpression(valueExpr);
         }
 
-        EventBus.emit(stmt.eventName, payload);
+        // Collect script-handler invocations triggered synchronously by this
+        // emit and AWAIT them. Fire-and-forget bodies containing `wait` used
+        // to keep running after emit returned, clobbering the interpreter's
+        // shared execution context when the emitting script continued.
+        const prevCollector = this._scriptEmitCollector;
+        this._scriptEmitCollector = [];
+        let pending;
+        try {
+            EventBus.emit(stmt.eventName, payload);
+        } finally {
+            pending = this._scriptEmitCollector;
+            this._scriptEmitCollector = prevCollector;
+        }
+        for (const p of pending) {
+            await p;
+        }
     }
 
     async visitLaunchStatement(stmt) {
@@ -843,15 +1008,23 @@ export class Interpreter {
     // ==================== EXPRESSION VISITORS ====================
 
     async visitLiteralExpression(expr) {
-        // Interpolate $variables in strings (e.g., "Hello, $name!")
+        // Interpolate $variables in strings (e.g., "Hello, $name!").
+        // A U+0001 sentinel before "$" marks a lexer-escaped \$ — it renders
+        // as a literal dollar and never interpolates.
         if (typeof expr.value === 'string' && expr.value.includes('$')) {
-            return expr.value.replace(/\$([a-zA-Z_][a-zA-Z0-9_]*)/g, (match, varName) => {
+            const interpolated = expr.value.replace(/(\u0001)?\$([a-zA-Z_][a-zA-Z0-9_]*)/g, (match, sentinel, varName) => {
+                if (sentinel) {
+                    return '$' + varName;
+                }
                 if (this.currentEnv.has(varName)) {
                     const val = this.currentEnv.get(varName);
                     return val !== null && val !== undefined ? String(val) : '';
                 }
                 return match;
             });
+            // Strip sentinels not consumed above (e.g. "\$" at end of string
+            // or before a non-identifier character).
+            return interpolated.includes('\u0001') ? interpolated.replace(/\u0001/g, '') : interpolated;
         }
         return expr.value;
     }

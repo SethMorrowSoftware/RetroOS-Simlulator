@@ -129,8 +129,16 @@ class WindowManagerClass {
         // Check if window already exists
         const existing = document.getElementById(`window-${id}`);
         if (existing) {
-            this.focus(id);
-            return existing;
+            const pending = this._pendingCloses && this._pendingCloses.get(id);
+            if (pending) {
+                // The window is mid-close-animation. Complete the teardown
+                // now (callbacks, state, DOM) and build a fresh window below.
+                clearTimeout(pending.timerId);
+                pending.finalize();
+            } else {
+                this.focus(id);
+                return existing;
+            }
         }
 
         // Play open sound
@@ -538,7 +546,13 @@ class WindowManagerClass {
         // Animate out
         windowEl.classList.add('minimizing');
 
-        setTimeout(() => {
+        // The teardown is tracked in _pendingCloses so create() can finalize
+        // it synchronously if the same window id is reopened during the
+        // 200ms animation — otherwise this timer would fire after the
+        // reopen and destroy the brand-new window.
+        const finalize = () => {
+            this._pendingCloses?.delete(id);
+
             // Call onClose callback if provided
             if (windowData && windowData.onClose) {
                 windowData.onClose();
@@ -555,7 +569,10 @@ class WindowManagerClass {
 
             // Emit close event
             EventBus.emit(Events.WINDOW_CLOSE, { id });
-        }, 200);
+        };
+
+        this._pendingCloses = this._pendingCloses || new Map();
+        this._pendingCloses.set(id, { timerId: setTimeout(finalize, 200), finalize });
     }
 
     /**

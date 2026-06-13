@@ -66,6 +66,14 @@ class PresenceManagerClass {
 
         this._eventUnsubscribers.push(EventBus.on('mp:presence:leave', (data) => {
             this.users.delete(data.userId);
+            // A user who disconnects mid-typing shouldn't linger in the
+            // typing list until the expiry sweep catches them.
+            for (const [roomId, users] of this.typingUsers) {
+                if (users.delete(data.userId)) {
+                    EventBus.emit('mp:typing:update', { roomId, typingUsers: this.getTypingUsers(roomId) });
+                    if (users.size === 0) this.typingUsers.delete(roomId);
+                }
+            }
             this._emitUpdate();
         }));
 

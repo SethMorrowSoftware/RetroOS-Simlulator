@@ -6,15 +6,25 @@
  * escapeHtml() or use setText()/setAttr() DOM helpers instead.
  */
 
-const _escapeDiv = document.createElement('div');
-
 /**
  * Escape a string for safe interpolation into innerHTML.
- * Uses the browser's own textContent -> innerHTML encoding.
+ *
+ * Encodes quotes as well as &, <, > so the same helper is safe in BOTH
+ * text content and quoted-attribute contexts. The previous
+ * textContent -> innerHTML trick only encoded &, <, > — every template
+ * that interpolated escapeHtml() output into an attribute (title="...",
+ * data-x="...") was an attribute-breakout XSS for values containing a
+ * double quote. Quote entities render identically in text content, so
+ * encoding them unconditionally costs nothing.
  */
 export function escapeHtml(text) {
-    _escapeDiv.textContent = text == null ? '' : String(text);
-    return _escapeDiv.innerHTML;
+    if (text == null) return '';
+    return String(text)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
 }
 
 /**

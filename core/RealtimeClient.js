@@ -23,6 +23,11 @@ let maxReconnectAttempts = 10;
 let reconnectTimer = null;
 let _token = null;
 let _connected = false;
+// Set by closeRealtime() (logout/auth-expired teardown). Without it, the
+// connect() call that was in flight when teardown ran would re-arm a fresh
+// reconnect timer after the cascade already cleared everything, producing
+// up to maxReconnectAttempts unauthenticated retries.
+let intentionallyClosed = false;
 
 /**
  * SSE-bridged event names, derived from the central EventTopology so the
@@ -43,6 +48,7 @@ const bridgedEvents = new Set(getBackendEventsForTransport('sse'));
 export function initRealtime(token) {
     _token = token;
     reconnectAttempts = 0; // Reset on re-init to allow fresh connection attempts
+    intentionallyClosed = false;
 
     // Cancel any pending reconnect timer from a previous connection
     if (reconnectTimer) {
@@ -169,7 +175,12 @@ async function connect() {
 
         if (!response.ok) {
             console.warn(`[RealtimeClient] SSE connection failed: ${response.status}`);
-            scheduleReconnect();
+            // 401/403 means the session is gone — fetchWithAuth has already
+            // run the logout cascade for 401; retrying without a token only
+            // generates noise.
+            if (response.status !== 401 && response.status !== 403) {
+                scheduleReconnect();
+            }
             return;
         }
 
@@ -231,6 +242,9 @@ function disconnect() {
  * Schedule a reconnection attempt with exponential backoff.
  */
 function scheduleReconnect() {
+    if (intentionallyClosed) {
+        return;
+    }
     if (reconnectAttempts >= maxReconnectAttempts) {
         console.warn('[RealtimeClient] Max reconnect attempts reached, giving up');
         return;
@@ -252,8 +266,10 @@ function scheduleReconnect() {
  * Close the SSE connection.
  */
 export function closeRealtime() {
+    intentionallyClosed = true;
     disconnect();
     clearTimeout(reconnectTimer);
+    reconnectTimer = null;
 }
 
 /**
