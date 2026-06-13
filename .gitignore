@@ -1,0 +1,24 @@
+# --- Secrets and per-deployment config (never commit) ---
+backend/env.php
+config/admin-credentials.php
+config/overrides.json
+config/.setup-complete
+
+# --- Runtime data (rate-limit buckets, uploads, setup token) ---
+data/*
+!data/.htaccess
+
+# --- Auto-generated backups ---
+backups/*
+!backups/.htaccess
+
+# --- OS / editor noise ---
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# --- Dependency dirs (project is no-build, but keep these out if ever added) ---
+node_modules/
+vendor/

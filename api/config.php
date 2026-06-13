@@ -49,7 +49,19 @@ if (file_exists($overridesFile)) {
 // Deep merge overrides on top of defaults
 $merged = deepMerge($defaults, $overrides);
 
-echo json_encode($merged, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+// This endpoint is unauthenticated (it serves the pre-login boot), so it
+// must expose only the same public sections the v2 ConfigController hands
+// to anonymous callers — overrides.json may hold non-public sections.
+require_once __DIR__ . '/../backend/models/Config.php';
+$publicSections = array_flip(Config::getPublicSections());
+$filtered = [];
+foreach ($merged as $key => $value) {
+    if (isset($publicSections[$key]) || (is_string($key) && str_starts_with($key, '_'))) {
+        $filtered[$key] = $value;
+    }
+}
+
+echo json_encode($filtered, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
 /**
  * Deep merge two associative arrays.

@@ -8,6 +8,11 @@
 
 class RoomManager
 {
+    /** Hard caps so clients cannot grow server memory without bound. */
+    private const MAX_ROOMS = 1000;
+    private const MAX_ROOMS_PER_CONN = 50;
+    private const MAX_METADATA_BYTES = 8192;
+
     /**
      * @var array<string, array{members: array, options: array, createdAt: float, hostId: string|null}>
      * roomId -> room data. members is keyed by connection ID.
@@ -40,14 +45,29 @@ class RoomManager
             return false;
         }
 
+        if (count($this->rooms) >= self::MAX_ROOMS) {
+            return false;
+        }
+
+        $metadata = is_array($options['metadata'] ?? null) ? $options['metadata'] : [];
+        $encoded = json_encode($metadata);
+        if ($encoded === false || strlen($encoded) > self::MAX_METADATA_BYTES) {
+            $metadata = [];
+        }
+
+        $password = $options['password'] ?? null;
+        if (!is_string($password) || $password === '') {
+            $password = null;
+        }
+
         $this->rooms[$roomId] = [
             'members' => [],
             'options' => [
-                'maxPlayers' => $options['maxPlayers'] ?? 0,
-                'isPrivate' => $options['isPrivate'] ?? false,
-                'password' => $options['password'] ?? null,
-                'persistent' => $options['persistent'] ?? false,
-                'metadata' => $options['metadata'] ?? [],
+                'maxPlayers' => max(0, (int) ($options['maxPlayers'] ?? 0)),
+                'isPrivate' => !empty($options['isPrivate']),
+                'password' => $password,
+                'persistent' => !empty($options['persistent']),
+                'metadata' => $metadata,
             ],
             'createdAt' => microtime(true) * 1000,
             'hostId' => $hostConnId,
@@ -63,11 +83,20 @@ class RoomManager
      */
     public function join(string $roomId, string $connId, array $connInfo, ?string $password = null): array
     {
+        // Cap the number of rooms one connection can occupy before any
+        // auto-create below — joins are the only way memberships grow.
+        if (!isset($this->rooms[$roomId]['members'][$connId])
+            && count($this->memberRooms[$connId] ?? []) >= self::MAX_ROOMS_PER_CONN) {
+            return ['success' => false, 'error' => 'Room limit reached for connection'];
+        }
+
         if (!isset($this->rooms[$roomId])) {
             // Auto-create for certain prefixes
             if (str_starts_with($roomId, 'dm:') || str_starts_with($roomId, 'game:') ||
                 str_starts_with($roomId, 'app:') || str_starts_with($roomId, 'campaign:')) {
-                $this->create($roomId, [], $connId);
+                if (!$this->create($roomId, [], $connId)) {
+                    return ['success' => false, 'error' => 'Unable to create room (limit reached)'];
+                }
             } else {
                 return ['success' => false, 'error' => 'Room not found'];
             }

@@ -1,0 +1,3 @@
+# data/ holds runtime state (rate-limit buckets, uploads, setup token).
+# Files here are served only through the API, never directly.
+Require all denied

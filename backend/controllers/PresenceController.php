@@ -112,6 +112,15 @@ class PresenceController
             jsonError('status must be one of: online, away, busy, in_game');
         }
 
+        // current_room is echoed back to every client via getOnline —
+        // reject junk rather than storing it.
+        if ($currentRoom !== null) {
+            if (!is_string($currentRoom) || strlen($currentRoom) > 128
+                || preg_match('/[\x00-\x1F\x7F]/', $currentRoom)) {
+                jsonError('current_room must be a string of at most 128 printable characters');
+            }
+        }
+
         $now = date('Y-m-d H:i:s');
 
         // Upsert: update if exists, insert if not
@@ -136,7 +145,8 @@ class PresenceController
                 );
             }
         } catch (\Throwable $e) {
-            jsonError('Presence update failed: ' . $e->getMessage(), 500);
+            error_log('[PresenceController] update failed: ' . $e->getMessage());
+            jsonError('Presence update failed', 500);
         }
 
         jsonResponse([
