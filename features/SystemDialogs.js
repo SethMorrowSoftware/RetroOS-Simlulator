@@ -84,6 +84,11 @@ class SystemDialogs extends FeatureBase {
             if (appId === 'help') this.showAboutDialog();
         });
 
+        // Terminal's `shutdown` command (and scripts) emit system:shutdown —
+        // it previously had no subscriber, so the command printed
+        // "Initiating system shutdown..." and nothing happened.
+        this.subscribe(Events.SHUTDOWN, () => this.showShutdownDialog());
+
         // Listen for dialog requests via EventBus
         this.subscribe('dialog:alert', (options) => this.showAlert(options));
         this.subscribe('dialog:confirm', (options) => this.showConfirm(options));
@@ -954,12 +959,14 @@ class SystemDialogs extends FeatureBase {
             await new Promise(r => setTimeout(r, 600));
             screen.remove();
 
-            // Show the login screen
+            // Show the login screen, then hand off to the boot module's
+            // session wiring (storage scope, state/FS rehydrate, SSE,
+            // multiplayer, presence). It emits user:login itself — emitting
+            // it here too would announce a login before storage is scoped.
             const loginResult = await LoginScreen.show();
-            StateManager.setState('user.userName', loginResult.username, true);
-            StateManager.setState('user.loginMode', loginResult.mode, true);
-            EventBus.emit(Events.USER_LOGIN, {
+            EventBus.emit('session:relogin', {
                 username: loginResult.username,
+                userUuid: loginResult.userUuid,
                 mode: loginResult.mode
             });
         }, 800);
@@ -1021,6 +1028,10 @@ class SystemDialogs extends FeatureBase {
     showAlert(options = {}) {
         // Store requestId for response
         this.alertRequestId = options.requestId || null;
+        // Callers that reach us via the `dialog:alert` event can't consume
+        // the returned promise, so support an onClose callback (invoked when
+        // the user acknowledges the alert). ReauthGate depends on this.
+        this.alertOnClose = typeof options.onClose === 'function' ? options.onClose : null;
 
         return new Promise((resolve) => {
             // Resolve any pending alert before replacing the resolver
@@ -1078,6 +1089,16 @@ class SystemDialogs extends FeatureBase {
         if (this.alertResolver) {
             this.alertResolver();
             this.alertResolver = null;
+        }
+
+        if (this.alertOnClose) {
+            const cb = this.alertOnClose;
+            this.alertOnClose = null;
+            try {
+                cb();
+            } catch (e) {
+                console.error('[SystemDialogs] alert onClose callback failed:', e);
+            }
         }
     }
 

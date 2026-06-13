@@ -22,19 +22,32 @@ class LoginScreen {
     constructor() {
         this.container = null;
         this.resolve = null;
+        this._pending = null;
     }
 
     /**
      * Show the login screen and wait for user action.
+     *
+     * Re-entrant: boot, logoff, and reauth can race onto this singleton —
+     * a second show() while one is pending must return the same promise,
+     * not overwrite `this.resolve` and orphan the first awaiter forever.
      * @returns {Promise<{mode: string, username: string}>}
      */
     show() {
+        if (this._pending) {
+            return this._pending;
+        }
         this.container = document.getElementById('loginScreen');
-        return new Promise((resolve) => {
-            this.resolve = resolve;
+        this._pending = new Promise((resolve) => {
+            this.resolve = (result) => {
+                this._pending = null;
+                this.resolve = null;
+                resolve(result);
+            };
             this._render();
             this.container.classList.add('active');
         });
+        return this._pending;
     }
 
     // ── Rendering ───────────────────────────────────────────
@@ -425,7 +438,7 @@ class LoginScreen {
             this.container.innerHTML = '';
         }, 500);
 
-        this.resolve({ mode, username, userUuid: options.userUuid || null });
+        this.resolve?.({ mode, username, userUuid: options.userUuid || null });
     }
 
     // ── Utilities ───────────────────────────────────────────

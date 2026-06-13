@@ -1558,7 +1558,7 @@ class MyComputer extends AppBase {
                 ${items.map((item, idx) => {
                     const itemPath = [...currentPath, item.name];
                     const isDraggable = item.type === 'file' || item.type === 'directory';
-                    const shortcutDataAttr = item.shortcutData ? `data-shortcut='${JSON.stringify(item.shortcutData)}'` : '';
+                    const shortcutDataAttr = item.shortcutData ? `data-shortcut="${escapeHtml(JSON.stringify(item.shortcutData))}"` : '';
                     return `
                     <div class="mycomputer-item ${escapeHtml(item.type)}-item"
                          data-index="${idx}"
@@ -1566,8 +1566,8 @@ class MyComputer extends AppBase {
                          data-type="${escapeHtml(item.type)}"
                          data-extension="${escapeHtml(item.extension || '')}"
                          ${shortcutDataAttr}
-                         ${isDraggable ? `draggable="true" data-file-path='${JSON.stringify(itemPath)}'` : ''}>
-                        <div class="mycomputer-item-icon">${item.icon}</div>
+                         ${isDraggable ? `draggable="true" data-file-path="${escapeHtml(JSON.stringify(itemPath))}"` : ''}>
+                        <div class="mycomputer-item-icon">${escapeHtml(item.icon)}</div>
                         <div class="mycomputer-item-label">${escapeHtml(item.displayName || item.name)}</div>
                     </div>
                 `;}).join('')}
@@ -1592,7 +1592,7 @@ class MyComputer extends AppBase {
                 ${items.map((item, idx) => {
                     const itemPath = [...currentPath, item.name];
                     const isDraggable = item.type === 'file' || item.type === 'directory';
-                    const shortcutDataAttr = item.shortcutData ? `data-shortcut='${JSON.stringify(item.shortcutData)}'` : '';
+                    const shortcutDataAttr = item.shortcutData ? `data-shortcut="${escapeHtml(JSON.stringify(item.shortcutData))}"` : '';
                     return `
                     <div class="mycomputer-list-item ${escapeHtml(item.type)}-item"
                          data-index="${idx}"
@@ -1600,8 +1600,8 @@ class MyComputer extends AppBase {
                          data-type="${escapeHtml(item.type)}"
                          data-extension="${escapeHtml(item.extension || '')}"
                          ${shortcutDataAttr}
-                         ${isDraggable ? `draggable="true" data-file-path='${JSON.stringify(itemPath)}'` : ''}>
-                        <div class="mycomputer-list-icon">${item.icon}</div>
+                         ${isDraggable ? `draggable="true" data-file-path="${escapeHtml(JSON.stringify(itemPath))}"` : ''}>
+                        <div class="mycomputer-list-icon">${escapeHtml(item.icon)}</div>
                         <div class="mycomputer-list-name">${escapeHtml(item.displayName || item.name)}</div>
                         <div class="mycomputer-list-size">${escapeHtml(item.size || '')}</div>
                         <div class="mycomputer-list-date">${escapeHtml(item.modified || '')}</div>

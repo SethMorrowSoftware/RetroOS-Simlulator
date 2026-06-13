@@ -278,7 +278,8 @@ class SkiFree extends AppBase {
         this.addHandler(this.getElement('#menuGame'), 'click', () => this.showGameMenu());
         this.addHandler(this.getElement('#menuHelp'), 'click', () => this.showHelp());
 
-        // Draw initial screen
+        // Draw initial screen (onClose parks state in GAMEOVER, so reset)
+        this.state = this.STATE.MENU;
         this.drawMenuScreen();
     }
 
@@ -287,6 +288,12 @@ class SkiFree extends AppBase {
             cancelAnimationFrame(this.gameLoop);
             this.gameLoop = null;
         }
+        if (this.menuAnim) {
+            cancelAnimationFrame(this.menuAnim);
+            this.menuAnim = null;
+        }
+        // Leave no active state behind — the menu rAF chain gates on MENU.
+        this.state = this.STATE.GAMEOVER;
     }
 
     resizeCanvas() {
@@ -395,6 +402,18 @@ class SkiFree extends AppBase {
     }
 
     startGame() {
+        // Cancel any running loops first — restarting mid-game (Game menu,
+        // command:skifree:start) otherwise stacks a second self-rescheduling
+        // update chain and the game runs at double speed permanently.
+        if (this.gameLoop) {
+            cancelAnimationFrame(this.gameLoop);
+            this.gameLoop = null;
+        }
+        if (this.menuAnim) {
+            cancelAnimationFrame(this.menuAnim);
+            this.menuAnim = null;
+        }
+
         this.initGameState();
         this.player.x = this.canvas.width / 2;
         this.player.speed = this.player.baseSpeed;
@@ -433,6 +452,9 @@ class SkiFree extends AppBase {
             this.state = this.STATE.PLAYING;
             this.updateStateText('Skiing!');
             this.lastTime = performance.now();
+            // A frame scheduled before the pause may still be pending —
+            // cancel it so resume can't double the loop.
+            if (this.gameLoop) cancelAnimationFrame(this.gameLoop);
             this.gameLoop = requestAnimationFrame((t) => this.update(t));
 
             // Emit resume event
@@ -504,8 +526,11 @@ class SkiFree extends AppBase {
     }
 
     update(timestamp) {
-        // Allow update loop to run during CRASHED state for recovery
-        if (this.state !== this.STATE.PLAYING && this.state !== this.STATE.CRASHED) return;
+        // Run during CRASHED (recovery) and EATEN (yeti chomp countdown) —
+        // stopping the loop on EATEN froze the game on the CHOMP frame and
+        // the eat timer never reached gameOver(true).
+        if (this.state !== this.STATE.PLAYING && this.state !== this.STATE.CRASHED
+            && this.state !== this.STATE.EATEN) return;
 
         this.deltaTime = Math.min((timestamp - this.lastTime) / 16.67, 3); // Cap delta
         this.lastTime = timestamp;
@@ -518,16 +543,26 @@ class SkiFree extends AppBase {
         this.updateEffects();
         this.updateUI();
 
-        this.draw();
+        // gameOver() may have painted its overlay during the updates above —
+        // skip the trailing scene draw so it isn't overpainted on the same
+        // frame it appears.
+        if (this.state !== this.STATE.GAMEOVER) {
+            this.draw();
+        }
 
-        // Continue game loop during PLAYING or CRASHED states
-        if (this.state === this.STATE.PLAYING || this.state === this.STATE.CRASHED) {
+        // Continue game loop while in an active state
+        if (this.state === this.STATE.PLAYING || this.state === this.STATE.CRASHED
+            || this.state === this.STATE.EATEN) {
             this.gameLoop = requestAnimationFrame((t) => this.update(t));
         }
     }
 
     updatePlayer() {
         const p = this.player;
+
+        // While being eaten the skier stays put — only the yeti's eat
+        // timer (updateYeti) advances.
+        if (this.state === this.STATE.EATEN) return;
 
         // Handle crashed state - use a timer for recovery
         if (this.state === this.STATE.CRASHED) {
@@ -1808,10 +1843,15 @@ class SkiFree extends AppBase {
             ctx.fillText(`High Score: ${this.highScore}`, w / 2, h - 30);
         }
 
-        // Request next frame for blinking
+        // Request next frame for blinking. Tracked + deduplicated: this
+        // chain used to be untracked, so it kept drawing to the detached
+        // canvas at 60fps after close, and every reopen/resize on the menu
+        // stacked an additional chain.
         if (this.state === this.STATE.MENU) {
-            requestAnimationFrame(() => {
-                if (this.state === this.STATE.MENU) {
+            if (this.menuAnim) cancelAnimationFrame(this.menuAnim);
+            this.menuAnim = requestAnimationFrame(() => {
+                this.menuAnim = null;
+                if (this.state === this.STATE.MENU && this.canvas?.isConnected) {
                     this.drawMenuScreen();
                 }
             });

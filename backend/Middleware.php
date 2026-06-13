@@ -257,8 +257,17 @@ class Middleware
         $trustProxy = !empty($env['app']['trust_proxy']);
 
         if ($trustProxy && !empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
-            $parts = explode(',', $_SERVER['HTTP_X_FORWARDED_FOR']);
-            $ip = trim($parts[0]);
+            // The client controls everything it sends, so the LEFTMOST
+            // entry is attacker-chosen — rotating it would defeat per-IP
+            // rate limiting. The rightmost entry is the address the trusted
+            // proxy itself observed; with `app.trust_proxy_hops` (default 1
+            // trusted proxy) we skip that many proxy-appended entries from
+            // the right and take the first untrusted hop.
+            $parts = array_values(array_filter(array_map('trim', explode(',', $_SERVER['HTTP_X_FORWARDED_FOR']))));
+            $hops = max(1, (int) ($env['app']['trust_proxy_hops'] ?? 1));
+            $index = count($parts) - $hops;
+            if ($index < 0) $index = 0;
+            $ip = $parts[$index] ?? '';
             if (filter_var($ip, FILTER_VALIDATE_IP)) {
                 return $ip;
             }

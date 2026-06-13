@@ -73,6 +73,14 @@ class MultiplayerClientClass {
             return;
         }
 
+        // A reconnect timer may still be armed (state === RECONNECTING).
+        // Cancel it before dialing, otherwise it fires later and opens a
+        // second socket over this one.
+        if (this.reconnectTimer) {
+            clearTimeout(this.reconnectTimer);
+            this.reconnectTimer = null;
+        }
+
         this.token = token;
         this.intentionalClose = false;
         this.reconnectAttempts = 0;

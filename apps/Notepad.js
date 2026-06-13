@@ -26,10 +26,10 @@ class Notepad extends AppBase {
         });
 
         this.storageKey = 'notepadContent';
-
-        // Multiplayer collaborative editing
-        this._mpSession = null;    // room ID when sharing
-        this._mpUnsubscribers = []; // cleanup handlers
+        // Multiplayer collaborative editing state lives in per-window
+        // instance state ('mpSession' / 'mpUnsubscribers') — plain fields
+        // here are shared across every Notepad window, so closing one
+        // window killed another's live share session.
     }
 
     onOpen(params = {}) {
@@ -110,7 +110,7 @@ class Notepad extends AppBase {
                     <span id="mpCollabUsers" style="margin-left:8px; color:#666;"></span>
                 </div>
                 <div class="notepad-filepath">
-                    File: <span id="filePathDisplay">${this.getInstanceState('currentFile') ? this.getInstanceState('currentFile').join('/') : 'Unsaved'}</span>
+                    File: <span id="filePathDisplay">${escapeHtml(this.getInstanceState('currentFile') ? this.getInstanceState('currentFile').join('/') : 'Unsaved')}</span>
                 </div>
                 <textarea class="notepad-content" id="notepadText"
                     placeholder="Start typing... (Ctrl+S to save)">${escapeHtml(content)}</textarea>
@@ -282,7 +282,10 @@ class Notepad extends AppBase {
     }
 
     handleKeypress(e) {
-        if (!this.isFocused()) return;
+        // Per-window check: the app-level isFocused() is true when ANY
+        // Notepad window is focused, so with two windows open every
+        // window's handler passed the gate and Ctrl+S saved them all.
+        if (!this.isFocused(this.getCurrentWindowId())) return;
 
         // Ctrl+S to save
         if (e.ctrlKey && e.key === 's') {
@@ -451,78 +454,93 @@ class Notepad extends AppBase {
     }
 
     // ===== MULTIPLAYER COLLABORATIVE EDITING =====
+    // Session + unsubscribers are per-window instance state, and every
+    // listener captures its window id + session at registration — the
+    // MultiplayerClient callbacks fire under whatever window holds the
+    // ambient context, which used to route a collaborator's edits into an
+    // unrelated Notepad window.
 
     _mpUpdateShareButton() {
         const btn = this.getElement('#btnShare');
         if (!btn) return;
         btn.style.display = MultiplayerClient.isConnected() ? '' : 'none';
-        btn.textContent = this._mpSession ? '🔗 Unshare' : '🔗 Share';
+        btn.textContent = this.getInstanceState('mpSession') ? '🔗 Unshare' : '🔗 Share';
     }
 
     _mpToggleShare() {
-        if (this._mpSession) {
+        if (this.getInstanceState('mpSession')) {
             this._mpStopSharing();
         } else {
             this._mpStartSharing();
         }
     }
 
+    /** Run fn with this window's context pinned (for WS-time callbacks). */
+    _mpWithWindow(windowId, fn) {
+        if (!this.openWindows.has(windowId)) return;
+        const prev = this._currentWindowId;
+        this._currentWindowId = windowId;
+        try {
+            fn();
+        } finally {
+            this._currentWindowId = prev;
+        }
+    }
+
     _mpStartSharing() {
         if (!MultiplayerClient.isConnected()) return;
 
+        const windowId = this.getCurrentWindowId();
         const docId = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-        this._mpSession = `app:notepad:${docId}`;
-        MultiplayerClient.joinRoom(this._mpSession);
+        const session = `app:notepad:${docId}`;
+        this.setInstanceState('mpSession', session);
+        MultiplayerClient.joinRoom(session);
 
         // Send current document content to new joiners
         const textarea = this.getElement('#notepadText');
         if (textarea) {
-            MultiplayerClient.sendEvent(this._mpSession, 'notepad:fullSync', {
+            MultiplayerClient.sendEvent(session, 'notepad:fullSync', {
                 text: textarea.value
             });
         }
 
-        // Listen for incoming text changes
+        // Listen for incoming text changes. Server relay shape:
+        // { type:'event', event, channel, payload, senderName, ... } —
+        // channel lives at the TOP level, payload is the inner data.
         const unsubChange = MultiplayerClient.on('event', (msg) => {
-            if (!msg.payload || msg.payload._remote === undefined) {
-                // Process messages from the server relay
-            }
-            const data = msg.payload || {};
-            if (data.channel !== this._mpSession) return;
-            if (data.data && data.data._self) return; // ignore own messages echoed back
-
-            if (msg.event === 'notepad:textChange' || data.event === 'notepad:textChange') {
-                const changeData = data.data || data;
-                this._mpApplyRemoteChange(changeData);
-            }
-            if (msg.event === 'notepad:fullSync' || data.event === 'notepad:fullSync') {
-                const syncData = data.data || data;
-                const ta = this.getElement('#notepadText');
-                if (ta && syncData.text !== undefined) {
-                    ta.value = syncData.text;
+            if (!msg || msg.channel !== session) return;
+            this._mpWithWindow(windowId, () => {
+                const data = msg.payload || {};
+                if (msg.event === 'notepad:textChange') {
+                    this._mpApplyRemoteChange(data);
                 }
-            }
+                if (msg.event === 'notepad:fullSync') {
+                    const ta = this.getElement('#notepadText');
+                    if (ta && data.text !== undefined) {
+                        ta.value = data.text;
+                    }
+                }
+            });
         });
-        this._mpUnsubscribers.push(unsubChange);
+        this._mpAddUnsub(unsubChange);
 
         // Listen for presence in the room
         const unsubPresence = MultiplayerClient.on('presence', (msg) => {
-            if (msg.payload && msg.payload.roomId === this._mpSession) {
-                this._mpUpdateCollabUsers(msg);
+            if (msg.payload && msg.payload.roomId === session) {
+                this._mpWithWindow(windowId, () => this._mpUpdateCollabUsers(msg));
             }
         });
-        this._mpUnsubscribers.push(unsubPresence);
+        this._mpAddUnsub(unsubPresence);
 
         // Broadcast local edits using input event on textarea
         if (textarea) {
             let debounceTimer = null;
             const inputHandler = () => {
-                if (!this._mpSession || !MultiplayerClient.isConnected()) return;
+                if (this.getInstanceState('mpSession') !== session || !MultiplayerClient.isConnected()) return;
                 clearTimeout(debounceTimer);
                 debounceTimer = setTimeout(() => {
-                    MultiplayerClient.sendEvent(this._mpSession, 'notepad:textChange', {
-                        text: textarea.value,
-                        _self: true
+                    MultiplayerClient.sendEvent(session, 'notepad:textChange', {
+                        text: textarea.value
                     });
                 }, 150);
             };
@@ -534,12 +552,19 @@ class Notepad extends AppBase {
         const indicator = this.getElement('#mpCollabIndicator');
         if (indicator) indicator.style.display = '';
         const status = this.getElement('#mpCollabStatus');
-        if (status) status.textContent = `Sharing: ${this._mpSession}`;
+        if (status) status.textContent = `Sharing: ${session}`;
+    }
+
+    _mpAddUnsub(unsub) {
+        const list = this.getInstanceState('mpUnsubscribers') || [];
+        list.push(unsub);
+        this.setInstanceState('mpUnsubscribers', list);
     }
 
     _mpStopSharing() {
-        if (this._mpSession) {
-            MultiplayerClient.leaveRoom(this._mpSession);
+        const session = this.getInstanceState('mpSession');
+        if (session) {
+            MultiplayerClient.leaveRoom(session);
         }
         this._mpCleanup();
         this._mpUpdateShareButton();
@@ -569,11 +594,12 @@ class Notepad extends AppBase {
     }
 
     _mpCleanup() {
-        for (const unsub of this._mpUnsubscribers) {
+        const list = this.getInstanceState('mpUnsubscribers') || [];
+        for (const unsub of list) {
             if (typeof unsub === 'function') unsub();
         }
-        this._mpUnsubscribers = [];
-        this._mpSession = null;
+        this.setInstanceState('mpUnsubscribers', []);
+        this.setInstanceState('mpSession', null);
     }
 
     onClose() {

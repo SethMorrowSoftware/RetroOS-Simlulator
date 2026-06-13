@@ -262,9 +262,9 @@ class StartMenuRendererClass {
         const links = (StateManager.getState('icons') || []).filter(i => i.type === 'link');
 
         const renderAppList = (list) => list.map(app => `
-            <div class="start-menu-item" data-app="${app.id}">
-                <span class="start-menu-icon">${app.icon}</span>
-                <span>${app.name}</span>
+            <div class="start-menu-item" data-app="${escapeHtml(app.id)}">
+                <span class="start-menu-icon">${escapeHtml(app.icon)}</span>
+                <span>${escapeHtml(app.name)}</span>
             </div>
         `).join('');
 
@@ -364,16 +364,16 @@ class StartMenuRendererClass {
                 <span>${getConfig('startMenuLabels.documents', 'Documents')}</span>
                 <span class="submenu-arrow">▶</span>
                 <div class="start-submenu">
-                    <div class="start-menu-item" data-file-path='${JSON.stringify(readmePath)}'>
+                    <div class="start-menu-item" data-file-path="${escapeHtml(JSON.stringify(readmePath))}">
                         <span class="start-menu-icon">📝</span>
                         <span>README.txt</span>
                     </div>
                     ${recentDocuments.length > 0 ? `
                         <div class="start-menu-divider"></div>
                         ${recentDocuments.map(doc => `
-                            <div class="start-menu-item" data-file-path='${JSON.stringify(doc.path)}'>
+                            <div class="start-menu-item" data-file-path="${escapeHtml(JSON.stringify(doc.path))}">
                                 <span class="start-menu-icon">📝</span>
-                                <span>${doc.name}</span>
+                                <span>${escapeHtml(doc.name)}</span>
                             </div>
                         `).join('')}
                     ` : ''}

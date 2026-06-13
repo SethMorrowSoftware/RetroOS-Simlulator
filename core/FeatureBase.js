@@ -55,8 +55,12 @@ class FeatureBase {
         this.category = metadata.category || 'enhancement';
         this.dependencies = metadata.dependencies || [];
 
-        // Runtime state
-        this.enabled = true;
+        // Runtime state — `enabledByDefault: false` in metadata is honored
+        // (it used to be silently ignored; the constructor default is the
+        // weakest tier: storage > server config > this).
+        this.enabled = metadata.enabledByDefault !== undefined
+            ? !!metadata.enabledByDefault
+            : true;
         this.initialized = false;
 
         // Configuration
@@ -107,6 +111,7 @@ class FeatureBase {
      */
     async enable() {
         return this._runLifecycle(async () => {
+            const wasEnabled = this.enabled;
             try {
                 if (!this.initialized) {
                     // Emit initialize event
@@ -114,6 +119,12 @@ class FeatureBase {
                         featureId: this.id,
                         config: this.config
                     });
+
+                    // Reflect the target state BEFORE initialize() runs —
+                    // many implementations guard with `if (!this.isEnabled())
+                    // return;`, and the boot path always initializes with
+                    // enabled === true. Rolled back in the catch below.
+                    this.enabled = true;
 
                     // SubscriptionManager.runAs binds any subscriptions created
                     // inside initialize() to this feature's ID, so they auto-clean
@@ -139,6 +150,7 @@ class FeatureBase {
 
                 console.log(`[${this.name}] Enabled`);
             } catch (error) {
+                this.enabled = wasEnabled;
                 EventBus.emit(Events.FEATURE_ERROR, {
                     featureId: this.id,
                     error: error.message,

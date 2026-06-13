@@ -273,6 +273,13 @@ class Solitaire extends AppBase {
             cancelAnimationFrame(this.victoryAnimFrame);
             this.victoryAnimFrame = null;
         }
+        // Stop a running auto-complete — its self-rescheduling timeout
+        // chain kept mutating state and playing sounds after close.
+        this.autoCompleting = false;
+        if (this._autoCompleteTimer) {
+            clearTimeout(this._autoCompleteTimer);
+            this._autoCompleteTimer = null;
+        }
     }
 
     // --- Shuffle (Fisher-Yates) ---
@@ -769,6 +776,15 @@ class Solitaire extends AppBase {
     handleDblClick(card, source, pileIdx) {
         if (this.isWon || this.autoCompleting) return;
 
+        // Only the TOP tableau card can move to a foundation, but the
+        // validation below checks the CLICKED card while the move executes
+        // with the top index — double-clicking a valid mid-pile card used
+        // to push the (unvalidated) top card onto the foundation.
+        if (source === 'tableau') {
+            const pile = this.tableau[pileIdx];
+            if (!pile || pile[pile.length - 1] !== card) return;
+        }
+
         for (let i = 0; i < 4; i++) {
             const pile = this.foundations[i];
             let valid = false;
@@ -853,7 +869,7 @@ class Solitaire extends AppBase {
         }
 
         if (moved && !this.isWon) {
-            setTimeout(() => this.autoCompleteStep(), 80);
+            this._autoCompleteTimer = setTimeout(() => this.autoCompleteStep(), 80);
         } else {
             this.autoCompleting = false;
         }

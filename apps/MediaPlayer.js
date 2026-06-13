@@ -76,7 +76,9 @@ class MediaPlayer extends AppBase {
             return { success: true };
         });
 
-        this.registerCommand('load', (src, name) => {
+        this.registerCommand('load', (payload) => {
+            const src = typeof payload === 'string' ? payload : payload?.src;
+            const name = typeof payload === 'object' && payload ? payload.name : undefined;
             if (src) {
                 this.loadMedia(src, name || src.split('/').pop());
                 return { success: true };
@@ -94,13 +96,15 @@ class MediaPlayer extends AppBase {
             return { success: true };
         });
 
-        this.registerCommand('setVolume', (volume) => {
+        this.registerCommand('setVolume', (payload) => {
+            const volume = (typeof payload === 'object' && payload) ? payload.volume : payload;
             const vol = Math.max(0, Math.min(100, parseInt(volume))) / 100;
             this.setVolume(vol * 100);
             return { success: true, volume: vol };
         });
 
-        this.registerCommand('seek', (position) => {
+        this.registerCommand('seek', (payload) => {
+            const position = Number((typeof payload === 'object' && payload) ? payload.position : payload) || 0;
             const media = this.getInstanceState('mediaElement');
             if (media) {
                 media.currentTime = Math.max(0, Math.min(media.duration || 0, position));

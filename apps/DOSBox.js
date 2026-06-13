@@ -806,10 +806,17 @@ class DOSBox extends AppBase {
             script.dataset.jsdos = '1';
             script.onload = () => waitForGlobal(15000);
             script.onerror = () => {
-                this._jsdosLoadPromise = null; // allow a retry
                 reject(new Error('Failed to fetch js-dos from CDN (' + JSDOS_JS_URL + ')'));
             };
             document.head.appendChild(script);
+        });
+
+        // ANY rejection (CDN fetch failure or the waitForGlobal timeout)
+        // must clear the cache — caching a rejected promise made every
+        // later launch fail instantly for the rest of the session.
+        this._jsdosLoadPromise = this._jsdosLoadPromise.catch((err) => {
+            this._jsdosLoadPromise = null;
+            throw err;
         });
 
         return this._jsdosLoadPromise;
@@ -857,6 +864,15 @@ class DOSBox extends AppBase {
         await this.stopEmulator(/* keepSplash= */ false);
         this.playSound('floppy');
 
+        // Claim a launch token AFTER the teardown above (stopEmulator bumps
+        // the generation). If another launch or a stop/close happens while
+        // we're awaiting below, the token goes stale and we abort — the old
+        // code booted a full DOSBox (CPU + audio) into a detached div when
+        // the window closed mid-load, with no way to stop it.
+        const generation = this._launchGeneration;
+        const launchStale = () =>
+            generation !== this._launchGeneration || !this.getElement('#dosboxStage');
+
         // Show loading overlay.
         if (splash) splash.style.display = 'none';
         if (stage) stage.style.display = 'block';
@@ -865,6 +881,7 @@ class DOSBox extends AppBase {
 
         try {
             await this.ensureJsDosLoaded();
+            if (launchStale()) return;
 
             if (loadingText) loadingText.textContent = 'Fetching bundle…';
 
@@ -880,6 +897,7 @@ class DOSBox extends AppBase {
             // Let the browser compute layout so the container has dimensions
             // before js-dos creates its canvas/WebGL context.
             await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+            if (launchStale()) return;
 
             this.currentBundle = url;
             this.currentBundleName = displayName;
@@ -1066,6 +1084,12 @@ class DOSBox extends AppBase {
      * @param {boolean} [keepSplash=true] - If false, caller will swap content immediately.
      */
     async stopEmulator(keepSplash = true) {
+        // Invalidate any in-flight launch: _startEmulatorWith checks this
+        // token after each await, so a stop (or a newer launch, which stops
+        // first) cancels the pending boot instead of letting it bring up a
+        // zombie DOSBox in a detached subtree.
+        this._launchGeneration = (this._launchGeneration || 0) + 1;
+
         const stage = this.getElement('#dosboxStage');
         const splash = this.getElement('#dosboxSplash');
 

@@ -4,6 +4,11 @@
  *
  * Routes incoming messages to appropriate handlers based on message type.
  * Each handler receives the message and a context object with server utilities.
+ *
+ * All payload fields are client-controlled: every handler validates types
+ * before passing values into typed functions. PHP TypeErrors are \Error,
+ * not \Exception — without these checks a crafted payload would throw past
+ * a too-narrow catch and could take down the server loop.
  */
 
 class MessageHandlers
@@ -13,6 +18,56 @@ class MessageHandlers
     public function __construct(WebSocketAuth $auth)
     {
         $this->auth = $auth;
+    }
+
+    /**
+     * A usable room identifier: non-empty string, bounded length, no
+     * control characters. Returns null when invalid.
+     */
+    private static function roomId($value): ?string
+    {
+        if (!is_string($value) || $value === '' || strlen($value) > 128) return null;
+        if (preg_match('/[\x00-\x1F\x7F]/', $value)) return null;
+        return $value;
+    }
+
+    /**
+     * Coerce a payload field to a bounded string, or null when it isn't one.
+     */
+    private static function str($value, int $maxLen = 256): ?string
+    {
+        if (!is_string($value)) return null;
+        if (strlen($value) > $maxLen) return null;
+        return $value;
+    }
+
+    /**
+     * Identifier restricted to a safe charset (game ids, session ids).
+     */
+    private static function ident($value, int $maxLen = 64): ?string
+    {
+        if (!is_string($value) || $value === '' || strlen($value) > $maxLen) return null;
+        if (!preg_match('/^[a-zA-Z0-9._-]+$/', $value)) return null;
+        return $value;
+    }
+
+    /**
+     * Sanitise client-supplied room options. Clients may not create
+     * persistent rooms (those are never reclaimed) and metadata is bounded.
+     */
+    private static function roomOptions($options): array
+    {
+        if (!is_array($options)) return [];
+
+        $clean = [];
+        $clean['maxPlayers'] = max(0, min(256, (int) ($options['maxPlayers'] ?? 0)));
+        $clean['isPrivate'] = !empty($options['isPrivate']);
+        $password = $options['password'] ?? null;
+        $clean['password'] = (is_string($password) && $password !== '' && strlen($password) <= 256) ? $password : null;
+        $metadata = $options['metadata'] ?? [];
+        $clean['metadata'] = is_array($metadata) ? $metadata : [];
+        // 'persistent' is deliberately not honoured from clients.
+        return $clean;
     }
 
     /**
@@ -53,14 +108,15 @@ class MessageHandlers
                 $ctx['sendToClient']($connId, [
                     'type' => 'pong',
                     'timestamp' => round(microtime(true) * 1000),
-                    'clientTimestamp' => $message['timestamp'] ?? null,
+                    'clientTimestamp' => is_scalar($message['timestamp'] ?? null) ? $message['timestamp'] : null,
                 ]);
                 break;
             default:
+                $type = is_string($message['type'] ?? null) ? substr($message['type'], 0, 64) : '';
                 $ctx['sendToClient']($connId, [
                     'type' => 'system',
                     'event' => 'error',
-                    'payload' => ['message' => 'Unknown message type: ' . ($message['type'] ?? ''), 'code' => 'UNKNOWN_TYPE'],
+                    'payload' => ['message' => 'Unknown message type: ' . $type, 'code' => 'UNKNOWN_TYPE'],
                 ]);
         }
     }
@@ -68,10 +124,10 @@ class MessageHandlers
     private function handleRoom(string $connId, array $message, array $ctx): void
     {
         $payload = $message['payload'] ?? [];
-        $action = $payload['action'] ?? '';
-        $roomId = $payload['roomId'] ?? '';
-        $options = $payload['options'] ?? [];
-        $password = $payload['password'] ?? null;
+        $action = self::str($payload['action'] ?? '', 32) ?? '';
+        $roomId = self::roomId($payload['roomId'] ?? '');
+        $options = self::roomOptions($payload['options'] ?? []);
+        $password = self::str($payload['password'] ?? null);
 
         /** @var RoomManager $rm */
         $rm = $ctx['roomManager'];
@@ -92,7 +148,7 @@ class MessageHandlers
                         'payload' => array_merge(['roomId' => $roomId], $rm->getRoomInfo($roomId) ?? []),
                     ]);
                 } else {
-                    $ctx['sendToClient']($connId, ['type' => 'room', 'event' => 'error', 'payload' => ['message' => 'Room already exists']]);
+                    $ctx['sendToClient']($connId, ['type' => 'room', 'event' => 'error', 'payload' => ['message' => 'Unable to create room (already exists or room limit reached)']]);
                 }
                 break;
 
@@ -143,7 +199,7 @@ class MessageHandlers
                 break;
 
             case 'list':
-                $filter = $payload['filter'] ?? null;
+                $filter = self::str($payload['filter'] ?? null, 128);
                 $rooms = $rm->listRooms($filter);
                 $ctx['sendToClient']($connId, ['type' => 'room', 'event' => 'list', 'payload' => ['rooms' => $rooms]]);
                 break;
@@ -166,10 +222,10 @@ class MessageHandlers
     private function handleEvent(string $connId, array $message, array $ctx): void
     {
         $payload = $message['payload'] ?? [];
-        $channel = $payload['channel'] ?? '';
-        $event = $payload['event'] ?? $payload['eventName'] ?? '';
+        $channel = self::roomId($payload['channel'] ?? '');
+        $event = self::str($payload['event'] ?? $payload['eventName'] ?? '', 128) ?? '';
         $data = $payload['data'] ?? [];
-        $broadcast = $payload['broadcast'] ?? false;
+        $broadcast = !empty($payload['broadcast']);
         $connInfo = $ctx['connInfo'];
 
         /** @var RoomManager $rm */
@@ -186,7 +242,7 @@ class MessageHandlers
             }
             $ctx['broadcastToRoom']('lobby', [
                 'type' => 'event',
-                'event' => $event ?: 'broadcast',
+                'event' => $event !== '' ? $event : 'broadcast',
                 'channel' => 'lobby',
                 'payload' => $data,
                 'senderId' => $connInfo['userId'],
@@ -224,11 +280,13 @@ class MessageHandlers
     private function handlePresence(string $connId, array $message, array $ctx): void
     {
         $payload = $message['payload'] ?? [];
-        $action = $payload['action'] ?? '';
+        $action = self::str($payload['action'] ?? '', 32) ?? '';
         $connInfo = $ctx['connInfo'];
 
         switch ($action) {
             case 'update_status':
+                $status = self::str($payload['status'] ?? 'online', 64) ?? 'online';
+                $activity = self::str($payload['activity'] ?? null, 128);
                 $ctx['broadcastToRoom']('lobby', [
                     'type' => 'presence',
                     'event' => 'status_update',
@@ -236,15 +294,15 @@ class MessageHandlers
                         'userId' => $connInfo['userId'],
                         'userUuid' => $connInfo['userUuid'],
                         'displayName' => $connInfo['displayName'],
-                        'status' => $payload['status'] ?? 'online',
-                        'activity' => $payload['activity'] ?? null,
+                        'status' => $status,
+                        'activity' => $activity,
                         'timestamp' => round(microtime(true) * 1000),
                     ],
                 ], $connId);
                 break;
 
             case 'typing':
-                $roomId = $payload['roomId'] ?? '';
+                $roomId = self::roomId($payload['roomId'] ?? '');
                 if (!$roomId || !$ctx['roomManager']->isInRoom($roomId, $connId)) return;
                 $ctx['broadcastToRoom']($roomId, [
                     'type' => 'presence',
@@ -262,12 +320,13 @@ class MessageHandlers
                 $onlineUsers = [];
                 $seen = [];
                 foreach ($ctx['connections'] as $cId => $info) {
-                    if (!isset($seen[$info['userId']])) {
-                        $seen[$info['userId']] = true;
+                    $uid = $info['userId'] ?? null;
+                    if ($uid !== null && !isset($seen[$uid])) {
+                        $seen[$uid] = true;
                         $onlineUsers[] = [
-                            'userId' => $info['userId'],
-                            'userUuid' => $info['userUuid'],
-                            'displayName' => $info['displayName'],
+                            'userId' => $uid,
+                            'userUuid' => $info['userUuid'] ?? '',
+                            'displayName' => $info['displayName'] ?? 'User',
                         ];
                     }
                 }
@@ -283,7 +342,7 @@ class MessageHandlers
     private function handleStateSync(string $connId, array $message, array $ctx): void
     {
         $payload = $message['payload'] ?? [];
-        $channel = $payload['channel'] ?? '';
+        $channel = self::roomId($payload['channel'] ?? '');
         $connInfo = $ctx['connInfo'];
 
         if (!$channel || !$ctx['roomManager']->isInRoom($channel, $connId)) {
@@ -305,15 +364,15 @@ class MessageHandlers
     private function handleChat(string $connId, array $message, array $ctx): void
     {
         $payload = $message['payload'] ?? [];
-        $roomId = $payload['roomId'] ?? '';
+        $roomId = self::roomId($payload['roomId'] ?? '');
         $text = $payload['text'] ?? '';
-        $messageType = $payload['messageType'] ?? 'message';
+        $messageType = self::str($payload['messageType'] ?? 'message', 32) ?? 'message';
         $connInfo = $ctx['connInfo'];
 
         /** @var RoomManager $rm */
         $rm = $ctx['roomManager'];
 
-        if (!$roomId || !$text) {
+        if (!$roomId || !is_string($text) || $text === '') {
             $ctx['sendToClient']($connId, ['type' => 'system', 'event' => 'error', 'payload' => ['message' => 'roomId and text required']]);
             return;
         }
@@ -360,12 +419,12 @@ class MessageHandlers
         $text = $payload['text'] ?? '';
         $connInfo = $ctx['connInfo'];
 
-        if (!$targetUserId || !$text) {
+        if (!$targetUserId || !is_string($text) || $text === '') {
             $ctx['sendToClient']($connId, ['type' => 'system', 'event' => 'error', 'payload' => ['message' => 'targetUserId and text required']]);
             return;
         }
 
-        $parsedTargetId = intval($targetUserId);
+        $parsedTargetId = is_scalar($targetUserId) ? intval($targetUserId) : 0;
         if ($parsedTargetId <= 0) {
             $ctx['sendToClient']($connId, ['type' => 'system', 'event' => 'error', 'payload' => ['message' => 'Invalid targetUserId', 'code' => 'INVALID_PARAM']]);
             return;
@@ -383,7 +442,7 @@ class MessageHandlers
                         $ctx['sendToClient']($connId, ['type' => 'system', 'event' => 'error', 'payload' => ['message' => 'Cannot send messages to this user', 'code' => 'BLOCKED']]);
                         return;
                     }
-                } catch (\Exception $e) {
+                } catch (\Throwable $e) {
                     // Fail closed — if block check errors, reject the message
                     error_log("[WS] Block check failed: " . $e->getMessage());
                     $ctx['sendToClient']($connId, ['type' => 'system', 'event' => 'error', 'payload' => ['message' => 'Unable to verify messaging permissions', 'code' => 'CHECK_FAILED']]);
@@ -425,28 +484,44 @@ class MessageHandlers
     private function handleGame(string $connId, array $message, array $ctx): void
     {
         $payload = $message['payload'] ?? [];
-        $action = $payload['action'] ?? '';
-        $sessionId = $payload['sessionId'] ?? '';
-        $gameId = $payload['gameId'] ?? '';
+        $action = self::str($payload['action'] ?? '', 32) ?? '';
+        $sessionId = self::ident($payload['sessionId'] ?? '');
+        $gameId = self::ident($payload['gameId'] ?? '');
         $data = $payload['data'] ?? [];
         $connInfo = $ctx['connInfo'];
 
         /** @var RoomManager $rm */
         $rm = $ctx['roomManager'];
 
+        // Every action below addresses a session room derived from the two ids.
+        if ($action !== 'list_sessions' && (!$sessionId || !$gameId)) {
+            $ctx['sendToClient']($connId, ['type' => 'game', 'event' => 'error', 'payload' => ['message' => 'Valid gameId and sessionId required']]);
+            return;
+        }
+
         switch ($action) {
             case 'create_session':
                 $roomId = "game:$gameId:$sessionId";
-                $rm->create($roomId, [
-                    'maxPlayers' => $payload['maxPlayers'] ?? 2,
+                $maxPlayers = max(2, min(64, (int) ($payload['maxPlayers'] ?? 2)));
+                $settings = is_array($payload['settings'] ?? null) ? $payload['settings'] : [];
+                $created = $rm->create($roomId, [
+                    'maxPlayers' => $maxPlayers,
                     'metadata' => [
                         'gameId' => $gameId,
                         'sessionId' => $sessionId,
                         'hostId' => $connInfo['userId'],
                         'status' => 'lobby',
-                        'settings' => $payload['settings'] ?? [],
+                        'settings' => $settings,
                     ],
                 ], $connId);
+
+                if (!$created) {
+                    // Either the session id collides or the room cap is hit;
+                    // claiming success here would leave two "hosts".
+                    $ctx['sendToClient']($connId, ['type' => 'game', 'event' => 'error', 'payload' => ['message' => 'Session already exists or room limit reached', 'code' => 'SESSION_EXISTS']]);
+                    return;
+                }
+
                 $rm->join($roomId, $connId, $connInfo);
 
                 $ctx['sendToClient']($connId, [
@@ -468,7 +543,7 @@ class MessageHandlers
                         'roomId' => $roomId,
                         'gameId' => $gameId,
                         'hostName' => $connInfo['displayName'],
-                        'maxPlayers' => $payload['maxPlayers'] ?? 2,
+                        'maxPlayers' => $maxPlayers,
                     ],
                 ]);
                 break;
@@ -553,15 +628,22 @@ class MessageHandlers
     private function handleRpc(string $connId, array $message, array $ctx): void
     {
         $payload = $message['payload'] ?? [];
-        $method = $payload['method'] ?? '';
-        $requestId = $payload['requestId'] ?? null;
+        $method = self::str($payload['method'] ?? '', 64) ?? '';
+        $requestId = is_scalar($payload['requestId'] ?? null) ? $payload['requestId'] : null;
 
         switch ($method) {
             case 'getOnlineCount':
+                // Count unique users, not connections (one user may have
+                // several tabs open).
+                $seen = [];
+                foreach ($ctx['connections'] as $info) {
+                    $uid = $info['userId'] ?? null;
+                    if ($uid !== null) $seen[$uid] = true;
+                }
                 $ctx['sendToClient']($connId, [
                     'type' => 'rpc',
                     'event' => 'response',
-                    'payload' => ['requestId' => $requestId, 'result' => ['count' => count($ctx['connections'])]],
+                    'payload' => ['requestId' => $requestId, 'result' => ['count' => count($seen)]],
                 ]);
                 break;
 
@@ -569,7 +651,7 @@ class MessageHandlers
                 $ctx['sendToClient']($connId, [
                     'type' => 'rpc',
                     'event' => 'response',
-                    'payload' => ['requestId' => $requestId, 'result' => ['rooms' => $ctx['roomManager']->listRooms($payload['filter'] ?? null)]],
+                    'payload' => ['requestId' => $requestId, 'result' => ['rooms' => $ctx['roomManager']->listRooms(self::str($payload['filter'] ?? null, 128))]],
                 ]);
                 break;
 

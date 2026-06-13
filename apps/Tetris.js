@@ -184,7 +184,9 @@ class Tetris extends AppBase {
 
     registerCommands() {
         this.registerCommand('start', () => {
-            if (!this.isGameRunning) this.startGame();
+            // Match the UI buttons: after a game over isGameRunning is
+            // still true, so the old condition made restart a silent no-op.
+            if (!this.isGameRunning || this.isGameOver) this.startGame();
             return { success: true };
         });
         this.registerCommand('pause', () => {
@@ -651,6 +653,13 @@ class Tetris extends AppBase {
             this.isLocking = false;
             this.lockTimer = 0;
             this.lockResets = 0;
+            // Same top-out rule as spawnPiece(): a swapped-in piece that
+            // overlaps locked cells ends the game instead of silently
+            // overwriting the board.
+            if (this.collides(this.currentPiece.blocks, this.currentPiece.x, this.currentPiece.y)) {
+                this.gameOverHandler();
+                return;
+            }
         } else {
             this.spawnPiece();
         }

@@ -653,6 +653,116 @@ function applySettings() {
 }
 
 /**
+ * Wire up everything a freshly logged-in user needs: storage scope,
+ * state/filesystem rehydration, media scan, realtime (SSE), multiplayer
+ * (WebSocket) and presence. Used by the boot flow AND by the
+ * logoff→login / reauth flows (via the session:relogin and
+ * reauth:completed subscriptions below) — SessionManager.logout() tears
+ * all of this down, so every path back to a session must rebuild it.
+ *
+ * @param {{username: string, userUuid?: string, mode?: string}} loginResult
+ */
+async function wireUserSession(loginResult) {
+    // === Per-user storage isolation ===
+    // Route the storage rescope through SessionManager so subscribers see
+    // the canonical `user:switch` event with { previous: null, next: id }
+    // at first login — same as a mid-session user-switch would emit.
+    // attachInitialUser skips the teardown step (no token to clear, no
+    // realtime to close), keeping the freshly-issued session token intact.
+    SessionManager.attachInitialUser(loginResult.userUuid || loginResult.username);
+
+    // For registered users on v2 backend, hydrate/sync scoped storage
+    // with database snapshots for resilient cross-device persistence.
+    await UserStateSync.initializeForLoggedInUser();
+
+    // Re-initialize StateManager from user-scoped storage so each user
+    // gets their own desktop icons, settings, achievements, etc.
+    StateManager.initialize();
+
+    // Reload the filesystem from user-scoped storage
+    FileSystemManager.reloadForUser();
+
+    // Re-sync filesystem with apps and desktop for this user
+    const icons = StateManager.getState('icons');
+    FileSystemManager.syncDesktopIcons(icons);
+    const apps = AppRegistry.getAll();
+    FileSystemManager.syncInstalledApps(apps);
+    FileSystemManager.saveFileSystem();
+
+    // Re-sync server files for this user
+    if (getApiVersion() >= 2) {
+        const synced = await FileSystemManager.syncServerFiles();
+        if (synced > 0) {
+            console.log(`[IlluminatOS!] Re-synced ${synced} server file(s) for user`);
+        }
+    }
+
+    // Re-scan media (uses user-scoped filesystem now)
+    MediaScanner.scanned = false; // Reset so it re-scans
+    await MediaScanner.scan();
+
+    // Store the user identity in state
+    StateManager.setState('user.userName', loginResult.username, true);
+    StateManager.setState('user.loginMode', loginResult.mode, true);
+
+    // Announce login so subscribers (multiplayer, presence, plugins) can
+    // initialize once the user is authenticated and storage is scoped.
+    EventBus.emit(Events.USER_LOGIN, {
+        username: loginResult.username,
+        mode: loginResult.mode
+    });
+
+    // Re-apply user-specific settings (wallpaper, color scheme, etc.)
+    applySettings();
+
+    // === Realtime + Multiplayer: connect with the session token ===
+    if (getApiVersion() >= 2 && getSessionToken()) {
+        // (Re)establish SSE on the current token — at boot this replaces the
+        // pre-login stream; after logoff/reauth the old stream is gone.
+        initRealtime(getSessionToken());
+
+        try {
+            MultiplayerClient.connect(getSessionToken());
+            PresenceManager.initialize();
+
+            // Wire up EventBus multiplayer bridge
+            const SemanticEventBus = (await import('./core/SemanticEventBus.js')).default;
+            SemanticEventBus.setMultiplayerBridge((eventName, payload, channel) => {
+                MultiplayerClient.send({
+                    type: 'event',
+                    payload: { eventName, data: payload, channel }
+                });
+            });
+
+            console.log('[IlluminatOS!] Multiplayer client initialized');
+        } catch (mpErr) {
+            console.warn('[IlluminatOS!] Multiplayer init failed (non-fatal):', mpErr);
+        }
+    }
+
+    // Re-render desktop icons for this user
+    DesktopRenderer.render();
+}
+
+// Re-wire the session after a mid-session login: "Log off" → login screen
+// (session:relogin, emitted by SystemDialogs.performLogoff) and the
+// ReauthGate flow after an auth:expired prompt (reauth:completed). Both
+// paths run after SessionManager.logout() destroyed realtime/presence and
+// reset the storage scope.
+const rewireSession = (payload, source) => {
+    if (!payload || !payload.username) return;
+    wireUserSession({
+        username: payload.username,
+        userUuid: payload.userUuid,
+        mode: payload.mode || 'returning'
+    }).catch(err => {
+        console.error(`[IlluminatOS!] Session rewiring after ${source} failed:`, err);
+    });
+};
+EventBus.on('session:relogin', (payload) => rewireSession(payload, 'logoff'));
+EventBus.on('reauth:completed', (payload) => rewireSession(payload, 'reauth'));
+
+/**
  * Setup global event handlers
  */
 function setupGlobalHandlers() {
@@ -793,7 +903,9 @@ function setupGlobalHandlers() {
     EventBus.on('sse:system.sound', (payload = {}) => {
         const { sound, volume = 0.5 } = payload;
         if (sound) {
-            EventBus.emit('sound:play', { sound, volume });
+            // SoundSystem reads `type` (see sound:play schema) — a `sound`
+            // key is silently ignored.
+            EventBus.emit('sound:play', { type: sound, volume });
         }
     });
 
@@ -801,12 +913,14 @@ function setupGlobalHandlers() {
     EventBus.on('sse:system.media', (payload = {}) => {
         const { mediaType, src, name } = payload;
         if (!src) return;
+        // The app:launch command handler destructures `appId` — `appName`
+        // launched undefined and every admin media broadcast failed silently.
         if (mediaType === 'audio' || mediaType === 'video') {
-            EventBus.emit('command:app:launch', { appName: 'mediaplayer', params: { src, name } });
+            EventBus.emit('command:app:launch', { appId: 'mediaplayer', params: { src, name } });
             return;
         }
         if (mediaType === 'image') {
-            EventBus.emit('command:app:launch', { appName: 'browser', params: { url: src } });
+            EventBus.emit('command:app:launch', { appId: 'browser', params: { url: src } });
         }
     });
 
@@ -1370,81 +1484,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         const loginResult = await LoginScreen.show();
         console.log(`[IlluminatOS!] User logged in as: ${loginResult.username} (${loginResult.mode})`);
 
-        // === Per-user storage isolation ===
-        // Route the storage rescope through SessionManager so subscribers see
-        // the canonical `user:switch` event with { previous: null, next: id }
-        // at first login — same as a mid-session user-switch would emit.
-        // attachInitialUser skips the teardown step (no token to clear, no
-        // realtime to close), keeping the freshly-issued session token intact.
-        SessionManager.attachInitialUser(loginResult.userUuid || loginResult.username);
-
-        // For registered users on v2 backend, hydrate/sync scoped storage
-        // with database snapshots for resilient cross-device persistence.
-        await UserStateSync.initializeForLoggedInUser();
-
-        // Re-initialize StateManager from user-scoped storage so each user
-        // gets their own desktop icons, settings, achievements, etc.
-        StateManager.initialize();
-
-        // Reload the filesystem from user-scoped storage
-        FileSystemManager.reloadForUser();
-
-        // Re-sync filesystem with apps and desktop for this user
-        const icons = StateManager.getState('icons');
-        FileSystemManager.syncDesktopIcons(icons);
-        const apps = AppRegistry.getAll();
-        FileSystemManager.syncInstalledApps(apps);
-        FileSystemManager.saveFileSystem();
-
-        // Re-sync server files for this user
-        if (getApiVersion() >= 2) {
-            const synced = await FileSystemManager.syncServerFiles();
-            if (synced > 0) {
-                console.log(`[IlluminatOS!] Re-synced ${synced} server file(s) for user`);
-            }
-        }
-
-        // Re-scan media (uses user-scoped filesystem now)
-        MediaScanner.scanned = false; // Reset so it re-scans
-        await MediaScanner.scan();
-
-        // Store the user identity in state
-        StateManager.setState('user.userName', loginResult.username, true);
-        StateManager.setState('user.loginMode', loginResult.mode, true);
-
-        // Announce login so subscribers (multiplayer, presence, plugins) can
-        // initialize once the user is authenticated and storage is scoped.
-        EventBus.emit(Events.USER_LOGIN, {
-            username: loginResult.username,
-            mode: loginResult.mode
-        });
-
-        // Re-apply user-specific settings (wallpaper, color scheme, etc.)
-        applySettings();
-
-        // === Multiplayer: Connect WebSocket after login ===
-        if (getApiVersion() >= 2 && getSessionToken()) {
-            try {
-                MultiplayerClient.connect(getSessionToken());
-                PresenceManager.initialize();
-
-                // Wire up EventBus multiplayer bridge
-                const SemanticEventBus = (await import('./core/SemanticEventBus.js')).default;
-                SemanticEventBus.setMultiplayerBridge((eventName, payload, channel) => {
-                    MultiplayerClient.send({
-                        type: 'event',
-                        payload: { eventName, data: payload, channel }
-                    });
-                });
-
-                console.log('[IlluminatOS!] Multiplayer client initialized');
-            } catch (mpErr) {
-                console.warn('[IlluminatOS!] Multiplayer init failed (non-fatal):', mpErr);
-            }
-        }
-
-        // Re-render desktop icons for this user
-        DesktopRenderer.render();
+        // Per-user storage isolation, state/FS rescope, realtime and
+        // multiplayer wiring. Shared with the logoff→login and reauth flows
+        // (via the session:relogin / reauth:completed subscriptions below) —
+        // previously this lived only in the boot path, so a re-login left
+        // SSE, the WebSocket, and presence dead until a page reload.
+        await wireUserSession(loginResult);
 
         // Finalize desktop first so startup remains responsive even if autoexec
         // scripts perform slow operations.

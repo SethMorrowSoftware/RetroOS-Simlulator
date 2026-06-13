@@ -13,6 +13,7 @@
 
 import EventBus from './EventBus.js';
 import StorageManager from './StorageManager.js';
+import SubscriptionManager from './SubscriptionManager.js';
 
 // Feature categories
 export const FEATURE_CATEGORIES = {
@@ -197,7 +198,11 @@ class FeatureRegistryClass {
                     // Trigger before-init hook
                     this.triggerGlobalHook('feature:before-init', { featureId });
 
-                    await feature.initialize();
+                    // Match FeatureBase.enable(): raw EventBus.on()/subscribe()
+                    // calls made inside initialize() must be owned by the
+                    // feature id so unsubscribeAll(featureId) releases them
+                    // on disable. The boot path used to skip this wrapper.
+                    await SubscriptionManager.runAs(featureId, () => feature.initialize());
                     feature.initialized = true;
 
                     // Update initialized state in metadata

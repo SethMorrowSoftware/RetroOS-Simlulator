@@ -101,9 +101,12 @@ class SessionManagerClass {
         this._safe('RealtimeClient.closeRealtime', () => closeRealtime());
         this._safe('PresenceManager.destroy', () => PresenceManager.destroy());
         this._safe('ConfigLoader.setSessionToken(null)', () => setSessionToken(null));
-        // Release any subscriptions registered under the 'session' owner —
-        // these are boot-time wires (SSE handlers in index.js, etc.) that
-        // should drop on logout so the next session starts clean.
+        // Release any subscriptions registered under the 'session' owner.
+        // NOTE: the boot-time SSE/global handlers in index.js are
+        // process-lifetime by design — they are NOT runAs('session')-owned,
+        // because setupGlobalHandlers only runs once and they must survive a
+        // logoff→login cycle. This hook is for code that explicitly
+        // registers via SubscriptionManager.runAs('session', ...).
         this._safe('SubscriptionManager.unsubscribeAll(session)',
             () => SubscriptionManager.unsubscribeAll('session'));
         this._safe('StateManager.resetVolatile', () => StateManager.resetVolatile());

@@ -210,6 +210,17 @@ class SoundSystem extends FeatureBase {
     }
 
     /**
+     * cleanup() releases the audio context and the event subscriptions
+     * initialize() created, so a re-enable must re-run initialize() —
+     * without this reset all system sounds stay dead after one
+     * disable→enable cycle.
+     */
+    async disable() {
+        this.initialized = false;
+        return super.disable();
+    }
+
+    /**
      * Initialize the Web Audio API context
      */
     initContext() {

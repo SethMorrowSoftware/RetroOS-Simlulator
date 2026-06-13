@@ -154,6 +154,17 @@ class Screensaver extends FeatureBase {
         super.cleanup();
     }
 
+    /**
+     * cleanup() tears down everything initialize() built (activity
+     * listeners, idle timer), and FeatureBase.enable() skips initialize()
+     * when `initialized` is still true — without this reset, one
+     * disable→enable cycle leaves the screensaver permanently dead.
+     */
+    async disable() {
+        this.initialized = false;
+        return super.disable();
+    }
+
     reset() {
         if (this.isActive) {
             this.hide();

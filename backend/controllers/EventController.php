@@ -11,14 +11,17 @@ class EventController
      * GET /events/stream
      * SSE endpoint — long-lived connection that pushes events to the client.
      *
+     * Auth: Authorization: Bearer header only (the frontend streams via
+     * fetch(), not EventSource, so headers work and tokens stay out of URLs).
+     *
      * Query params:
-     *   token     - Auth token (required fallback for EventSource clients)
      *   last_id   - Resume from this event ID (for reconnection)
      */
     public function stream(array $params): void
     {
         // Require authentication for SSE streams to prevent unauthenticated event access.
         Middleware::auth(true)($params);
+        $currentUser = currentUser();
 
         $env = require __DIR__ . '/../env.php';
         $pollInterval = $env['sse']['poll_interval'] ?? 1;
@@ -73,13 +76,26 @@ class EventController
 
             if (!empty($events)) {
                 foreach ($events as $event) {
+                    $lastId = (int) $event['id'];
+
+                    // Per-user session lifecycle events (revocation/eviction)
+                    // are only relevant — and only safe — for the session's
+                    // owner. Without this filter every connected client
+                    // learns when and why any other user was logged out.
+                    $type = (string) ($event['event_type'] ?? '');
+                    if (str_starts_with($type, 'session.')) {
+                        $eventUserId = $event['user_id'] ?? ($event['payload']['user_id'] ?? null);
+                        if ($eventUserId !== null && (int) $eventUserId !== (int) ($currentUser['id'] ?? 0)) {
+                            continue;
+                        }
+                    }
+
                     $sanitized = EventService::sanitizeEventRow($event);
                     SSEBroadcaster::sendEvent(
                         $sanitized['event_type'],
                         $sanitized['payload'] ?? [],
                         (string) $event['id']
                     );
-                    $lastId = (int) $event['id'];
                 }
             }
 

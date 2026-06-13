@@ -94,12 +94,19 @@ class DVDBouncerFeature extends FeatureBase {
     }
 
     async enable() {
+        // super.enable() runs the real lifecycle (re-init when needed,
+        // enabled flag, persisted state) — the old override that only
+        // logged left the feature broken after any disable→enable toggle.
+        await super.enable();
         this.log('DVD Bouncer feature enabled');
     }
 
     async disable() {
         this.stop();
         this.stopIdleMonitoring();
+        // cleanup() (run by super.disable()) releases the activity handlers
+        // initialize() installed, so a re-enable must re-run initialize().
+        this.initialized = false;
         this.log('DVD Bouncer feature disabled');
         await super.disable();
     }

@@ -1,0 +1,3 @@
+# backend/ contains PHP includes (config, models, controllers, migrations).
+# Nothing in here is a web entry point — all requests route through api/.
+Require all denied

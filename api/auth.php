@@ -302,7 +302,7 @@ function handleAdminIdentity(): void {
 
     try {
         $env = require $envFile;
-        $db = $env['db'];
+        $db = $env['database'] ?? $env['db']; // canonical key first, legacy fallback
         $dsn = sprintf('mysql:host=%s;port=%d;dbname=%s;charset=%s',
             $db['host'], $db['port'], $db['database'], $db['charset']);
         $pdo = new PDO($dsn, $db['username'], $db['password'], [

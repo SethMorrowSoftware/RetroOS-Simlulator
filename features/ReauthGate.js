@@ -40,6 +40,14 @@ class ReauthGate extends FeatureBase {
         this.subscribe(Events.AUTH_EXPIRED, (payload) => {
             this._handleAuthExpired(payload || {});
         });
+
+        // Safety valve: if a login completes through any path while the
+        // prompt flag is set (e.g. the alert was replaced by another dialog
+        // and never acknowledged), reset the gate so the next auth:expired
+        // isn't silently dropped.
+        this.subscribe(Events.USER_LOGIN, () => {
+            this._promptOpen = false;
+        });
     }
 
     _handleAuthExpired(payload) {
@@ -79,8 +87,11 @@ class ReauthGate extends FeatureBase {
             const { default: LoginScreen } = await import('../core/LoginScreen.js');
             const result = await LoginScreen.show();
             if (result && result.username) {
+                // index.js subscribes to this and re-wires the session
+                // (storage scope, SSE, multiplayer, presence).
                 EventBus.emit('reauth:completed', {
                     username: result.username,
+                    userUuid: result.userUuid,
                     reason: this._lastReason
                 });
             }

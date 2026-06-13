@@ -77,8 +77,11 @@ class WebSocketAuth
             return null;
         }
 
-        $user = json_decode($response, true);
-        if (!$user || !isset($user['id'])) {
+        // /auth/me responds with { user: {...} }; accept a flat user object
+        // too so an older backend keeps working.
+        $body = json_decode($response, true);
+        $user = is_array($body) ? ($body['user'] ?? $body) : null;
+        if (!is_array($user) || !isset($user['id'])) {
             return null;
         }
 
@@ -89,6 +92,44 @@ class WebSocketAuth
         ];
 
         return $user;
+    }
+
+    /**
+     * Re-check a token against the API, distinguishing "definitively
+     * invalid" from "couldn't tell". Used by the server's periodic sweep
+     * that disconnects sessions whose tokens have *expired* (expiry emits
+     * no revocation event, so the revocation poller never sees it).
+     *
+     * @return bool|null true = still valid, false = invalid/expired (401/403),
+     *                   null = indeterminate (API unreachable / unexpected status)
+     */
+    public function revalidate(string $token): ?bool
+    {
+        $url = $this->apiBase . '/api/v2/auth/me';
+
+        $context = stream_context_create([
+            'http' => [
+                'method' => 'GET',
+                'header' => "Authorization: Bearer $token\r\nAccept: application/json\r\n",
+                'timeout' => 3,
+                'ignore_errors' => true,
+            ],
+        ]);
+
+        $response = @file_get_contents($url, false, $context);
+        if ($response === false) {
+            return null;
+        }
+
+        $status = self::extractHttpStatus($http_response_header[0] ?? '');
+        if ($status === 200) {
+            return true;
+        }
+        if ($status === 401 || $status === 403) {
+            unset($this->cache[$token]);
+            return false;
+        }
+        return null;
     }
 
     /**

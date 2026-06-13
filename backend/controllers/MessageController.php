@@ -10,17 +10,52 @@
 class MessageController
 {
     /**
+     * Gate access to private rooms. Room membership lives in the WebSocket
+     * server's memory, so the durable, DB-backed rule is: the host, an
+     * admin, or a caller presenting the room password may read/post —
+     * everyone else is rejected. Rooms unknown to the DB (ad-hoc WS rooms
+     * like 'lobby') and public rooms stay open to any authenticated user.
+     */
+    private function assertRoomAccess(string $roomId, array $user): void
+    {
+        $room = Room::findById($roomId);
+        if (!$room || empty($room['is_private'])) {
+            return;
+        }
+        if ((int) ($room['host_user_id'] ?? 0) === (int) ($user['id'] ?? 0)) {
+            return;
+        }
+        if (in_array($user['role'] ?? '', ['admin', 'superadmin'], true)) {
+            return;
+        }
+
+        $password = input('password', '');
+        if (!is_string($password) || $password === '') {
+            $password = is_string($_GET['password'] ?? null) ? $_GET['password'] : '';
+        }
+        $hash = $room['password_hash'] ?? null;
+        if (is_string($hash) && $hash !== '' && $password !== '' && password_verify($password, $hash)) {
+            return;
+        }
+
+        jsonError('This room is private', 403);
+    }
+
+    /**
      * GET /messages/room/{id}
      * Get chat messages for a specific room.
      */
     public function getMessages(array $params): void
     {
         Middleware::auth(true)($params);
+        $user = currentUser();
 
         $roomId = $params['id'] ?? $params['uuid'] ?? '';
         if (empty($roomId)) {
             jsonError('Room ID is required');
         }
+
+        $this->assertRoomAccess($roomId, $user);
 
         $limit  = max(1, min(200, (int) ($_GET['limit'] ?? 50)));
         $offset = max(0, (int) ($_GET['offset'] ?? 0));
@@ -47,6 +82,8 @@ class MessageController
         if (empty($roomId)) {
             jsonError('Room ID is required');
         }
+
+        $this->assertRoomAccess($roomId, $user);
 
         $content = input('content', '');
         $type    = input('type', 'message'); // message, emote, system

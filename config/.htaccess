@@ -1,0 +1,3 @@
+# config/ holds deployment configuration (admin credentials, overrides).
+# Only PHP reads these — never serve them.
+Require all denied

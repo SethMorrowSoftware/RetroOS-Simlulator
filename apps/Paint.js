@@ -415,13 +415,33 @@ class Paint extends AppBase {
         if (btnCollab) this.addHandler(btnCollab, 'click', () => this._mpToggleCollab());
         this._mpUpdateCollabButton();
 
-        // Set up ResizeObserver to resize canvas when window is resized
+        // Set up ResizeObserver to resize canvas when window is resized.
+        // The callback fires outside any window context — pin it to THIS
+        // window or a resize could shrink/grow another Paint window's canvas.
         const canvasWrapper = this.getElement('.paint-canvas-wrapper');
         if (canvasWrapper) {
+            const windowId = this.getCurrentWindowId();
             this.resizeObserver = new ResizeObserver(() => {
-                this.resizeCanvas();
+                this._withWindow(windowId, () => this.resizeCanvas());
             });
             this.resizeObserver.observe(canvasWrapper);
+        }
+    }
+
+    /**
+     * Run fn with the given window's context pinned. Async callbacks
+     * (image loads, observers, multiplayer messages) otherwise resolve
+     * `this.ctx` / instance state through whichever Paint window last
+     * held the ambient context.
+     */
+    _withWindow(windowId, fn) {
+        if (!this.openWindows.has(windowId)) return;
+        const prev = this._currentWindowId;
+        this._currentWindowId = windowId;
+        try {
+            fn();
+        } finally {
+            this._currentWindowId = prev;
         }
     }
 
@@ -697,15 +717,20 @@ class Paint extends AppBase {
      * Draw an image from a source URL onto the canvas
      */
     _drawImageFromSrc(imageSrc, canvas) {
+        // img.onload can fire after the user switched/closed windows
+        // (server-file sources involve a network fetch) — pin to the
+        // window this draw was issued for.
+        const windowId = this.getCurrentWindowId();
         const img = new Image();
-        img.onload = () => {
+        img.onload = () => this._withWindow(windowId, () => {
+            if (!this.ctx) return;
             this.ctx.fillStyle = '#ffffff';
             this.ctx.fillRect(0, 0, canvas.width, canvas.height);
             const scale = Math.min(canvas.width / img.width, canvas.height / img.height, 1);
             const drawWidth = img.width * scale;
             const drawHeight = img.height * scale;
             this.ctx.drawImage(img, 0, 0, drawWidth, drawHeight);
-        };
+        });
         img.onerror = () => {
             this.alert('Failed to load image - the file may be corrupted or in an unsupported format');
         };
@@ -766,6 +791,9 @@ class Paint extends AppBase {
      * Import an image from the user's computer via native file picker
      */
     importImage() {
+        // The native picker + FileReader + Image pipeline resolves long
+        // after this call — pin everything to the window that opened it.
+        const windowId = this.getCurrentWindowId();
         const input = document.createElement('input');
         input.type = 'file';
         input.accept = 'image/png,image/jpeg,image/gif,image/bmp,image/webp,image/svg+xml,image/x-icon,image/tiff,.png,.jpg,.jpeg,.gif,.bmp,.webp,.svg,.ico,.tiff,.tif';
@@ -773,15 +801,15 @@ class Paint extends AppBase {
         input.addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (!file) return;
-
-            const canvas = this.getElement('#paintCanvas');
-            if (!canvas) return;
+            if (!this.openWindows.has(windowId)) return; // window closed while picking
 
             const reader = new FileReader();
             reader.onload = (evt) => {
                 const dataURL = evt.target.result;
                 const img = new Image();
-                img.onload = () => {
+                img.onload = () => this._withWindow(windowId, () => {
+                    const canvas = this.getElement('#paintCanvas');
+                    if (!canvas) return;
                     // Clear canvas and draw imported image
                     this.ctx.fillStyle = '#ffffff';
                     this.ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -814,7 +842,7 @@ class Paint extends AppBase {
                         this.setInstanceState('fileName', fileName);
                         this.updateWindowTitle();
                     }
-                };
+                });
                 img.onerror = () => {
                     this.alert('Failed to load the selected image file.');
                 };
@@ -862,21 +890,24 @@ class Paint extends AppBase {
     _mpStartCollab() {
         if (!MultiplayerClient.isConnected()) return;
 
+        const windowId = this.getCurrentWindowId();
         const sessionId = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-        this._mpSession = `app:paint:${sessionId}`;
-        MultiplayerClient.joinRoom(this._mpSession);
+        const session = `app:paint:${sessionId}`;
+        this._mpSession = session;
+        MultiplayerClient.joinRoom(session);
 
-        // Listen for incoming strokes
+        // Listen for incoming strokes. Server relay shape:
+        // { type:'event', event, channel, payload } — channel is TOP level
+        // (the old payload.channel read never matched, so remote strokes
+        // were silently dropped), and the handler fires under whatever
+        // window holds the ambient context, hence the captured session +
+        // window pin.
         const unsubStroke = MultiplayerClient.on('event', (msg) => {
-            const data = msg.payload || {};
-            if (data.channel !== this._mpSession) return;
-            if (data.data && data.data._self) return;
-
-            const event = msg.event || data.event;
-            if (event === 'paint:stroke') {
-                const s = data.data || data;
-                this._mpDrawRemoteStroke(s);
-            }
+            if (!msg || msg.channel !== session) return;
+            if (msg.event !== 'paint:stroke') return;
+            this._withWindow(windowId, () => {
+                this._mpDrawRemoteStroke(msg.payload || {});
+            });
         });
         this._mpUnsubscribers.push(unsubStroke);
 

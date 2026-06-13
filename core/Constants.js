@@ -166,7 +166,10 @@ export const STORAGE_KEYS = Object.freeze({
     HAS_VISITED: 'hasVisited',
     DESKTOP_BG: 'desktopBg',
     ADMIN_PASSWORD: 'adminPassword',
-    FILESYSTEM: 'filesystem'
+    // Must match the key FileSystemManager/StateManager actually persist
+    // under ('fileSystem', capital S) — a caller trusting this constant
+    // would otherwise read/write the wrong key.
+    FILESYSTEM: 'fileSystem'
 });
 
 // ============================================

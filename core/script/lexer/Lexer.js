@@ -285,6 +285,10 @@ export class Lexer {
                 case "'": return "'";
                 case '\\': return '\\';
                 case '0': return '\0';
+                // \$ = literal dollar that must NOT interpolate. U+0001 is a
+                // sentinel the interpreter's interpolation pass strips; it
+                // cannot appear in source text otherwise.
+                case '$': return '\u0001$';
                 default: return char; // Unknown escape, just return the character
             }
         });

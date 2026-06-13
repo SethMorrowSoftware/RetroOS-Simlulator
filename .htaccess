@@ -1,0 +1,27 @@
+# IlluminatOS! — root web rules (Apache)
+#
+# The project root doubles as the web root in the documented deployment, so
+# this file is the perimeter: it blocks the version-control tree, secrets,
+# and runtime data from ever being served. Directory-level .htaccess files
+# in backend/, config/, data/, and backups/ provide a second layer for
+# hosts that allow per-directory overrides but ignore rules inherited from
+# the root.
+
+# Block all dotfiles and dot-directories (.git, .gitignore, .htaccess itself, ...)
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule (^|/)\.(?!well-known/) - [F]
+</IfModule>
+
+# Belt-and-braces for servers without mod_rewrite
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>
+
+# Never serve PHP includes' secrets or SQL migrations directly
+<FilesMatch "^(env\.php|env\.example\.php|admin-credentials\.php)$">
+    Require all denied
+</FilesMatch>
+<FilesMatch "\.(sql|bak|log)$">
+    Require all denied
+</FilesMatch>

@@ -825,7 +825,9 @@ Release 88 / Serial number 840726
     }
 
     printCommand(cmd) {
-        this.print(`<span style="color:#8f8">&gt; ${escapeHtml(cmd.toUpperCase())}</span>`);
+        // cmd arrives pre-escaped from processCommand — escaping again
+        // would render literal entity text for legitimate `&` input.
+        this.print(`<span style="color:#8f8">&gt; ${cmd.toUpperCase()}</span>`);
     }
 
     updateScore() {
@@ -847,6 +849,13 @@ Release 88 / Serial number 840726
     }
 
     processCommand(input) {
+        // print() renders raw HTML (the game's own text uses markup), and
+        // several "You don't see any ${target} here." style responses echo
+        // the player's words back — escape the input once at the boundary
+        // so `take <img onerror=...>` can't inject into the transcript.
+        // Game vocabulary never contains &<>"' so matching is unaffected.
+        input = escapeHtml(String(input ?? ''));
+
         if (this.gameOver) {
             // Any typed command at game over restarts only if it's "restart"; otherwise reprompt
             if (input.toLowerCase().trim() === 'restart') {

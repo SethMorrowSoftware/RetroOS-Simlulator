@@ -321,13 +321,22 @@ class MoodOrchestrator extends FeatureBase {
         // CSS custom properties
         if (visual.cssVars && typeof visual.cssVars === 'object') {
             for (const [prop, value] of Object.entries(visual.cssVars)) {
-                // Only allow CSS custom properties (--prefixed)
+                // Only allow CSS custom properties (--prefixed) with values
+                // free of the usual CSS-injection vectors — presets come
+                // from campaigns/storage, and a custom property is inert
+                // only until some rule references it in a url()-capable
+                // context.
                 if (typeof prop === 'string' && prop.startsWith('--')) {
+                    const strValue = String(value);
+                    if (strValue.length > 256 || /url\s*\(|expression\s*\(|javascript:|@import|<|>/i.test(strValue)) {
+                        this.log(`Blocked unsafe cssVar value for ${prop}`);
+                        continue;
+                    }
                     if (this._originalState && !(prop in this._originalState.cssVars)) {
                         this._originalState.cssVars[prop] = document.documentElement.style.getPropertyValue(prop) || null;
                     }
                     this._appliedCssVarKeys.add(prop);
-                    document.documentElement.style.setProperty(prop, String(value));
+                    document.documentElement.style.setProperty(prop, strValue);
                 }
             }
         }

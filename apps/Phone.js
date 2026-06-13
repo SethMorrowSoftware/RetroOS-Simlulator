@@ -596,11 +596,18 @@ class Phone extends AppBase {
 
     onClose() {
         if (this.callTimer) clearInterval(this.callTimer);
+        this.callTimer = null;
         if (this._ringInterval) clearInterval(this._ringInterval);
         if (this._botResponseTimeout) clearTimeout(this._botResponseTimeout);
         if (this._clockInterval) clearInterval(this._clockInterval);
         if (this._vmPlaybackTimeout) clearTimeout(this._vmPlaybackTimeout);
         this._stopCallAudio();
+
+        // Reset call state — the dial/ring setTimeout chain guards on
+        // callState, so without this a close mid-dial let connectCall()
+        // run after the window was gone, arming a call timer nothing
+        // would ever clear and blocking tab navigation on reopen.
+        this.callState = 'idle';
 
         // Clear scheduled calls
         for (const id of Object.keys(this._scheduledCalls)) {
@@ -1398,7 +1405,7 @@ class Phone extends AppBase {
                         <div class="phone-list-number">${this._esc(h.number)}${h.reason && h.reason !== 'Call Ended' ? ` - ${this._esc(h.reason)}` : ''}</div>
                     </div>
                     <div class="phone-list-meta">
-                        ${h.time}<br>
+                        ${this._esc(h.time)}<br>
                         ${this._formatDuration(h.duration)}
                     </div>
                 </div>
@@ -1448,7 +1455,7 @@ class Phone extends AppBase {
                     <div class="phone-list-msg-preview">${this._esc(vm.message.substring(0, 60))}${vm.message.length > 60 ? '...' : ''}</div>
                 </div>
                 <div class="phone-list-meta">
-                    ${vm.time}<br>${vm.date || ''}
+                    ${this._esc(vm.time)}<br>${this._esc(vm.date || '')}
                     ${vm.audioSrc ? '<br>🔊' : ''}
                 </div>
             </div>
@@ -1582,9 +1589,17 @@ class Phone extends AppBase {
     }
 
     _esc(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
+        // Quote-encoding included: _esc output is interpolated into
+        // attributes (speed-dial title="...") as well as text content; the
+        // textContent trick alone leaves quotes intact, enabling
+        // attribute breakout.
+        if (text == null) return '';
+        return String(text)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
     }
 
     _generateVmId() {

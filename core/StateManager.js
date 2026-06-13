@@ -221,8 +221,20 @@ class StateManagerClass {
             try {
                 return structuredClone(value);
             } catch {
-                // Fallback for non-cloneable values (DOM nodes, functions, etc.)
-                return value;
+                // Non-cloneable content (DOM nodes, functions). Window
+                // entries hold a live `element` reference, so a raw
+                // fallback would hand callers the mutable internal array —
+                // shallow-copy the containers so pushes/in-place edits on
+                // the result can't corrupt internal state. (Mutating a
+                // window entry's own fields still requires setState.)
+                if (Array.isArray(value)) {
+                    return value.map(item =>
+                        (item !== null && typeof item === 'object' && !Array.isArray(item))
+                            ? { ...item }
+                            : item
+                    );
+                }
+                return { ...value };
             }
         }
 

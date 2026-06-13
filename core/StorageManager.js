@@ -355,8 +355,13 @@ class StorageManagerClass {
             return true;
         }
 
+        // Declared outside the try so the QuotaExceededError retry below can
+        // still see it — block-scoping it inside made the retry a
+        // ReferenceError, which meant every write silently failed once the
+        // store filled up.
+        let serialized;
         try {
-            const serialized = JSON.stringify(value);
+            serialized = JSON.stringify(value);
 
             if (this.available) {
                 localStorage.setItem(prefixedKey, serialized);
@@ -379,8 +384,9 @@ class StorageManagerClass {
                 this.cleanup();
                 // Retry once after cleanup
                 try {
+                    if (serialized === undefined) return false;
                     localStorage.setItem(prefixedKey, serialized);
-                    this._cache.set(prefixedKey, value);
+                    this._cache.set(prefixedKey, JSON.parse(serialized));
                     this._notifyRemoteChange();
                     return true;
                 } catch (retryError) {

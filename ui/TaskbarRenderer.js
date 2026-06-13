@@ -235,14 +235,26 @@ class TaskbarRendererClass {
         calendar.innerHTML = html;
         calendar.classList.toggle('active');
 
-        // Close on outside click
-        const closeHandler = (e) => {
-            if (!calendar.contains(e.target) && e.target.id !== 'clock') {
-                calendar.classList.remove('active');
-                document.removeEventListener('click', closeHandler);
-            }
-        };
-        setTimeout(() => document.addEventListener('click', closeHandler), 0);
+        // Close on outside click. Remove any previous handler first —
+        // rapidly toggling the clock used to stack one document listener
+        // per click until an outside click drained them.
+        if (this._calendarCloseHandler) {
+            document.removeEventListener('click', this._calendarCloseHandler);
+            this._calendarCloseHandler = null;
+        }
+        if (calendar.classList.contains('active')) {
+            const closeHandler = (e) => {
+                if (!calendar.contains(e.target) && e.target.id !== 'clock') {
+                    calendar.classList.remove('active');
+                    document.removeEventListener('click', closeHandler);
+                    if (this._calendarCloseHandler === closeHandler) {
+                        this._calendarCloseHandler = null;
+                    }
+                }
+            };
+            this._calendarCloseHandler = closeHandler;
+            setTimeout(() => document.addEventListener('click', closeHandler), 0);
+        }
     }
 
     /**
