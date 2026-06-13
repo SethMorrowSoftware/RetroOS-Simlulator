@@ -5,7 +5,7 @@
 # and by the manual smoke checklist in docs/MIGRATION_ROADMAP.md.
 #
 # Gates (each must pass):
-#   1. node --check on all .js files in core/ apps/ features/ ui/ index.js
+#   1. node --check on all .js files in core/ apps/ features/ ui/ admin/ plugins/ index.js
 #   2. php -l on every .php file (excludes backups/, vendor/)
 #   3. bash scripts/lint-innerhtml.sh
 #   4. bash scripts/test-retroscript.sh
@@ -32,7 +32,7 @@ while IFS= read -r -d '' f; do
         echo "  syntax error: $f"
         js_failed=1
     fi
-done < <(find core apps features ui -name '*.js' -not -path '*/node_modules/*' -print0; printf 'index.js\0')
+done < <(find core apps features ui admin plugins -name '*.js' -not -path '*/node_modules/*' -print0; printf 'index.js\0')
 report "JS syntax check" "$js_failed"
 
 section "2/5 PHP lint"

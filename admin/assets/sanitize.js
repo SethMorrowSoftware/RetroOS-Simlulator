@@ -14,15 +14,20 @@
  *   `<span>${escHtmlArray(items)}</span>`
  */
 
-const _div = document.createElement('div');
-
 /**
- * Escape a string for safe insertion into HTML text content.
- * Handles &, <, >.
+ * Escape a string for safe insertion into HTML text content OR a quoted
+ * attribute. Handles &, <, >, ", and ' — quote entities render identically
+ * in text content, and encoding them unconditionally means a value that
+ * ends up in an attribute by mistake can't break out of it.
  */
 export function escHtml(str) {
-    _div.textContent = str ?? '';
-    return _div.innerHTML;
+    if (str == null) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
 }
 
 /**
@@ -30,8 +35,7 @@ export function escHtml(str) {
  * Handles &, <, >, ", and '.
  */
 export function escAttr(str) {
-    _div.textContent = str ?? '';
-    return _div.innerHTML.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    return escHtml(str);
 }
 
 /**

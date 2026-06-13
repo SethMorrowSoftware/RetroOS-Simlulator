@@ -80,6 +80,16 @@ class EasterEggs extends FeatureBase {
     }
 
     /**
+     * cleanup() removes the keydown handler initialize() installed, so a
+     * re-enable must re-run initialize() — without this reset the cheat
+     * codes stay dead after one disable→enable cycle.
+     */
+    async disable() {
+        this.initialized = false;
+        return super.disable();
+    }
+
+    /**
      * Handle keydown events for cheat codes
      * @param {KeyboardEvent} e - Keyboard event
      */
