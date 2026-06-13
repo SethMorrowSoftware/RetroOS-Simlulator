@@ -50,7 +50,11 @@ const PER_WINDOW_FIELDS = [
     'commandHistory', 'historyIndex', 'godMode', 'activeProcess',
     'currentPath', 'lastOutput', 'aliases', 'batchCommands',
     'batchIndex', 'pipeEnabled', '_mpSession', '_mpUnsubscribers',
-    'envVars'
+    'envVars',
+    // Two terminals sharing one matrix-interval handle meant the first
+    // interval could never be cleared; a shared `more` buffer let one
+    // window page through another's file.
+    'matrixInterval', 'moreBuffer', 'moreIndex', '_scrollRafId'
 ];
 
 function defaultEnvVars() {
@@ -81,7 +85,11 @@ function defaultInstanceState() {
         pipeEnabled: true,
         _mpSession: null,
         _mpUnsubscribers: [],
-        envVars: defaultEnvVars()
+        envVars: defaultEnvVars(),
+        matrixInterval: null,
+        moreBuffer: null,
+        moreIndex: 0,
+        _scrollRafId: null
     };
 }
 
@@ -111,7 +119,8 @@ class Terminal extends AppBase {
      */
     registerCommands() {
         // Execute a terminal command
-        this.registerCommand('execute', (cmd) => {
+        this.registerCommand('execute', (payload) => {
+            const cmd = typeof payload === 'string' ? payload : payload?.command;
             if (!cmd || typeof cmd !== 'string') {
                 return { success: false, error: 'Command must be a string' };
             }
@@ -135,7 +144,8 @@ class Terminal extends AppBase {
         });
 
         // Execute multiple commands in sequence
-        this.registerCommand('executeSequence', (commands) => {
+        this.registerCommand('executeSequence', (payload) => {
+            const commands = Array.isArray(payload) ? payload : payload?.commands;
             if (!Array.isArray(commands)) {
                 return { success: false, error: 'Commands must be an array' };
             }
@@ -159,7 +169,9 @@ class Terminal extends AppBase {
         });
 
         // Print text to terminal
-        this.registerCommand('print', (text, color = null) => {
+        this.registerCommand('print', (payload) => {
+            const text = typeof payload === 'string' ? payload : payload?.text;
+            const color = typeof payload === 'object' && payload ? (payload.color ?? null) : null;
             if (text !== undefined && text !== null) {
                 this.print(String(text), color);
                 return { success: true, text: String(text) };
@@ -168,7 +180,8 @@ class Terminal extends AppBase {
         });
 
         // Print HTML to terminal
-        this.registerCommand('printHtml', (html) => {
+        this.registerCommand('printHtml', (payload) => {
+            const html = typeof payload === 'string' ? payload : payload?.html;
             if (html !== undefined && html !== null) {
                 this.printHtml(String(html));
                 return { success: true, html: String(html) };
@@ -177,7 +190,8 @@ class Terminal extends AppBase {
         });
 
         // Change directory
-        this.registerCommand('cd', (path) => {
+        this.registerCommand('cd', (payload) => {
+            const path = typeof payload === 'string' ? payload : payload?.path;
             if (!path) {
                 return { success: false, error: 'Path required' };
             }
@@ -195,7 +209,8 @@ class Terminal extends AppBase {
         });
 
         // List directory contents
-        this.registerCommand('dir', (path = null) => {
+        this.registerCommand('dir', (payload) => {
+            const path = typeof payload === 'string' ? payload : (payload?.path ?? null);
             try {
                 const output = this.cmdDir(path ? [path] : []);
                 return { success: true, output };
@@ -205,7 +220,8 @@ class Terminal extends AppBase {
         });
 
         // Read a file
-        this.registerCommand('readFile', (filePath) => {
+        this.registerCommand('readFile', (payload) => {
+            const filePath = typeof payload === 'string' ? payload : (payload?.filePath ?? payload?.path);
             if (!filePath) {
                 return { success: false, error: 'File path required' };
             }
@@ -219,7 +235,10 @@ class Terminal extends AppBase {
         });
 
         // Write to a file
-        this.registerCommand('writeFile', (filePath, content, extension = 'txt') => {
+        this.registerCommand('writeFile', (payload = {}) => {
+            const filePath = typeof payload === 'string' ? payload : (payload.filePath ?? payload.path);
+            const content = typeof payload === 'object' ? (payload.content ?? '') : '';
+            const extension = (typeof payload === 'object' && payload.extension) || 'txt';
             if (!filePath || content === undefined) {
                 return { success: false, error: 'File path and content required' };
             }
@@ -234,7 +253,8 @@ class Terminal extends AppBase {
         });
 
         // Set environment variable
-        this.registerCommand('setEnvVar', (name, value) => {
+        this.registerCommand('setEnvVar', (payload = {}) => {
+            const { name, value } = payload;
             if (!name) {
                 return { success: false, error: 'Variable name required' };
             }
@@ -243,7 +263,8 @@ class Terminal extends AppBase {
         });
 
         // Get environment variable
-        this.registerCommand('getEnvVar', (name) => {
+        this.registerCommand('getEnvVar', (payload) => {
+            const name = typeof payload === 'string' ? payload : payload?.name;
             if (!name) {
                 return { success: false, error: 'Variable name required' };
             }
@@ -252,7 +273,8 @@ class Terminal extends AppBase {
         });
 
         // Create an alias
-        this.registerCommand('createAlias', (name, command) => {
+        this.registerCommand('createAlias', (payload = {}) => {
+            const { name, command } = payload;
             if (!name || !command) {
                 return { success: false, error: 'Alias name and command required' };
             }
@@ -261,7 +283,8 @@ class Terminal extends AppBase {
         });
 
         // Remove an alias
-        this.registerCommand('removeAlias', (name) => {
+        this.registerCommand('removeAlias', (payload) => {
+            const name = typeof payload === 'string' ? payload : payload?.name;
             if (!name) {
                 return { success: false, error: 'Alias name required' };
             }
@@ -271,7 +294,8 @@ class Terminal extends AppBase {
         });
 
         // Run a script file
-        this.registerCommand('runScript', (scriptPath) => {
+        this.registerCommand('runScript', (payload) => {
+            const scriptPath = typeof payload === 'string' ? payload : (payload?.scriptPath ?? payload?.path);
             if (!scriptPath) {
                 return { success: false, error: 'Script path required' };
             }
@@ -290,10 +314,14 @@ class Terminal extends AppBase {
             }
         });
 
-        // Focus the terminal window
+        // Focus / minimize / maximize the terminal window. These must run
+        // the registered window:* COMMANDS — emitting the same-named events
+        // only mimics WindowManager's post-action notifications ({ id }),
+        // which performed nothing and made every app's focus tracker take
+        // the blur branch.
         this.registerCommand('focus', () => {
             if (this.windowId) {
-                EventBus.emit(Events.WINDOW_FOCUS, { windowId: this.windowId });
+                EventBus.executeCommand('window:focus', { windowId: this.windowId });
                 return { success: true };
             }
             return { success: false, error: 'Window not available' };
@@ -302,7 +330,7 @@ class Terminal extends AppBase {
         // Minimize the terminal window
         this.registerCommand('minimize', () => {
             if (this.windowId) {
-                EventBus.emit(Events.WINDOW_MINIMIZE, { windowId: this.windowId });
+                EventBus.executeCommand('window:minimize', { windowId: this.windowId });
                 return { success: true };
             }
             return { success: false, error: 'Window not available' };
@@ -311,7 +339,7 @@ class Terminal extends AppBase {
         // Maximize the terminal window
         this.registerCommand('maximize', () => {
             if (this.windowId) {
-                EventBus.emit(Events.WINDOW_MAXIMIZE, { windowId: this.windowId });
+                EventBus.executeCommand('window:maximize', { windowId: this.windowId });
                 return { success: true };
             }
             return { success: false, error: 'Window not available' };
@@ -324,7 +352,9 @@ class Terminal extends AppBase {
         });
 
         // Show a message in the terminal
-        this.registerCommand('showMessage', (message, type = 'info') => {
+        this.registerCommand('showMessage', (payload = {}) => {
+            const message = typeof payload === 'string' ? payload : payload.message;
+            const type = (typeof payload === 'object' && payload.type) || 'info';
             const colors = {
                 'info': '#c0c0c0',
                 'success': '#00ff00',
@@ -339,7 +369,9 @@ class Terminal extends AppBase {
         });
 
         // Create a file
-        this.registerCommand('createFile', (filePath, content = '') => {
+        this.registerCommand('createFile', (payload = {}) => {
+            const filePath = typeof payload === 'string' ? payload : (payload.filePath ?? payload.path);
+            const content = typeof payload === 'object' ? (payload.content ?? '') : '';
             try {
                 const resolvedPath = this.resolvePath(filePath);
                 const extension = filePath.split('.').pop() || 'txt';
@@ -664,20 +696,75 @@ class Terminal extends AppBase {
             { text: '', delay: 20 },
         ];
 
+        // The timeouts resolve elements through the ambient window context;
+        // capture this window's id and restore it inside every callback —
+        // otherwise opening a second terminal mid-boot makes the remaining
+        // lines print into the new window and attaches BOTH input handlers
+        // to it (double keystrokes there, dead input here).
+        const bootWindowId = this._currentWindowId;
         let totalDelay = 0;
         postLines.forEach((line, i) => {
             totalDelay += line.delay;
             setTimeout(() => {
-                this.print(line.text, line.color);
-                if (i === postLines.length - 1) {
-                    if (inputLine) inputLine.style.display = 'flex';
-                    input?.focus();
-                    this.attachInputHandler();
-                    // Emit sound event for boot complete
-                    EventBus.emit(Events.SOUND_PLAY, { sound: 'startup' });
+                if (!this.openWindows.has(bootWindowId)) return; // window closed mid-boot
+                const prevWindowId = this._currentWindowId;
+                this._currentWindowId = bootWindowId;
+                try {
+                    this.print(line.text, line.color);
+                    if (i === postLines.length - 1) {
+                        const bootInputLine = this.getElement('#inputLine');
+                        const bootInput = this.getElement('#terminalInput');
+                        if (bootInputLine) bootInputLine.style.display = 'flex';
+                        bootInput?.focus();
+                        this.attachInputHandler();
+                        // Emit sound event for boot complete
+                        EventBus.emit(Events.SOUND_PLAY, { type: 'startup' });
+                    }
+                } finally {
+                    this._currentWindowId = prevWindowId;
                 }
             }, totalDelay);
         });
+    }
+
+    /**
+     * setInterval wrapper that pins each tick to the window that started
+     * it. Terminal is multi-instance with an ambient window context —
+     * without pinning, focusing another terminal mid-`ping`/`defrag`/etc.
+     * made the tick read the OTHER window's activeProcess and strand this
+     * window with input blocked. Auto-clears once the window closes.
+     */
+    _windowInterval(callback, ms) {
+        const windowId = this._currentWindowId;
+        const id = setInterval(() => {
+            if (!this.openWindows.has(windowId)) {
+                clearInterval(id);
+                return;
+            }
+            const prev = this._currentWindowId;
+            this._currentWindowId = windowId;
+            try {
+                callback();
+            } finally {
+                this._currentWindowId = prev;
+            }
+        }, ms);
+        return id;
+    }
+
+    /** setTimeout twin of _windowInterval. No-ops if the window closed. */
+    _windowTimeout(callback, ms) {
+        const windowId = this._currentWindowId;
+        return setTimeout(() => {
+            if (!this.openWindows.has(windowId)) return;
+            const prev = this._currentWindowId;
+            this._currentWindowId = windowId;
+            try {
+                callback();
+            } finally {
+                this._currentWindowId = prev;
+            }
+        }, ms);
     }
 
     attachInputHandler() {
@@ -688,7 +775,7 @@ class Terminal extends AppBase {
         this.addHandler(input, 'keydown', (e) => {
             // Play subtle keyclick sound for printable keys
             if (e.key.length === 1 || e.key === 'Enter' || e.key === 'Backspace' || e.key === 'Tab') {
-                EventBus.emit(Events.SOUND_PLAY, { sound: 'click' });
+                EventBus.emit(Events.SOUND_PLAY, { type: 'click' });
             }
         });
 
@@ -729,10 +816,14 @@ class Terminal extends AppBase {
                 this.executeCommand(cmd);
             } else if (e.key === 'ArrowUp') {
                 e.preventDefault();
-                this.navigateHistory(-1, input);
+                // historyIndex 0 = most recent entry (resolved as
+                // history[length-1-index]), so walking BACK through history
+                // means incrementing. These were swapped — ArrowUp cleared
+                // the input and ArrowDown recalled.
+                this.navigateHistory(1, input);
             } else if (e.key === 'ArrowDown') {
                 e.preventDefault();
-                this.navigateHistory(1, input);
+                this.navigateHistory(-1, input);
             } else if (e.key === 'Tab') {
                 e.preventDefault();
                 this.tabComplete(input);
@@ -841,12 +932,20 @@ class Terminal extends AppBase {
     }
 
     scrollToBottom() {
-        if (this._scrollRafId) return; // Already scheduled
+        if (this._scrollRafId) return; // Already scheduled (for this window)
+        const windowId = this._currentWindowId;
         this._scrollRafId = requestAnimationFrame(() => {
-            this._scrollRafId = null;
-            const scroller = this.getElement('#terminalScroller');
-            if (scroller) {
-                scroller.scrollTop = scroller.scrollHeight;
+            if (!this.openWindows.has(windowId)) return;
+            const prev = this._currentWindowId;
+            this._currentWindowId = windowId;
+            try {
+                this._scrollRafId = null;
+                const scroller = this.getElement('#terminalScroller');
+                if (scroller) {
+                    scroller.scrollTop = scroller.scrollHeight;
+                }
+            } finally {
+                this._currentWindowId = prev;
             }
         });
     }
@@ -885,13 +984,24 @@ class Terminal extends AppBase {
 
         // Parse command and arguments (handle quoted strings)
         const parts = this.parseCommandLine(interpolated);
+        if (!parts.length) return; // quote-only / pipe-only input parses to nothing
         let cmd = parts[0].toLowerCase();
         const args = parts.slice(1);
 
-        // Resolve aliases
+        // Resolve aliases (with a depth guard — `alias dir=dir` or an a↔b
+        // alias cycle used to recurse until the stack blew)
         if (this.aliases[cmd]) {
-            const aliasCmd = this.aliases[cmd];
-            return this.executeCommand(aliasCmd + ' ' + args.join(' '));
+            this._aliasDepth = (this._aliasDepth || 0) + 1;
+            try {
+                if (this._aliasDepth > 16) {
+                    this.print(`Alias loop detected for '${cmd}'`, '#ff5555');
+                    return;
+                }
+                const aliasCmd = this.aliases[cmd];
+                return this.executeCommand(aliasCmd + ' ' + args.join(' '));
+            } finally {
+                this._aliasDepth--;
+            }
         }
 
         // Konami code easter egg
@@ -1898,7 +2008,7 @@ Command shell is resident in the high memory area.`;
         this.print(`\nChecking ${drive}...`);
 
         // Simulate disk check
-        setTimeout(() => {
+        this._windowTimeout(() => {
             const totalSize = this.getDriveSize(drive);
             const usedSize = FileSystemManager.getDirectorySize([drive]);
             const freeSize = totalSize - usedSize;
@@ -2012,7 +2122,7 @@ Ethernet adapter Local Area Connection:
         this.print(`\nPinging ${host} with 32 bytes of data:\n`);
 
         let count = 0;
-        const interval = setInterval(() => {
+        const interval = this._windowInterval(() => {
             if (count >= 4 || this.activeProcess !== 'ping') {
                 clearInterval(interval);
                 if (this.activeProcess === 'ping') {
@@ -2067,7 +2177,7 @@ Active Connections
         ];
 
         let hop = 0;
-        const interval = setInterval(() => {
+        const interval = this._windowInterval(() => {
             if (hop >= hops.length || this.activeProcess !== 'tracert') {
                 clearInterval(interval);
                 if (this.activeProcess === 'tracert') {
@@ -2113,7 +2223,7 @@ Active Connections
         const cols = Math.floor(canvas.width / 20);
         const drops = Array(cols).fill(1);
 
-        this.matrixInterval = setInterval(() => {
+        this.matrixInterval = this._windowInterval(() => {
             ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             ctx.fillStyle = '#0f0';
@@ -2297,7 +2407,7 @@ Special Thanks:
         let totalDelay = 0;
         steps.forEach((step, i) => {
             totalDelay += step.delay;
-            setTimeout(() => {
+            this._windowTimeout(() => {
                 if (this.activeProcess !== 'scanreg') return;
                 const color = step.text.includes('OK') ? '#00ff00' : '#c0c0c0';
                 this.print(step.text, color);
@@ -2322,7 +2432,7 @@ Special Thanks:
         this.print(`ScanDisk is now checking drive ${drive} for errors.\n`);
 
         let progress = 0;
-        const interval = setInterval(() => {
+        const interval = this._windowInterval(() => {
             if (this.activeProcess !== 'scandisk') {
                 clearInterval(interval);
                 return;
@@ -2404,7 +2514,7 @@ Special Thanks:
         let fragCount = blocks.filter(b => b === 'fragmented').length;
         const totalFrag = fragCount;
 
-        const interval = setInterval(() => {
+        const interval = this._windowInterval(() => {
             if (this.activeProcess !== 'defrag') {
                 clearInterval(interval);
                 return;
@@ -2543,7 +2653,7 @@ Special Thanks:
         ];
 
         let index = 0;
-        const scanInterval = setInterval(() => {
+        const scanInterval = this._windowInterval(() => {
             if (this.activeProcess !== 'sfc' || index >= files.length) {
                 clearInterval(scanInterval);
                 if (this.activeProcess === 'sfc') {
@@ -2750,7 +2860,7 @@ Press Esc to return to FDISK Options...
                 this.activeProcess = 'shutdown';
 
                 let remaining = seconds;
-                const countdownInterval = setInterval(() => {
+                const countdownInterval = this._windowInterval(() => {
                     remaining--;
                     if (remaining <= 0 || this.activeProcess !== 'shutdown') {
                         clearInterval(countdownInterval);
@@ -2884,14 +2994,17 @@ Press Esc to return to FDISK Options...
             return;
         }
 
-        // File/directory completion
+        // File/directory completion. String.lastIndexOf stringifies a regex
+        // argument instead of matching it, so the previous /[\\\/]/ version
+        // always returned -1 and path completion silently never worked.
         const lastPart = parts[parts.length - 1];
-        const dirPath = lastPart.includes('\\') || lastPart.includes('/')
-            ? this.resolvePath(lastPart.substring(0, lastPart.lastIndexOf(/[\\\/]/) + 1))
+        const sepIdx = Math.max(lastPart.lastIndexOf('\\'), lastPart.lastIndexOf('/'));
+        const dirPath = sepIdx >= 0
+            ? this.resolvePath(lastPart.substring(0, sepIdx + 1))
             : this.currentPath;
 
-        const searchTerm = lastPart.includes('\\') || lastPart.includes('/')
-            ? lastPart.substring(lastPart.lastIndexOf(/[\\\/]/) + 1)
+        const searchTerm = sepIdx >= 0
+            ? lastPart.substring(sepIdx + 1)
             : lastPart;
 
         try {
@@ -2965,6 +3078,10 @@ Press Esc to return to FDISK Options...
      */
     executeCommandSilent(cmdLine, callback) {
         const parts = this.parseCommandLine(cmdLine);
+        if (!parts.length) {
+            if (callback) callback('');
+            return;
+        }
         const cmd = parts[0].toLowerCase();
         const args = parts.slice(1);
 
@@ -3081,6 +3198,12 @@ Press Esc to return to FDISK Options...
 
         // Execute the command (without showing the prompt again)
         const parts = this.parseCommandLine(cmd);
+        if (!parts.length) {
+            // Blank/quote-only line — keep the batch going instead of
+            // letting a TypeError kill the whole chain.
+            this.executeBatchNext();
+            return;
+        }
         const cmdName = parts[0].toLowerCase();
         const args = parts.slice(1);
 
@@ -3095,7 +3218,7 @@ Press Esc to return to FDISK Options...
         }
 
         // Continue with next command
-        setTimeout(() => this.executeBatchNext(), 50);
+        this._windowTimeout(() => this.executeBatchNext(), 50);
     }
 
     /**
@@ -3678,20 +3801,33 @@ ECHO Batch script completed!
     }
 
     _mpSetupListeners() {
+        // Capture session + window at registration time. The handler fires
+        // at WS-message time under whatever window holds the ambient
+        // context, and the server message carries `channel` at the TOP
+        // level (`{ type:'event', event, channel, payload, senderName }`) —
+        // the old `msg.payload.channel` read was always undefined, so
+        // joined peers never saw any shared-session traffic.
+        const sessionId = this._mpSession;
+        const windowId = this._currentWindowId;
         const unsubEvent = MultiplayerClient.on('event', (msg) => {
-            const data = msg.payload || {};
-            if (data.channel !== this._mpSession) return;
-            if (data.data && data.data._self) return;
+            if (!msg || msg.channel !== sessionId) return;
+            if (!this.openWindows.has(windowId)) return;
 
-            const event = msg.event || data.event;
-            const payload = data.data || data;
+            const event = msg.event;
+            const payload = msg.payload || {};
             const senderName = msg.senderName || payload.senderName || 'Remote';
 
-            if (event === 'terminal:command') {
-                this.print(`[${senderName}] ${this.getPrompt()}${payload.command}`, '#55aaff');
-            }
-            if (event === 'terminal:output') {
-                this.print(`[${senderName}] ${payload.text}`, payload.color || '#55aaff');
+            const prevWindowId = this._currentWindowId;
+            this._currentWindowId = windowId;
+            try {
+                if (event === 'terminal:command') {
+                    this.print(`[${senderName}] ${this.getPrompt()}${payload.command}`, '#55aaff');
+                }
+                if (event === 'terminal:output') {
+                    this.print(`[${senderName}] ${payload.text}`, payload.color || '#55aaff');
+                }
+            } finally {
+                this._currentWindowId = prevWindowId;
             }
         });
         this._mpUnsubscribers.push(unsubEvent);

@@ -215,6 +215,13 @@ class Calculator extends AppBase {
     handleOperator(nextOperator) {
         const inputValue = parseFloat(this.displayValue);
 
+        // After "Error"/overflow the display isn't numeric; treating it as
+        // an operand propagated NaN through every later calculation.
+        if (!Number.isFinite(inputValue)) {
+            this.resetCalculator();
+            return;
+        }
+
         if (this.operator && this.waitingForSecondOperand) {
             this.operator = nextOperator;
             return;
@@ -242,6 +249,10 @@ class Calculator extends AppBase {
     handleEqual() {
         if (!this.operator || this.firstOperand === null) return;
         const inputValue = parseFloat(this.displayValue);
+        if (!Number.isFinite(inputValue)) {
+            this.resetCalculator();
+            return;
+        }
         const result = this.calculate(this.firstOperand, inputValue, this.operator);
 
         if (result === null) {

@@ -356,6 +356,12 @@ class InstantMessenger extends AppBase {
      * Listens for real-time direct messages from other users
      */
     _setupMultiplayerDM() {
+        // A previous handler may still be registered (re-signOn) — without
+        // releasing it first, every incoming DM rendered once per signOn.
+        if (this._mpDmUnsub) {
+            this._mpDmUnsub();
+            this._mpDmUnsub = null;
+        }
         // Listen for incoming DMs
         this._mpDmUnsub = MultiplayerClient.on('dm', (message) => {
             if (message.event !== 'message') return;
@@ -448,6 +454,13 @@ class InstantMessenger extends AppBase {
         this._botTimers.forEach(t => clearTimeout(t));
         this._botTimers = [];
         if (this._buddyActivityInterval) clearInterval(this._buddyActivityInterval);
+        // Release the multiplayer DM listener — leaving it registered after
+        // sign-off kept delivering (and double-rendering after re-signOn)
+        // DMs into a signed-off UI.
+        if (this._mpDmUnsub) {
+            this._mpDmUnsub();
+            this._mpDmUnsub = null;
+        }
 
         this.playSound('shutdown');
         this.emitAppEvent('signedOff', { username: this.username });
@@ -474,7 +487,7 @@ class InstantMessenger extends AppBase {
             totalOnline += onlineInGroup;
             totalBuddies += buddies.length;
 
-            html += `<div class="im-group-header">📁 ${group} (${onlineInGroup}/${buddies.length})</div>`;
+            html += `<div class="im-group-header">📁 ${escapeHtml(group)} (${onlineInGroup}/${buddies.length})</div>`;
 
             // Show online buddies first, then offline
             const sorted = [...buddies].sort((a, b) => {
@@ -509,17 +522,24 @@ class InstantMessenger extends AppBase {
         const countEl = this.getElement('#imOnlineCount');
         if (countEl) countEl.textContent = `${totalOnline} / ${totalBuddies} Buddies Online`;
 
-        // Attach double-click handlers to open conversations
-        this.getElements('.im-buddy').forEach(el => {
-            this.addHandler(el, 'dblclick', () => {
-                this.openConversation(el.dataset.buddy);
+        // Delegate buddy clicks through the list container, bound ONCE.
+        // renderBuddyList runs on every received IM and on a ~5s timer;
+        // per-row addHandler calls accumulated detached nodes in the
+        // AppBase handler map for the lifetime of the window.
+        if (!list.dataset.imHandlersBound) {
+            list.dataset.imHandlersBound = '1';
+            this.addHandler(list, 'dblclick', (e) => {
+                const el = e.target.closest('.im-buddy');
+                if (el) this.openConversation(el.dataset.buddy);
             });
-            this.addHandler(el, 'click', () => {
+            this.addHandler(list, 'click', (e) => {
+                const el = e.target.closest('.im-buddy');
+                if (!el) return;
                 // Single click just highlights
                 this.getElements('.im-buddy').forEach(b => b.classList.remove('active'));
                 el.classList.add('active');
             });
-        });
+        }
     }
 
     getAllBuddies() {
@@ -608,7 +628,7 @@ class InstantMessenger extends AppBase {
             return `
                 <div class="im-msg">
                     <span class="im-msg-name ${cls}">${escapeHtml(m.from)}</span>
-                    <span class="im-msg-time">(${m.time})</span>:
+                    <span class="im-msg-time">(${escapeHtml(m.time)})</span>:
                     <span>${escapeHtml(m.text)}</span>
                 </div>
             `;

@@ -165,12 +165,14 @@ class FreeCell extends AppBase {
 
     onClose() {
         if (this.timer) clearInterval(this.timer);
+        this._cancelVictoryTimers();
     }
 
     // --- Game Logic ---
 
     startNewGame() {
         if (this.timer) clearInterval(this.timer);
+        this._cancelVictoryTimers();
         this.resetState();
 
         // Hide win screen
@@ -702,11 +704,16 @@ class FreeCell extends AppBase {
 
     cascadeVictory() {
         const board = this.getElement('.freecell-board');
-        const cards = [];
+
+        // Track every staggered timer so close/new-game can cancel the
+        // rain instead of letting it keep appending to a detached (or
+        // freshly dealt) board for the next several seconds.
+        this._victoryTimers = this._victoryTimers || [];
 
         // Create falling cards
         for (let i = 0; i < 52; i++) {
-            setTimeout(() => {
+            this._victoryTimers.push(setTimeout(() => {
+                if (!board.isConnected) return;
                 const card = document.createElement('div');
                 card.className = 'fc-victory-card';
                 card.style.left = Math.random() * 100 + '%';
@@ -714,12 +721,16 @@ class FreeCell extends AppBase {
                 card.innerHTML = ['♠', '♥', '♣', '♦'][i % 4];
                 card.style.color = (i % 4 === 1 || i % 4 === 3) ? 'red' : 'black';
                 board.appendChild(card);
-                cards.push(card);
 
                 // Clean up
-                setTimeout(() => card.remove(), 4000);
-            }, i * 50);
+                this._victoryTimers.push(setTimeout(() => card.remove(), 4000));
+            }, i * 50));
         }
+    }
+
+    _cancelVictoryTimers() {
+        (this._victoryTimers || []).forEach(clearTimeout);
+        this._victoryTimers = [];
     }
 
     // --- Rendering ---

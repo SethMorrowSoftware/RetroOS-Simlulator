@@ -40,9 +40,10 @@ class RunDialog extends AppBase {
 
         this.registerCommand('setInput', (payload) => {
             if (!payload || payload.text === undefined) return { success: false, error: 'No text provided' };
-            const input = this.getElement('#run-input');
+            // The input's id is run-command; .run-input is only a CSS class.
+            const input = this.getElement('#run-command');
             if (input) input.value = payload.text;
-            return { success: true };
+            return { success: true, applied: !!input };
         });
     }
 
@@ -51,7 +52,7 @@ class RunDialog extends AppBase {
      */
     registerQueries() {
         this.registerQuery('getState', () => {
-            const input = this.getElement('#run-input');
+            const input = this.getElement('#run-command');
             return { currentInput: input ? input.value : '' };
         });
     }

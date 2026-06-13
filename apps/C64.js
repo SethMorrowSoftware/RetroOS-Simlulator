@@ -1096,6 +1096,12 @@ class C64 extends AppBase {
         this._showLoading(resolveLabel);
         this.setStatus(resolveLabel);
 
+        // _loadGeneration cancels stale resolves: if the user picks another
+        // title, hits Stop, or closes the window while the IA round-trips
+        // are in flight, this token goes stale and the late resolve must
+        // NOT boot over the newer state.
+        const generation = ++this._loadGeneration;
+
         try {
             // If the entry only has a search query, resolve it to a specific
             // item ID first. The search result is cached so re-launching
@@ -1103,9 +1109,11 @@ class C64 extends AppBase {
             let itemId = entry.iaItem;
             if (!itemId) {
                 itemId = await this._resolveIASearchToItemId(entry.iaSearch, displayName);
+                if (generation !== this._loadGeneration) return;
                 this._showLoading('Resolving "' + displayName + '" (' + itemId + ')…');
             }
             const url = await this._resolveIAItemToUrl(itemId);
+            if (generation !== this._loadGeneration || !this.getWindow()) return;
             // Push BEFORE the load — that way if the load itself fails the
             // user still has the recent button as a quick re-try.
             this._pushRecent(entry);
@@ -1485,6 +1493,14 @@ class C64 extends AppBase {
         await this.stopEmulator(/* keepSplash= */ false);
         this.playSound('floppy');
 
+        // Claim a launch token AFTER stopEmulator (which bumps the
+        // generation). Any newer launch / stop / window close invalidates
+        // it, aborting this boot instead of starting an emulator into a
+        // detached stage or over the user's newer choice.
+        const generation = ++this._loadGeneration;
+        const launchStale = () =>
+            generation !== this._loadGeneration || !this.getElement('#c64Stage');
+
         if (splash) splash.style.display = 'none';
         if (stage) stage.style.display = 'block';
         if (loading) loading.style.display = 'flex';
@@ -1492,6 +1508,7 @@ class C64 extends AppBase {
 
         try {
             await this.ensureLoaderPreloaded();
+            if (launchStale()) return;
 
             // Fresh root div per session. EmulatorJS attaches a lot of
             // internal state to its player target; re-using the same div
@@ -1505,6 +1522,7 @@ class C64 extends AppBase {
             // Let the browser compute layout so the container has
             // dimensions before EmulatorJS creates its canvas.
             await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+            if (launchStale()) return;
 
             this.currentRom = url;
             this.currentRomName = displayName;
@@ -1526,6 +1544,13 @@ class C64 extends AppBase {
                     this.setStatus(text);
                 });
                 this._prefetchBlobUrl = emulatorUrl; // tracked for revocation on stop
+                if (launchStale()) {
+                    // Don't leak the blob if this boot lost the race.
+                    if (emulatorUrl && emulatorUrl.startsWith('blob:')) URL.revokeObjectURL(emulatorUrl);
+                    this._prefetchBlobUrl = null;
+                    this.isRunning = false;
+                    return;
+                }
             }
 
             if (loadingText) loadingText.textContent = 'Booting C64…';
@@ -1705,6 +1730,10 @@ class C64 extends AppBase {
      * @param {boolean} [keepSplash=true] - If false, caller will swap content immediately.
      */
     async stopEmulator(keepSplash = true) {
+        // Invalidate any in-flight load/boot (see _startEmulatorWith /
+        // loadLibraryEntry — they check this token after every await).
+        this._loadGeneration++;
+
         const stage = this.getElement('#c64Stage');
         const splash = this.getElement('#c64Splash');
 
@@ -1962,18 +1991,23 @@ class C64 extends AppBase {
         // Plain shortcuts — ignore if any modifier is held to avoid
         // colliding with browser shortcuts.
         if (e.altKey || e.shiftKey) return;
+
+        // While the machine is running, the C64's primary input IS the
+        // keyboard (BASIC, text adventures) — plain-letter shortcuts would
+        // hijack typing: `RUN` hits R (reset = total state loss), `drop
+        // lamp` hits P (pause). Only Escape stays live mid-run, matching
+        // TRS80's deliberate behaviour.
+        if (this.isRunning) {
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                this.stopEmulator();
+            }
+            return;
+        }
+
         switch (e.key) {
-            case 'Escape':
-                if (this.isRunning) { e.preventDefault(); this.stopEmulator(); }
-                break;
-            case 'p': case 'P':
-                if (this.isRunning) { e.preventDefault(); this.togglePause(); }
-                break;
             case 'm': case 'M':
                 e.preventDefault(); this.toggleMute();
-                break;
-            case 'r': case 'R':
-                if (this.isRunning) { e.preventDefault(); this.resetCurrent(); }
                 break;
             case 'f': case 'F':
                 e.preventDefault(); this.toggleFullscreen();

@@ -206,8 +206,9 @@ class Asteroids extends AppBase {
             this.keyUp(e);
         });
 
+        // newGame() starts the loop itself — assigning a second interval
+        // here orphaned the first one (unclearable, game ran double-speed).
         this.newGame();
-        this.gameLoop = setInterval(() => this.update(), 1000 / this.FPS);
     }
 
     togglePause() {

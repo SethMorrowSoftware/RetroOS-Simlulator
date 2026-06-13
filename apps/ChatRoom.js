@@ -709,9 +709,12 @@ class ChatRoom extends AppBase {
         const list = this.getElement('#userList');
         if (!list) return;
 
+        // status feeds a class attribute and is script-settable — allow
+        // only known states.
+        const safeStatus = (s) => ['online', 'away', 'busy', 'idle', 'offline'].includes(s) ? s : 'online';
         list.innerHTML = this.users.map(u => `
             <div class="chatroom-user">
-                <span class="chatroom-user-status ${u.status}"></span>
+                <span class="chatroom-user-status ${safeStatus(u.status)}"></span>
                 <span style="color: ${sanitizeCssColor(u.color)};">${u.isUser ? `<b>${escapeHtml(u.name)}</b>` : escapeHtml(u.name)}</span>
             </div>
         `).join('');

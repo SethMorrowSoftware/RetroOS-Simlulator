@@ -267,7 +267,7 @@ class Minesweeper extends AppBase {
 
         gridEl.innerHTML = '';
         // 24px is the standard Win95 cell size
-        gridEl.style.gridTemplateColumns = `repeat(${this.cols}, 24px)`; 
+        gridEl.style.gridTemplateColumns = `repeat(${this.cols}, 24px)`;
 
         // Generate Grid
         for (let r = 0; r < this.rows; r++) {
@@ -275,7 +275,9 @@ class Minesweeper extends AppBase {
             for (let c = 0; c < this.cols; c++) {
                 const cellElement = document.createElement('div');
                 cellElement.className = 'mine-cell';
-                
+                cellElement.dataset.r = r;
+                cellElement.dataset.c = c;
+
                 const cell = {
                     r, c,
                     mine: false,
@@ -286,38 +288,61 @@ class Minesweeper extends AppBase {
                     element: cellElement
                 };
 
-                this.attachCellEvents(cellElement, r, c);
-                
                 this.grid[r][c] = cell;
                 gridEl.appendChild(cellElement);
             }
         }
+
+        this.attachGridEvents(gridEl);
     }
 
-    attachCellEvents(el, r, c) {
+    /**
+     * One delegated handler set on the grid container instead of three per
+     * cell. initGame() runs per game (face click, difficulty switch) and the
+     * per-cell addHandler calls retained every detached cell + closure in
+     * the AppBase handler map until the window closed — an Expert board
+     * leaked ~1,440 entries per game.
+     */
+    attachGridEvents(gridEl) {
+        if (gridEl.dataset.mineHandlersBound) return;
+        gridEl.dataset.mineHandlersBound = '1';
+
+        const cellAt = (target) => {
+            const el = target.closest('.mine-cell');
+            if (!el) return null;
+            const r = parseInt(el.dataset.r, 10);
+            const c = parseInt(el.dataset.c, 10);
+            return this.grid[r]?.[c] ? { r, c } : null;
+        };
+
         // Mouse Down (Face reaction)
-        this.addHandler(el, 'mousedown', (e) => {
-            if (this.gameOver || this.grid[r][c].revealed) return;
+        this.addHandler(gridEl, 'mousedown', (e) => {
+            const pos = cellAt(e.target);
+            if (!pos) return;
+            if (this.gameOver || this.grid[pos.r][pos.c].revealed) return;
             if (e.button === 0) this.updateFace('😮');
         });
 
         // Left Click (Reveal or Chord) — sound is fired here, not inside the
         // recursive reveal() so flood-fill doesn't spam dozens of clicks.
-        this.addHandler(el, 'click', () => {
-            if (this.gameOver) return;
-            if (this.grid[r][c].revealed) {
-                this.attemptChord(r, c);
+        this.addHandler(gridEl, 'click', (e) => {
+            const pos = cellAt(e.target);
+            if (!pos || this.gameOver) return;
+            if (this.grid[pos.r][pos.c].revealed) {
+                this.attemptChord(pos.r, pos.c);
                 this.playSound('click');
-            } else if (!this.grid[r][c].flagged) {
+            } else if (!this.grid[pos.r][pos.c].flagged) {
                 this.playSound('click');
-                this.reveal(r, c);
+                this.reveal(pos.r, pos.c);
             }
         });
 
         // Right Click (Flag)
-        this.addHandler(el, 'contextmenu', (e) => {
+        this.addHandler(gridEl, 'contextmenu', (e) => {
             e.preventDefault();
-            this.toggleFlag(r, c);
+            const pos = cellAt(e.target);
+            if (!pos) return;
+            this.toggleFlag(pos.r, pos.c);
         });
     }
 
@@ -531,7 +556,7 @@ class Minesweeper extends AppBase {
 
             this._showBanner({
                 title: 'YOU WIN!',
-                sub: `Time: ${this.time}s` + (this.bestTimes[this.difficulty] !== null
+                sub: `Time: ${this.time}s` + (this.bestTimes[this.difficulty] != null
                     ? `  · Best: ${this.bestTimes[this.difficulty]}s` : ''),
                 icon: '🏆',
                 record: isNewRecord

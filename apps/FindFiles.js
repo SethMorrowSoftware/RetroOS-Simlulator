@@ -313,6 +313,12 @@ class FindFiles extends AppBase {
         `;
     }
 
+    onClose() {
+        // Stop an in-flight search loop immediately — its awaited walk
+        // otherwise keeps scanning the filesystem after the window is gone.
+        this.isSearching = false;
+    }
+
     onMount() {
         // Find Now button
         this.addHandler(this.getElement('#btn-find-now'), 'click', () => this.startSearch());
@@ -375,11 +381,19 @@ class FindFiles extends AppBase {
             await this.searchDirectory(startPath, pattern, searchContent, includeSubfolders, caseSensitive);
         }
 
+        this.isSearching = false;
+
+        // The awaited walk yields to the event loop — the window may have
+        // closed mid-search. Touching the (now null) elements threw and
+        // the completion sound played into a dead window.
+        if (!this.getWindow()) return;
+
         // Display results
         this.displayResults();
-        this.isSearching = false;
-        this.getElement('#btn-find-now').disabled = false;
-        this.getElement('#btn-stop').disabled = true;
+        const findBtn = this.getElement('#btn-find-now');
+        const stopBtn = this.getElement('#btn-stop');
+        if (findBtn) findBtn.disabled = false;
+        if (stopBtn) stopBtn.disabled = true;
         this.playSound(this.searchResults.length > 0 ? 'notify' : 'error');
 
         // Emit search complete event

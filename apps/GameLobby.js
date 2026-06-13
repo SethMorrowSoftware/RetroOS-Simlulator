@@ -181,8 +181,12 @@ class GameLobby extends AppBase {
     }
 
     onMount() {
-        // Always listen for connection state changes so an offline lobby can heal itself.
-        this._connectListenerUnsub = MultiplayerClient.on('connected', () => {
+        // Always listen for connection state changes so an offline lobby can
+        // heal itself. The WS server announces connection as
+        // { type:'system', event:'connected' }, which MultiplayerClient
+        // consumes internally and re-emits on the EventBus as mp:connected —
+        // a raw 'connected' client listener never fires.
+        this._connectListenerUnsub = EventBus.on('mp:connected', () => {
             this._rerenderContent();
         });
 
@@ -324,7 +328,7 @@ class GameLobby extends AppBase {
                 <div class="gamelobby-session${selected}" data-idx="${i}">
                     <span class="gamelobby-col-game">${gameType?.icon || '🎮'} ${gameName}</span>
                     <span class="gamelobby-col-host gamelobby-session-host">${hostName}</span>
-                    <span class="gamelobby-col-players">${s.memberCount || 0}/${s.options?.maxPlayers || '?'}</span>
+                    <span class="gamelobby-col-players">${Number(s.memberCount) || 0}/${Number(s.options?.maxPlayers) || '?'}</span>
                     <span class="gamelobby-col-status gamelobby-session-status--${statusKey}">${statusText}</span>
                 </div>
             `;

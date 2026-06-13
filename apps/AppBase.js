@@ -453,12 +453,18 @@ class AppBase {
             this.windowId = null;
             this._currentWindowId = null;
 
-            // Clean up global event subscriptions registered outside any window context
-            this._globalEventUnsubscribers.forEach(unsub => unsub());
-            this._globalEventUnsubscribers = [];
+            // Do NOT release _globalEventUnsubscribers here. Those are
+            // constructor-time command/query registrations, and apps are
+            // constructed exactly once (AppRegistry.initialize) — tearing
+            // them down on last-window close permanently killed the
+            // command:<app>:* / query:<app>:* scripting API for the rest
+            // of the session (relaunching never re-registers them). They
+            // are app-lifetime, not window-lifetime; per-window listeners
+            // are already released via instanceData.eventUnsubscribers and
+            // SubscriptionManager.unsubscribeAll(windowId) above.
 
             // Release any subscriptions tracked against the app ID itself
-            // (e.g. constructor-time registrations).
+            // (registered under SubscriptionManager.runAs(appId), if any).
             SubscriptionManager.unsubscribeAll(this.id);
         } else {
             // Set windowId to another open window
